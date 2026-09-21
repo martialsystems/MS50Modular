@@ -1,0 +1,55 @@
+# Build trees
+/build/
+/Builds/
+/cmake-build-*/
+/out/
+
+# JUCE fetch and generated
+/_deps/
+/JUCE/
+**/JuceLibraryCode/
+
+# IDE and OS
+.DS_Store
+.idea/
+.vs/
+.vscode/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+CMakeUserPresets.json
+
+# Plugin binaries if a local copy lands in the tree
+*.vst3
+*.component
+*.aaxplugin
+*.appex
+
+# Secrets
+.env
+.env.*
+*.pem
+*.key
+credentials.*
+
+# DAW projects and bounces. A/B notes stay out of git.
+*.logicx
+*.als
+*.ptx
+*.cpr
+*.band
+*.flp
+/bounces/
+/samples/
+/recordings/
+*.wav
+*.aif
+*.aiff
+*.mp3
+*.flac
+*.ogg
+
+# Do not commit Korg scans, even if someone drops them in while studying.
+/reference-scans/
+*.djvu
