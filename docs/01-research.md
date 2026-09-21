@@ -1,3 +1,7 @@
+Copyright (c) 2026 Martial Systems LLC. All rights reserved.
+
+Korg owns the MS-50, its name, and its circuit designs. This repository is an independent study of published drawings and papers. It is not a Korg product, it is not endorsed by Korg, and it does not license those designs.
+
 # Research summary (functional evidence)
 
 Date: 2026-09-21.

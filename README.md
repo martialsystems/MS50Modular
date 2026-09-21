@@ -1,3 +1,7 @@
+Copyright (c) 2026 Martial Systems LLC. All rights reserved.
+
+Korg owns the MS-50, its name, and its circuit designs. This repository is an independent study of published drawings and papers. It is not a Korg product, it is not endorsed by Korg, and it does not license those designs.
+
 # MS-50 Modular
 
 Personal white-box FX plugin modeled on the module set of the Korg MS-50 (1978). Stereo audio enters, a fixed rack of mono modules processes a patched signal, and stereo audio leaves. Cables are visible and animated. The instrument is the patch.
@@ -76,7 +80,7 @@ Synth-like check, not the default: unplug Ext In `Mono` from the VCF, patch VCO 
 MS50Modular/
   README.md                 front door
   METHODOLOGY.md            evidence rules, stand-ins, done definition
-  LICENSE                   personal, all rights reserved
+  LICENSE                   copyright, and the Korg notice
   .gitignore
   scripts/init-repo.sh      first commit helper
   scripts/build_design_pdf.py
@@ -100,7 +104,7 @@ The design-pack commit is documents, license, gitignore, and scripts. `CMakeList
 Design pack only (this commit):
 
 ```bash
-git clone <private-url> MS50Modular
+git clone https://github.com/martialsystems/MS50Modular.git
 cd MS50Modular
 python3 scripts/build_design_pdf.py
 ```
@@ -135,4 +139,4 @@ Read these three files before editing code: `docs/01-research.md`, `docs/METHODO
 
 ## License note
 
-See `LICENSE`. Korg owns the original drawings and the MS-50 design. This repo owns only the notes and the code written here.
+See `LICENSE`. Martial Systems LLC holds the copyright in these notes and in code written here. Korg holds the MS-50 name and the circuit designs. Nothing in this repository licenses that instrument.

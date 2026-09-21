@@ -1,9 +1,7 @@
-Personal design packet and code.
+Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
-Copyright (c) 2026. All rights reserved.
+Korg owns the MS-50, its name, and its circuit designs. This repository is an independent study of published drawings and papers. It is not a Korg product, it is not endorsed by Korg, and it does not license those designs.
 
-You may keep a private copy and modify it for your own use. You may not publish a release, a sample library, or a claim that this is a Korg product.
+You may read this public repository. You may not present these notes or any later code as an official Korg instrument, and you may not add Korg schematic scans or redrawn copies of those drawings. Facts cited here stay attributed to the sources in docs/01-research.md.
 
-The Korg MS-50, the MS-50 drawings, and the Korg name are not licensed by this file. Do not commit scans or redrawn copies of those drawings. Facts used here are cited in docs/01-research.md.
-
-No warranty. This is a study instrument, not a measurement of a particular unit.
+The notes and code written in this repository are not granted for relicensing. No warranty. This is a study instrument, not a measurement of a particular unit.

@@ -34,4 +34,4 @@ Research summary, software schematic, build steps 0-20, and test plan
 for a white-box VST3 FX rack. No plugin code in this commit.
 EOF
 )"
-echo "Committed on main. Add a private remote when you are ready. See docs/REPO_SETUP.md."
+echo "Committed on main. To publish: gh repo create MS50Modular --public --source=. --remote=origin --push"

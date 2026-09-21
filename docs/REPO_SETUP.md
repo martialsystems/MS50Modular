@@ -1,8 +1,12 @@
+Copyright (c) 2026 Martial Systems LLC. All rights reserved.
+
+Korg owns the MS-50, its name, and its circuit designs. This repository is an independent study of published drawings and papers. It is not a Korg product, it is not endorsed by Korg, and it does not license those designs.
+
 # Repo setup
 
 Date: 2026-09-21.
 
-Private repository. The design-pack commit contains documents and scripts. It does not contain a plugin binary, a JUCE checkout, or a scan of the Korg drawings.
+Public repository. The design-pack commits contain documents and scripts. They do not contain a plugin binary, a JUCE checkout, or a scan of the Korg drawings. Read `LICENSE` before you mirror this tree.
 
 ## Layout
 
@@ -103,29 +107,27 @@ Merge `feat/step-XX` only after that step's acceptance test is green. Do not ope
 
 GitHub: Settings, Branches, branch protection on `main`, require a pull request. GitLab: Protected branches, `main`, no direct push.
 
-## Private remote
+## Public remote
 
-GitHub, after `gh auth login`:
+The GitHub account `martialsystems` is already logged in on the machine that published this tree. Create or update the public repo with:
 
 ```bash
-gh repo create MS50Modular --private --source=. --remote=origin --push
+gh repo create MS50Modular --public --source=. --remote=origin --push
 ```
 
-GitLab:
+GitLab, if you use that host instead:
 
 ```bash
-glab repo create MS50Modular --private --source=.
+glab repo create MS50Modular --public --source=.
 git push -u origin main
 ```
 
-If neither CLI is logged in, create an empty private repo in the website UI and:
+If neither CLI is logged in, create an empty public repo in the website UI and:
 
 ```bash
-git remote add origin git@github.com:YOURUSER/MS50Modular.git
+git remote add origin git@github.com:martialsystems/MS50Modular.git
 git push -u origin main
 ```
-
-Do not use `--public`.
 
 ## Never commit
 
@@ -136,12 +138,10 @@ Do not use `--public`.
 *   The JUCE tree, `build/`, and plugin binaries.
 *   A listening recording made while following `TESTPLAN.md`. Commit the short note in `docs/listening/`, not the audio.
 
-## How to put this on a private host
+## How this repo was published
 
-1. Read `LICENSE` and confirm you are willing to keep the repo private.
-2. Run `scripts/init-repo.sh` from the project root.
-3. Create the private remote with the command above. Do not flip the visibility toggle.
-4. Turn on branch protection for `main`.
-5. Clone the private URL on the machine that will build step 1.
-6. Build the PDF once (`python3 scripts/build_design_pdf.py`) and confirm the cover date is 2026-09-21 or later if you revised it.
-7. Start `feat/step-01` only after that. Step 0 is this commit.
+1. `LICENSE` is the first legal text: Martial Systems LLC copyright, then the Korg notice.
+2. The same two sentences sit at the top of every markdown file and in the running head of every PDF page.
+3. `gh repo create MS50Modular --public --source=. --remote=origin --push` published `main`.
+4. Branch protection on `main` is still worth turning on in the GitHub settings.
+5. Later steps use `feat/step-XX`. Step 1 is the first code step.

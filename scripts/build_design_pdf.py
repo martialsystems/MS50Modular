@@ -271,29 +271,45 @@ def markdown_to_flow(text: str, st, skip_first_h1: bool = False) -> list:
 
 def draw_page(canvas, doc):
     canvas.saveState()
-    canvas.setFont("Times-Roman", 8)
+    width, height = letter
+    canvas.setFillColor(colors.HexColor("#1a1a1a"))
+    canvas.setFont("Times-Bold", 8)
+    canvas.drawString(
+        0.85 * inch,
+        height - 0.42 * inch,
+        "Copyright (c) 2026 Martial Systems LLC. All rights reserved.",
+    )
+    canvas.setFont("Times-Roman", 7.5)
+    canvas.drawString(
+        0.85 * inch,
+        height - 0.56 * inch,
+        "Korg owns the MS-50 name and its circuit designs. Independent study. Not a Korg product. Not a license of those designs.",
+    )
+    canvas.setStrokeColor(colors.HexColor("#1a1a1a"))
+    canvas.line(0.85 * inch, height - 0.68 * inch, width - 0.85 * inch, height - 0.68 * inch)
     canvas.setFillColor(colors.HexColor("#444444"))
-    canvas.drawString(0.85 * inch, 0.5 * inch, "MS-50 Modular design pack  |  2026-09-21")
-    canvas.drawRightString(7.65 * inch, 0.5 * inch, f"{doc.page}")
+    canvas.setFont("Times-Roman", 8)
+    canvas.drawString(0.85 * inch, 0.48 * inch, "MS-50 Modular design pack  |  2026-09-21")
+    canvas.drawRightString(width - 0.85 * inch, 0.48 * inch, f"{doc.page}")
     canvas.setStrokeColor(colors.HexColor("#c8c2b4"))
-    canvas.line(0.85 * inch, 0.68 * inch, 7.65 * inch, 0.68 * inch)
+    canvas.line(0.85 * inch, 0.64 * inch, width - 0.85 * inch, 0.64 * inch)
     canvas.restoreState()
 
 
 def build():
     st = styles()
     story = []
-    story.append(Spacer(1, 1.1 * inch))
+    story.append(Spacer(1, 0.15 * inch))
     story.append(Paragraph("MS-50 Modular", st["cover_title"]))
     story.append(Paragraph("Design pack for a white-box modular FX VST", st["cover_sub"]))
-    story.append(Paragraph("Personal study instrument. Not a Korg product.", st["cover_sub"]))
+    story.append(Paragraph("Public study notes. Not a Korg product.", st["cover_sub"]))
     story.append(Spacer(1, 0.2 * inch))
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#1a1a1a")))
     story.append(Spacer(1, 0.15 * inch))
     story.append(Paragraph("Document date: 2026-09-21", st["body"]))
     story.append(Paragraph(
         "Stack specified here: C++20, JUCE 8, CMake, VST3 effect, stereo in and stereo out, "
-        "mono module graph, private git repository.",
+        "mono module graph, public git repository.",
         st["body"],
     ))
     story.append(Spacer(1, 0.15 * inch))
@@ -301,6 +317,11 @@ def build():
     story.append(Paragraph(
         "2026-09-21: first compiled pack. Cover, methodology, research summary, software "
         "schematic, build guide, test plan, and bibliography.",
+        st["body"],
+    ))
+    story.append(Paragraph(
+        "2026-09-21: copyright and the Korg notice placed at the top of every page. "
+        "The repository is public.",
         st["body"],
     ))
     story.append(Paragraph(
@@ -328,10 +349,10 @@ def build():
         pagesize=letter,
         leftMargin=0.85 * inch,
         rightMargin=0.85 * inch,
-        topMargin=0.75 * inch,
+        topMargin=0.92 * inch,
         bottomMargin=0.8 * inch,
         title="MS-50 Modular design pack",
-        author="Personal design pack",
+        author="Martial Systems LLC",
     )
     doc.build(story, onFirstPage=draw_page, onLaterPages=draw_page)
     print(OUT)
