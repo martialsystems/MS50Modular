@@ -281,7 +281,7 @@ Rollback: `getStateInformation` writes an empty block and `setState` no-ops. Doc
 
 Files: `PatchGraph` sort and delay. Update the UI string from step 6.
 
-Acceptance: `testFeedbackIsOneSample` builds a one-module cycle through a test gain of 1 (input + output cable loop). The delayed edge is the newest cable. A impulse returns on the next sample, not the same sample. `testNoAllocInProcess` still passes. Two legal feedback cables in one cycle: only the newest is delayed. An older cycle-free patch (the default eight cables) has zero delayed cables.
+Acceptance: `testFeedbackIsOneSample` builds a one-module cycle through a test gain of 1 (input + output cable loop). The delayed edge is the newest cable. An impulse returns on the next sample, not the same sample. `testNoAllocInProcess` still passes. Two legal feedback cables in one cycle: only the newest is delayed. An older cycle-free patch (the default eight cables) has zero delayed cables.
 
 Do not touch: module formulas. Do not delay every cable "to be safe."
 
