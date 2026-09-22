@@ -276,17 +276,22 @@ def draw_page(canvas, doc):
     canvas.setFont("Times-Bold", 8)
     canvas.drawString(
         0.85 * inch,
-        height - 0.42 * inch,
+        height - 0.40 * inch,
         "Copyright (c) 2026 Martial Systems LLC. All rights reserved.",
     )
     canvas.setFont("Times-Roman", 7.5)
     canvas.drawString(
         0.85 * inch,
-        height - 0.56 * inch,
-        "Korg owns the MS-50 name and its circuit designs. Independent study. Not a Korg product. Not a license of those designs.",
+        height - 0.55 * inch,
+        "The Korg MS-50, its name, and its circuit designs are the property of Korg Inc.",
+    )
+    canvas.drawString(
+        0.85 * inch,
+        height - 0.68 * inch,
+        "This independent study is not produced or endorsed by Korg, and it grants no license to those designs.",
     )
     canvas.setStrokeColor(colors.HexColor("#1a1a1a"))
-    canvas.line(0.85 * inch, height - 0.68 * inch, width - 0.85 * inch, height - 0.68 * inch)
+    canvas.line(0.85 * inch, height - 0.80 * inch, width - 0.85 * inch, height - 0.80 * inch)
     canvas.setFillColor(colors.HexColor("#444444"))
     canvas.setFont("Times-Roman", 8)
     canvas.drawString(0.85 * inch, 0.48 * inch, "MS-50 Modular design pack  |  2026-09-21")
@@ -302,7 +307,15 @@ def build():
     story.append(Spacer(1, 0.15 * inch))
     story.append(Paragraph("MS-50 Modular", st["cover_title"]))
     story.append(Paragraph("Design pack for a white-box modular FX VST", st["cover_sub"]))
-    story.append(Paragraph("Public study notes. Not a Korg product.", st["cover_sub"]))
+    story.append(Paragraph(
+        "The Korg MS-50, the MS-50 name, and the circuit designs of that instrument are the property of Korg Inc. "
+        "Martial Systems LLC claims copyright only in the original text of this repository and in any code later written here. "
+        "The work is an independent study of published schematics and of the literature cited in the research summary. "
+        "Korg has not produced, sponsored, or endorsed it. "
+        "No license is granted to the MS-50 design, to the Korg drawings, or to the Korg trademarks. "
+        "The instrument's name is used only to identify the subject of the study.",
+        st["body"],
+    ))
     story.append(Spacer(1, 0.2 * inch))
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#1a1a1a")))
     story.append(Spacer(1, 0.15 * inch))
@@ -322,6 +335,11 @@ def build():
     story.append(Paragraph(
         "2026-09-21: copyright and the Korg notice placed at the top of every page. "
         "The repository is public.",
+        st["body"],
+    ))
+    story.append(Paragraph(
+        "2026-09-21: rights statement set out in full. Korg Inc. is named as owner of the MS-50, "
+        "its name, and its circuit designs. Martial Systems LLC claims copyright only in the original text and code of this repository.",
         st["body"],
     ))
     story.append(Paragraph(
@@ -349,7 +367,7 @@ def build():
         pagesize=letter,
         leftMargin=0.85 * inch,
         rightMargin=0.85 * inch,
-        topMargin=0.92 * inch,
+        topMargin=1.05 * inch,
         bottomMargin=0.8 * inch,
         title="MS-50 Modular design pack",
         author="Martial Systems LLC",
