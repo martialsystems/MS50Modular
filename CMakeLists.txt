@@ -37,3 +37,17 @@ target_link_libraries(MS50Modular PRIVATE
   juce::juce_audio_utils
   juce::juce_recommended_config_flags
   juce::juce_recommended_warning_flags)
+
+add_executable(MS50ModularTests
+  Source/Tests/GraphTests.cpp
+  Source/Modular/Module.cpp
+  Source/Modular/PatchGraph.cpp)
+
+target_include_directories(MS50ModularTests PRIVATE Source)
+
+target_compile_features(MS50ModularTests PRIVATE cxx_std_20)
+
+target_compile_definitions(MS50ModularTests PRIVATE
+  MS50_PATCH_GRAPH_SOURCE="${CMAKE_SOURCE_DIR}/Source/Modular/PatchGraph.cpp")
+
+target_compile_options(MS50ModularTests PRIVATE -Wall -Wextra -Wpedantic)
