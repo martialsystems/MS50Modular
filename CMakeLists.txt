@@ -26,7 +26,13 @@ juce_add_plugin(MS50Modular
 
 target_sources(MS50Modular PRIVATE
   Source/PluginProcessor.cpp
-  Source/PluginEditor.cpp)
+  Source/PluginEditor.cpp
+  Source/Modular/Module.cpp
+  Source/Modular/PatchGraph.cpp
+  Source/Modular/ExtIn.cpp
+  Source/Modular/OutputModule.cpp)
+
+target_include_directories(MS50Modular PRIVATE Source)
 
 target_compile_definitions(MS50Modular PUBLIC
   JUCE_WEB_BROWSER=0
@@ -40,8 +46,11 @@ target_link_libraries(MS50Modular PRIVATE
 
 add_executable(MS50ModularTests
   Source/Tests/GraphTests.cpp
+  Source/Tests/Step3Tests.cpp
   Source/Modular/Module.cpp
-  Source/Modular/PatchGraph.cpp)
+  Source/Modular/PatchGraph.cpp
+  Source/Modular/ExtIn.cpp
+  Source/Modular/OutputModule.cpp)
 
 target_include_directories(MS50ModularTests PRIVATE Source)
 

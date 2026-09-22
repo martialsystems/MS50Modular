@@ -8,12 +8,20 @@ MS50ModularAudioProcessor::MS50ModularAudioProcessor()
                           .withInput ("Input", juce::AudioChannelSet::stereo(), true)
                           .withOutput ("Output", juce::AudioChannelSet::stereo(), true))
 {
+    const int extIndex = graph.addModule (extIn);
+    const int outIndex = graph.addModule (output);
+    graph.connect (extIndex, 0, outIndex, 0);
+    graph.connect (extIndex, 1, outIndex, 1);
 }
 
 MS50ModularAudioProcessor::~MS50ModularAudioProcessor() = default;
 
-void MS50ModularAudioProcessor::prepareToPlay (double, int)
+void MS50ModularAudioProcessor::prepareToPlay (double sampleRate, int)
 {
+    graph.prepare (sampleRate);
+    extIn.prepare (sampleRate);
+    output.prepare (sampleRate);
+    setLatencySamples (0);
 }
 
 void MS50ModularAudioProcessor::releaseResources()
@@ -37,21 +45,23 @@ void MS50ModularAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, 
     const int numInputs = getTotalNumInputChannels();
     const int numOutputs = getTotalNumOutputChannels();
 
-    for (int channel = 0; channel < numOutputs; ++channel)
-    {
-        if (channel < numInputs)
-        {
-            const float* input = buffer.getReadPointer (channel);
-            float* output = buffer.getWritePointer (channel);
+    for (int channel = numInputs; channel < numOutputs; ++channel)
+        buffer.clear (channel, 0, numSamples);
 
-            // VST3 presents one buffer. A self-copy would be an overlapping memcpy.
-            if (output != input)
-                juce::FloatVectorOperations::copy (output, input, numSamples);
-        }
-        else
-        {
-            buffer.clear (channel, 0, numSamples);
-        }
+    if (numInputs < 2 || numOutputs < 2)
+        return;
+
+    float* left = buffer.getWritePointer (0);
+    float* right = buffer.getWritePointer (1);
+
+    for (int i = 0; i < numSamples; ++i)
+    {
+        const float inLeft = left[i];
+        const float inRight = right[i];
+        extIn.setHostSample (inLeft, inRight);
+        graph.process();
+        left[i] = output.hostLeft();
+        right[i] = output.hostRight();
     }
 }
 

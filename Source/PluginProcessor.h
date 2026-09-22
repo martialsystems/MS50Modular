@@ -2,6 +2,10 @@
 
 #pragma once
 
+#include "Modular/ExtIn.h"
+#include "Modular/OutputModule.h"
+#include "Modular/PatchGraph.h"
+
 #include <juce_audio_processors/juce_audio_processors.h>
 
 class MS50ModularAudioProcessor : public juce::AudioProcessor
@@ -37,5 +41,9 @@ public:
     void setStateInformation (const void* data, int sizeInBytes) override;
 
 private:
+    PatchGraph graph;
+    ExtIn extIn;
+    OutputModule output;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MS50ModularAudioProcessor)
 };

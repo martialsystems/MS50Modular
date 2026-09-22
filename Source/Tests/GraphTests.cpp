@@ -304,6 +304,12 @@ int testDisconnectMissingIsNoop()
 
 }
 
+int testDryMixPassesStereo();
+int testExtInMonoAveragesStereo();
+int testWetMixIgnoresDry();
+int testLevelZeroIsSilence();
+int testLeftOnlyStaysLeft();
+
 int main()
 {
     int failed = 0;
@@ -313,5 +319,10 @@ int main()
     failed += testRejectCycle();
     failed += testSnapshotSwapDoesNotAllocate();
     failed += testDisconnectMissingIsNoop();
+    failed += testDryMixPassesStereo();
+    failed += testExtInMonoAveragesStereo();
+    failed += testWetMixIgnoresDry();
+    failed += testLevelZeroIsSilence();
+    failed += testLeftOnlyStaysLeft();
     return failed == 0 ? 0 : 1;
 }
