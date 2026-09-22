@@ -131,16 +131,32 @@ RC4200 four-quadrant multiplier. `A IN`, `B IN`, `OUT`. DC-coupled. Null trims V
 | Dr. Kunz, MS-50 Textures (YouTube `_iJJYsWUYd0`) | Ring used as a VCA. Effects are on the file. Not a timbre reference |
 | Perfect Circuit MS-20 and MS-50 jam (YouTube `UXW39LO-bxY`) | Not isolated |
 
-## Bibliography
+## References
 
-*   Korg MS-50 schematics, drawings 78-11-8 and 78-11-9. https://z3sound.com/manuals/Korg/Korg%20MS-50%20Schematics.pdf
-*   Archive.org image set: https://archive.org/details/synthmanual-korg-ms-50-schematics
-*   Archive.org file titled service manual, same kind of image set: https://archive.org/download/korg_service_manuals/KORG_ALL_SM/Korg_MS-50_Service_Manual.pdf
-*   Synthfool index of other MS-series files: https://synthfool.com/docs/Korg/MS_series
-*   Maximilian Rest, Julian D. Parker, Kurt James Werner, "WDF Modeling of a Korg MS-50 Based Non-Linear Diode Bridge VCF," DAFx-17, Edinburgh, 5 to 9 September 2017. https://www.dafx.de/paper-archive/2017/papers/DAFx17_paper_88.pdf
-*   Yasuji Nagahama, US 4,039,980, "Voltage-controlled filter," issued 2 August 1977. https://patents.google.com/patent/US4039980A/en
-*   Tim Stinchcombe, "A study of the Korg MS10 & MS20 filters" (2006). Contrast only. http://www.timstinchcombe.co.uk/synth/MS20_study.pdf
-*   Alex Ball, KORG MS Series panel notes. https://www.alexballmusic.com/korg-ms-series
-*   Korg MS-20 owner's manual, Archive.org JL11275. https://archive.org/details/JL11275
-*   Sequencer.de MS50 page. Useful as an example of the "two ADSRs" error. https://www.sequencer.de/syns/korg/MS50.html
-*   AMSynths AM8319. A later Eurorack reading that adds a highpass the MS-50 VCF sheet does not show. https://modulargrid.net/e/amsynths-am8319
+AMSynths. (n.d.). *AM8319* [Eurorack module listing]. ModularGrid. Retrieved September 21, 2026, from https://modulargrid.net/e/amsynths-am8319
+
+Note: The listing adds a highpass that the MS-50 VCF sheet does not show.
+
+Ball, A. (n.d.). *Korg MS series*. Retrieved September 21, 2026, from https://www.alexballmusic.com/korg-ms-series
+
+Korg. (n.d.). *MS-20 owner's manual*. Internet Archive. https://archive.org/details/JL11275
+
+Korg. (1978a). *MS-50 schematics* [Drawings dated 1978-11-8 and 1978-11-9]. https://z3sound.com/manuals/Korg/Korg%20MS-50%20Schematics.pdf
+
+Korg. (1978b). *MS-50 schematics* [Image set]. Internet Archive. https://archive.org/details/synthmanual-korg-ms-50-schematics
+
+Korg. (1978c). *MS-50 service manual* [Schematic image set]. Internet Archive. https://archive.org/download/korg_service_manuals/KORG_ALL_SM/Korg_MS-50_Service_Manual.pdf
+
+Nagahama, Y. (1977). Voltage-controlled filter (U.S. Patent No. 4,039,980). U.S. Patent and Trademark Office. https://patents.google.com/patent/US4039980A/en
+
+Rest, M., Parker, J. D., & Werner, K. J. (2017, September 5 to 9). WDF modeling of a Korg MS-50 based non-linear diode bridge VCF. *Proceedings of the 20th International Conference on Digital Audio Effects*, Edinburgh, United Kingdom. https://www.dafx.de/paper-archive/2017/papers/DAFx17_paper_88.pdf
+
+Sequencer.de. (n.d.). *Korg MS50*. Retrieved September 21, 2026, from https://www.sequencer.de/syns/korg/MS50.html
+
+Note: The page is included because it states two ADSRs.
+
+Stinchcombe, T. (2006). *A study of the Korg MS10 & MS20 filters*. http://www.timstinchcombe.co.uk/synth/MS20_study.pdf
+
+Note: MS-20 filter contrast only.
+
+Synthfool. (n.d.). *Korg MS series document index*. Retrieved September 21, 2026, from https://synthfool.com/docs/Korg/MS_series

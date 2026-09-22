@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Compile the design-pack PDF from the markdown sources.
 
-Reading order is fixed. The bibliography is the last part of 01-research.md.
+The printed pack uses APA page form: Times 12 point, double spaced, left
+aligned, 1 inch margins, APA heading levels, and a reference list with a
+hanging indent. The reference list is the last part of 01-research.md.
 
-Page geometry is one set of constants. The header rule, the body column, and
-the footer rule share the same left and right edges. Each markdown heading
-starts a page. A heading that is already at the top of a page does not insert
-a blank page.
+The copyright notice and the pack line share one footer. There is no running
+header. Body text flows. A heading stays with the line under it. A table or a
+code listing moves to the next page only when that whole block fits on one
+page and does not fit in the space left.
 """
 
 from __future__ import annotations
@@ -16,14 +18,14 @@ import re
 from pathlib import Path
 
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_JUSTIFY, TA_LEFT
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.platypus import (
     BaseDocTemplate,
     Frame,
-    HRFlowable,
+    PageBreak,
     PageTemplate,
     Paragraph,
     Preformatted,
@@ -31,154 +33,233 @@ from reportlab.platypus import (
     Table,
     TableStyle,
 )
-from reportlab.platypus.flowables import PageBreakIfNotEmpty
+from reportlab.platypus.flowables import KeepTogether, PageBreakIfNotEmpty
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
 OUT = DOCS / "MS50_Modular_Design_Pack.pdf"
 
 CHAPTERS = [
-    ("Methodology", ROOT / "METHODOLOGY.md"),
-    ("Research summary", DOCS / "01-research.md"),
-    ("Software schematics", DOCS / "SCHEMATICS.md"),
-    ("Build guide", DOCS / "BUILD_GUIDE.md"),
-    ("Test plan", DOCS / "TESTPLAN.md"),
+    ROOT / "METHODOLOGY.md",
+    DOCS / "01-research.md",
+    DOCS / "SCHEMATICS.md",
+    DOCS / "BUILD_GUIDE.md",
+    DOCS / "TESTPLAN.md",
 ]
 
 PAGE_W, PAGE_H = letter
-LEFT = 0.75 * inch
-RIGHT = 0.75 * inch
-# Distances from the top of the page.
-HEADER_LINE_1 = 0.40 * inch
-HEADER_LINE_2 = 0.54 * inch
-HEADER_LINE_3 = 0.68 * inch
-HEADER_RULE = 0.84 * inch
-CONTENT_TOP = 1.04 * inch
-# Distances from the bottom of the page.
-FOOTER_RULE = 0.58 * inch
-FOOTER_BASELINE = 0.36 * inch
-CONTENT_BOTTOM = FOOTER_RULE + 0.20 * inch
+LEFT = 1.0 * inch
+RIGHT = 1.0 * inch
+TOP = 1.0 * inch
+# Footer, from the bottom: pack line, two Korg lines, copyright, then the rule.
+FOOTER_BASE = 0.42 * inch
+FOOTER_STEP = 11
+FOOTER_RULE = FOOTER_BASE + 48
+CONTENT_BOTTOM = FOOTER_RULE + 14
 FRAME_WIDTH = PAGE_W - LEFT - RIGHT
-FRAME_HEIGHT = PAGE_H - CONTENT_TOP - CONTENT_BOTTOM
-# Courier at 7.5 pt is 4.5 pt wide. Leave the code indent inside the column.
-CODE_COLS = int((FRAME_WIDTH - 12) / 4.5)
+FRAME_HEIGHT = PAGE_H - TOP - CONTENT_BOTTOM
+# Courier 9 pt is 5.4 pt wide.
+CODE_COLS = int((FRAME_WIDTH - 8) / 5.4)
 
-INK = colors.HexColor("#1a1a1a")
-RULE = colors.HexColor("#1a1a1a")
-FOOTER_INK = colors.HexColor("#333333")
+INK = colors.black
+BODY = 12
+LEADING = 24
 
 
 def styles():
     serif = "Times-Roman"
     serif_b = "Times-Bold"
-    mono = "Courier"
+    serif_bi = "Times-BoldItalic"
     return {
         "h1": ParagraphStyle(
             "H1",
             fontName=serif_b,
-            fontSize=16,
-            leading=20,
+            fontSize=BODY,
+            leading=LEADING,
+            alignment=TA_CENTER,
             spaceBefore=0,
-            spaceAfter=8,
+            spaceAfter=0,
             textColor=INK,
         ),
         "h2": ParagraphStyle(
             "H2",
             fontName=serif_b,
-            fontSize=13,
-            leading=16,
+            fontSize=BODY,
+            leading=LEADING,
+            alignment=TA_LEFT,
             spaceBefore=0,
-            spaceAfter=6,
+            spaceAfter=0,
             textColor=INK,
         ),
         "h3": ParagraphStyle(
             "H3",
-            fontName=serif_b,
-            fontSize=11,
-            leading=14,
+            fontName=serif_bi,
+            fontSize=BODY,
+            leading=LEADING,
+            alignment=TA_LEFT,
             spaceBefore=0,
-            spaceAfter=4,
+            spaceAfter=0,
+            textColor=INK,
+        ),
+        "title": ParagraphStyle(
+            "Title",
+            fontName=serif_b,
+            fontSize=BODY,
+            leading=LEADING,
+            alignment=TA_CENTER,
+            spaceBefore=0,
+            spaceAfter=0,
+            textColor=INK,
+        ),
+        "center": ParagraphStyle(
+            "Center",
+            fontName=serif,
+            fontSize=BODY,
+            leading=LEADING,
+            alignment=TA_CENTER,
+            spaceBefore=0,
+            spaceAfter=0,
             textColor=INK,
         ),
         "body": ParagraphStyle(
             "Body",
             fontName=serif,
-            fontSize=10,
-            leading=13,
-            alignment=TA_JUSTIFY,
-            spaceAfter=6,
+            fontSize=BODY,
+            leading=LEADING,
+            alignment=TA_LEFT,
+            firstLineIndent=0.5 * inch,
+            spaceBefore=0,
+            spaceAfter=0,
+            textColor=INK,
         ),
         "bullet": ParagraphStyle(
             "BulletBody",
             fontName=serif,
-            fontSize=10,
-            leading=13,
-            leftIndent=0,
-            spaceAfter=2,
+            fontSize=BODY,
+            leading=LEADING,
+            alignment=TA_LEFT,
+            leftIndent=0.5 * inch,
+            bulletIndent=0.25 * inch,
+            firstLineIndent=0,
+            spaceBefore=0,
+            spaceAfter=0,
+            textColor=INK,
+        ),
+        "ref": ParagraphStyle(
+            "Reference",
+            fontName=serif,
+            fontSize=BODY,
+            leading=LEADING,
+            alignment=TA_LEFT,
+            leftIndent=0.5 * inch,
+            firstLineIndent=-0.5 * inch,
+            spaceBefore=0,
+            spaceAfter=0,
+            textColor=INK,
+        ),
+        "refnote": ParagraphStyle(
+            "ReferenceNote",
+            fontName=serif,
+            fontSize=BODY,
+            leading=LEADING,
+            alignment=TA_LEFT,
+            leftIndent=0.5 * inch,
+            firstLineIndent=0,
+            spaceBefore=0,
+            spaceAfter=0,
+            textColor=INK,
         ),
         "cell": ParagraphStyle(
             "Cell",
             fontName=serif,
-            fontSize=8,
-            leading=10,
+            fontSize=10,
+            leading=12,
+            alignment=TA_LEFT,
+            textColor=INK,
         ),
         "cellh": ParagraphStyle(
             "CellH",
             fontName=serif_b,
-            fontSize=8,
-            leading=10,
-        ),
-        "cover_title": ParagraphStyle(
-            "CoverTitle",
-            fontName=serif_b,
-            fontSize=22,
-            leading=26,
+            fontSize=10,
+            leading=12,
             alignment=TA_LEFT,
-            spaceAfter=8,
             textColor=INK,
-        ),
-        "cover_sub": ParagraphStyle(
-            "CoverSub",
-            fontName=serif,
-            fontSize=12,
-            leading=16,
-            textColor=colors.HexColor("#333333"),
-            spaceAfter=6,
-        ),
-        "toc": ParagraphStyle(
-            "TOC",
-            fontName=serif,
-            fontSize=12,
-            leading=18,
         ),
         "code": ParagraphStyle(
             "Code",
-            fontName=mono,
-            fontSize=7.5,
-            leading=9.5,
-            leftIndent=6,
-            rightIndent=4,
-            spaceBefore=4,
-            spaceAfter=8,
-            backColor=colors.HexColor("#f4f1ea"),
+            fontName="Courier",
+            fontSize=9,
+            leading=11,
+            leftIndent=0,
+            rightIndent=0,
+            spaceBefore=0,
+            spaceAfter=0,
+            textColor=INK,
         ),
     }
 
 
 def inline(text: str) -> str:
     text = html.escape(text)
-    text = re.sub(r"`([^`]+)`", r"<font face='Courier' size='8'>\1</font>", text)
+    text = re.sub(r"`([^`]+)`", r"<font face='Courier' size='10'>\1</font>", text)
     text = re.sub(r"\*\*([^*]+)\*\*", r"<b>\1</b>", text)
+    text = re.sub(r"(?<!\*)\*([^*]+)\*(?!\*)", r"<i>\1</i>", text)
     return text
 
 
+SMALL_WORDS = {
+    "a", "an", "the", "and", "but", "or", "for", "nor",
+    "on", "at", "to", "from", "by", "of", "in", "as", "with",
+}
+
+
+def apa_title(text: str) -> str:
+    """APA title case. Tokens that already contain a digit or a slash stay as written."""
+    tokens = re.findall(r"\s+|\S+", text)
+    words = [token for token in tokens if not token.isspace()]
+    last = len(words) - 1
+    seen = 0
+    out = []
+    for token in tokens:
+        if token.isspace():
+            out.append(token)
+            continue
+        force = seen == 0 or seen == last
+        if any(ch.isdigit() for ch in token) or "/" in token or (token.isupper() and len(token) > 1):
+            out.append(token)
+        elif "-" in token:
+            parts = []
+            for piece in token.split("-"):
+                if piece.lower() in SMALL_WORDS and not force:
+                    parts.append(piece.lower())
+                elif piece:
+                    parts.append(piece[0].upper() + piece[1:])
+                else:
+                    parts.append(piece)
+            out.append("-".join(parts))
+        elif token.lower() in SMALL_WORDS and not force:
+            out.append(token.lower())
+        elif token:
+            out.append(token[0].upper() + token[1:])
+        else:
+            out.append(token)
+        seen += 1
+    return "".join(out)
+
+
+def heading(text: str, style) -> Paragraph:
+    paragraph = Paragraph(inline(apa_title(text)), style)
+    paragraph.keepWithNext = True
+    return paragraph
+
+
 def is_table_line(line: str) -> bool:
-    s = line.strip()
-    return s.startswith("|") and s.endswith("|") and s.count("|") >= 2
+    stripped = line.strip()
+    return stripped.startswith("|") and stripped.endswith("|") and stripped.count("|") >= 2
 
 
 def split_row(line: str) -> list[str]:
-    return [p.strip() for p in line.strip().strip("|").split("|")]
+    return [part.strip() for part in line.strip().strip("|").split("|")]
 
 
 def is_separator(line: str) -> bool:
@@ -188,13 +269,11 @@ def is_separator(line: str) -> bool:
 
 
 def column_widths(cols: int, width: float) -> list[float]:
-    # Shares of the body column, not of the paper. A 7 inch table on a
-    # narrower frame is what pushed rows past the footer rule.
     shares = {
         2: [1.6, 5.4],
-        3: [1.3, 2.2, 3.5],
-        4: [1.15, 1.7, 1.7, 2.45],
-        5: [0.7, 1.5, 1.3, 1.5, 2.0],
+        3: [1.5, 2.2, 2.8],
+        4: [1.2, 1.7, 1.6, 2.0],
+        5: [0.8, 1.4, 1.2, 1.4, 1.7],
     }
     parts = shares.get(cols)
     if parts is None:
@@ -203,21 +282,40 @@ def column_widths(cols: int, width: float) -> list[float]:
     return [part * scale for part in parts]
 
 
+def measured_height(flowable) -> float:
+    _width, height = flowable.wrap(FRAME_WIDTH, FRAME_HEIGHT)
+    return height
+
+
+def place_block(flow, block):
+    """Move a chart or listing that fits on one page when the space left is short."""
+    try:
+        height = measured_height(block)
+    except Exception:
+        flow.append(block)
+        return
+    if height <= FRAME_HEIGHT - 12:
+        flow.append(KeepTogether([block]))
+    else:
+        flow.append(block)
+
+
 def add_table(flow, rows, st):
     if not rows:
         return
-    cols = max(len(r) for r in rows)
-    norm = [r + [""] * (cols - len(r)) for r in rows]
+    cols = max(len(row) for row in rows)
+    norm = [row + [""] * (cols - len(row)) for row in rows]
     data = []
-    for i, row in enumerate(norm):
-        style = st["cellh"] if i == 0 else st["cell"]
-        data.append([Paragraph(inline(c) if c else "&nbsp;", style) for c in row])
+    for index, row in enumerate(norm):
+        style = st["cellh"] if index == 0 else st["cell"]
+        data.append([Paragraph(inline(cell) if cell else "&nbsp;", style) for cell in row])
     table = Table(data, colWidths=column_widths(cols, FRAME_WIDTH), repeatRows=1)
     table.setStyle(
         TableStyle(
             [
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e6e0d4")),
-                ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#b9b2a4")),
+                ("LINEABOVE", (0, 0), (-1, 0), 1, INK),
+                ("LINEBELOW", (0, 0), (-1, 0), 0.5, INK),
+                ("LINEBELOW", (0, -1), (-1, -1), 1, INK),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 3),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 3),
@@ -226,172 +324,182 @@ def add_table(flow, rows, st):
             ]
         )
     )
-    flow.append(Spacer(1, 4))
-    flow.append(table)
-    flow.append(Spacer(1, 8))
+    # A one-line label such as "Knobs:" stays with the table.
+    if flow and not getattr(flow[-1], "keepWithNext", False):
+        previous = flow[-1]
+        if isinstance(previous, Paragraph) and len(previous.getPlainText()) < 80:
+            previous.keepWithNext = True
+    place_block(flow, table)
 
 
-def markdown_to_flow(text: str, st, skip_first_h1: bool = False) -> list:
+def split_references(text: str) -> tuple[str, str]:
+    """APA puts the reference list after the rest of the paper."""
+    lines = text.splitlines(keepends=True)
+    for index, line in enumerate(lines):
+        if line.strip().lower() in {"## references", "## bibliography"}:
+            return "".join(lines[:index]), "".join(lines[index:])
+    return text, ""
+
+
+def strip_banner(text: str) -> str:
+    """The footer carries the copyright notice. Do not repeat it before each chapter."""
+    lines = text.splitlines()
+    index = 0
+    while index < len(lines) and lines[index].strip() == "":
+        index += 1
+    if index < len(lines) and lines[index].startswith("Copyright (c) 2026"):
+        while index < len(lines) and lines[index].strip() != "":
+            index += 1
+        while index < len(lines) and lines[index].strip() == "":
+            index += 1
+        if index < len(lines) and lines[index].startswith("The Korg MS-50"):
+            while index < len(lines) and lines[index].strip() != "":
+                index += 1
+            while index < len(lines) and lines[index].strip() == "":
+                index += 1
+    return "\n".join(lines[index:])
+
+
+def markdown_to_flow(text: str, st) -> list:
     flow = []
     lines = text.splitlines()
-    i = 0
-    first_h1 = True
-    while i < len(lines):
-        line = lines[i]
+    index = 0
+    in_references = False
+    while index < len(lines):
+        line = lines[index]
         if line.strip() == "":
-            i += 1
+            index += 1
             continue
         if line.startswith("```"):
-            i += 1
+            index += 1
             buf = []
-            while i < len(lines) and not lines[i].startswith("```"):
-                buf.append(lines[i].replace("\t", "    "))
-                i += 1
-            i += 1
-            block = "\n".join(buf)
+            while index < len(lines) and not lines[index].startswith("```"):
+                buf.append(lines[index].replace("\t", "    "))
+                index += 1
+            index += 1
             wrapped = []
-            for raw in block.splitlines() or [""]:
+            for raw in buf or [""]:
                 while len(raw) > CODE_COLS:
                     wrapped.append(raw[:CODE_COLS])
                     raw = raw[CODE_COLS:]
                 wrapped.append(raw)
-            flow.append(Preformatted("\n".join(wrapped), st["code"]))
+            place_block(flow, Preformatted("\n".join(wrapped), st["code"]))
             continue
         if is_table_line(line):
             rows = []
-            while i < len(lines) and is_table_line(lines[i]):
-                if not is_separator(lines[i]):
-                    rows.append(split_row(lines[i]))
-                i += 1
+            while index < len(lines) and is_table_line(lines[index]):
+                if not is_separator(lines[index]):
+                    rows.append(split_row(lines[index]))
+                index += 1
             add_table(flow, rows, st)
             continue
         if line.startswith("#"):
             level = len(line) - len(line.lstrip("#"))
             title = line[level:].strip()
-            if level == 1 and first_h1 and skip_first_h1:
-                first_h1 = False
-                i += 1
-                continue
-            first_h1 = False
-            level = min(level, 3)
-            # Already-empty pages drop this break, so two headings in a row
-            # do not produce a blank sheet.
-            flow.append(PageBreakIfNotEmpty())
-            key = {1: "h1", 2: "h2"}.get(level, "h3")
-            flow.append(Paragraph(inline(title), st[key]))
-            i += 1
+            in_references = title.lower() in {"references", "bibliography"}
+            if in_references:
+                flow.append(PageBreakIfNotEmpty())
+                flow.append(heading("References", st["h1"]))
+            else:
+                key = {1: "h1", 2: "h2"}.get(min(level, 3), "h3")
+                flow.append(heading(title, st[key]))
+            index += 1
             continue
         if line.lstrip().startswith(("- ", "* ")):
-            while i < len(lines) and lines[i].lstrip().startswith(("- ", "* ")):
-                item = lines[i].lstrip()[2:].strip()
-                flow.append(Paragraph("- " + inline(item), st["bullet"]))
-                i += 1
-            flow.append(Spacer(1, 4))
+            while index < len(lines) and lines[index].lstrip().startswith(("- ", "* ")):
+                item = lines[index].lstrip()[2:].strip()
+                style = st["ref"] if in_references else st["bullet"]
+                bullet = None if in_references else "•"
+                flow.append(Paragraph(inline(item), style, bulletText=bullet))
+                index += 1
             continue
         buf = [line.strip()]
-        i += 1
-        while i < len(lines) and lines[i].strip() and not lines[i].startswith(("#", "```", "|", "- ", "* ")):
-            buf.append(lines[i].strip())
-            i += 1
-        flow.append(Paragraph(inline(" ".join(buf)), st["body"]))
+        index += 1
+        while index < len(lines) and lines[index].strip() and not lines[index].startswith(("#", "```", "|", "- ", "* ")):
+            buf.append(lines[index].strip())
+            index += 1
+        text_line = " ".join(buf)
+        if in_references and text_line.startswith("Note:"):
+            flow.append(Paragraph(inline(text_line[5:].strip()), st["refnote"]))
+        elif in_references:
+            flow.append(Paragraph(inline(text_line), st["ref"]))
+        else:
+            paragraph = Paragraph(inline(text_line), st["body"])
+            if text_line.endswith(":") and len(text_line) < 80:
+                paragraph.keepWithNext = True
+            flow.append(paragraph)
     return flow
 
 
-def draw_page(canvas, doc):
+def draw_page(canvas, _doc):
     canvas.saveState()
     canvas.setFillColor(INK)
     canvas.setFont("Times-Bold", 8)
-    canvas.drawString(LEFT, PAGE_H - HEADER_LINE_1, "Copyright (c) 2026 Martial Systems LLC. All rights reserved.")
-    canvas.setFont("Times-Roman", 7.5)
+    canvas.drawString(LEFT, FOOTER_BASE + 3 * FOOTER_STEP, "Copyright (c) 2026 Martial Systems LLC. All rights reserved.")
+    canvas.setFont("Times-Roman", 8)
     canvas.drawString(
         LEFT,
-        PAGE_H - HEADER_LINE_2,
+        FOOTER_BASE + 2 * FOOTER_STEP,
         "The Korg MS-50, its name, and its circuit designs are the property of Korg Inc.",
     )
     canvas.drawString(
         LEFT,
-        PAGE_H - HEADER_LINE_3,
+        FOOTER_BASE + FOOTER_STEP,
         "This independent study is not produced or endorsed by Korg, and it grants no license to those designs.",
     )
-    canvas.setStrokeColor(RULE)
-    canvas.setLineWidth(0.6)
-    canvas.line(LEFT, PAGE_H - HEADER_RULE, PAGE_W - RIGHT, PAGE_H - HEADER_RULE)
-
-    canvas.setStrokeColor(RULE)
+    canvas.setFont("Times-Roman", 9)
+    canvas.drawString(LEFT, FOOTER_BASE, "MS-50 Modular design pack")
+    canvas.drawCentredString(PAGE_W / 2.0, FOOTER_BASE, "2026-09-21")
+    canvas.drawRightString(PAGE_W - RIGHT, FOOTER_BASE, str(canvas.getPageNumber()))
+    canvas.setStrokeColor(INK)
     canvas.setLineWidth(0.6)
     canvas.line(LEFT, FOOTER_RULE, PAGE_W - RIGHT, FOOTER_RULE)
-    canvas.setFillColor(FOOTER_INK)
-    canvas.setFont("Times-Roman", 9)
-    canvas.drawString(LEFT, FOOTER_BASELINE, "MS-50 Modular design pack")
-    canvas.drawCentredString(PAGE_W / 2.0, FOOTER_BASELINE, "2026-09-21")
-    canvas.drawRightString(PAGE_W - RIGHT, FOOTER_BASELINE, str(canvas.getPageNumber()))
     canvas.restoreState()
 
 
 def build():
     st = styles()
     story = []
-    story.append(Spacer(1, 0.12 * inch))
-    story.append(Paragraph("MS-50 Modular", st["cover_title"]))
-    story.append(Paragraph("Design pack for a white-box modular FX VST", st["cover_sub"]))
+    story.append(Spacer(1, 24))
+    story.append(Paragraph("MS-50 Modular", st["title"]))
+    story.append(Paragraph("Design Pack for a White-Box Modular FX Instrument", st["center"]))
+    story.append(Spacer(1, 24))
+    story.append(Paragraph("Martial Systems LLC", st["center"]))
+    story.append(Spacer(1, 2.2 * inch))
+    story.append(Paragraph("Author Note", st["title"]))
     story.append(Paragraph(
         "The Korg MS-50, the MS-50 name, and the circuit designs of that instrument are the property of Korg Inc. "
         "Martial Systems LLC claims copyright only in the original text of this repository and in any code later written here. "
-        "The work is an independent study of published schematics and of the literature cited in the research summary. "
+        "The work is an independent study of published schematics and of the literature cited in the reference list. "
         "Korg has not produced, sponsored, or endorsed it. "
         "No license is granted to the MS-50 design, to the Korg drawings, or to the Korg trademarks. "
         "The instrument's name is used only to identify the subject of the study.",
         st["body"],
     ))
-    story.append(Spacer(1, 0.15 * inch))
-    story.append(HRFlowable(width="100%", thickness=1, color=RULE, spaceBefore=0, spaceAfter=0))
-    story.append(Spacer(1, 0.12 * inch))
-    story.append(Paragraph("Document date: 2026-09-21", st["body"]))
-    story.append(Paragraph(
-        "Stack specified here: C++20, JUCE 8, CMake, VST3 effect, stereo in and stereo out, "
-        "mono module graph, public git repository.",
-        st["body"],
-    ))
-    story.append(Spacer(1, 0.12 * inch))
-    story.append(Paragraph("Revisions", st["h2"]))
-    story.append(Paragraph(
-        "2026-09-21: first compiled pack. Cover, methodology, research summary, software "
-        "schematic, build guide, test plan, and bibliography.",
-        st["body"],
-    ))
-    story.append(Paragraph(
-        "2026-09-21: copyright and the Korg notice placed at the top of every page. "
-        "The repository is public.",
-        st["body"],
-    ))
-    story.append(Paragraph(
-        "2026-09-21: rights statement set out in full. Korg Inc. is named as owner of the MS-50, "
-        "its name, and its circuit designs. Martial Systems LLC claims copyright only in the original text and code of this repository.",
-        st["body"],
-    ))
-    story.append(Paragraph(
-        "2026-09-21: page layout. Each heading starts on a new page. The footer is one rule, "
-        "the pack title, the date, and the page number, on the same baselines on every page. "
-        "The body column stops above that rule.",
-        st["body"],
-    ))
-    story.append(Paragraph(
-        "A generated timestamp is not a revision. Later edits add a line here and a date "
-        "on the changed section heading in the markdown.",
-        st["body"],
-    ))
-    story.append(Spacer(1, 0.12 * inch))
-    story.append(Paragraph("Contents", st["h2"]))
-    for name, _path in CHAPTERS:
-        story.append(Paragraph(name, st["toc"]))
-    story.append(Paragraph("Bibliography (end of the research summary)", st["toc"]))
+    story.append(Paragraph("Document date: September 21, 2026.", st["body"]))
+    story.append(PageBreak())
 
-    for title, path in CHAPTERS:
-        story.append(PageBreakIfNotEmpty())
-        story.append(Paragraph(title, st["h1"]))
-        story.append(HRFlowable(width="100%", thickness=0.6, color=RULE, spaceBefore=2, spaceAfter=8))
-        text = path.read_text(encoding="utf-8")
-        story.extend(markdown_to_flow(text, st, skip_first_h1=True))
+    story.append(heading("Revisions", st["h1"]))
+    for line in (
+        "September 21, 2026: First compiled pack. Title page, methodology, research summary, software schematic, build guide, test plan, and reference list.",
+        "September 21, 2026: Copyright and the Korg notice placed on every page. The repository is public.",
+        "September 21, 2026: Rights statement set out in full. Korg Inc. is named as owner of the MS-50, its name, and its circuit designs. Martial Systems LLC claims copyright only in the original text and code of this repository.",
+        "September 21, 2026: APA page form. Body text is Times 12 point, double spaced, and left aligned, with a half-inch first-line indent. Headings follow APA levels. The reference list uses a hanging indent and starts on its own page. The copyright notice, the Korg notice, the pack title, the date, and the page number share one footer. A heading stays with the line under it. A table or a code listing moves to the next page only when that block fits on one page and does not fit in the space left.",
+    ):
+        story.append(Paragraph(line, st["body"]))
+    story.append(Paragraph(
+        "A generated timestamp is not a revision. Later edits add a line here and a date on the changed section heading in the markdown.",
+        st["body"],
+    ))
+
+    reference_blocks = []
+    for path in CHAPTERS:
+        main, references = split_references(strip_banner(path.read_text(encoding="utf-8")))
+        story.extend(markdown_to_flow(main, st))
+        if references.strip():
+            reference_blocks.append(references)
+    for references in reference_blocks:
+        story.extend(markdown_to_flow(references, st))
 
     frame = Frame(
         LEFT,
