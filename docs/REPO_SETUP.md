@@ -54,7 +54,7 @@ python3 scripts/build_design_pdf.py
 
 Output: `docs/MS50_Modular_Design_Pack.pdf`.
 
-The PDF is a compiled reading copy: cover, methodology, research summary, software schematic, build guide, test plan, bibliography. The bibliography is the last section of `docs/01-research.md`. Commit the PDF with the docs when those docs change.
+The PDF is a compiled reading copy: title page, methodology, research summary, software schematic, build guide, test plan, and the reference list. The reference list is the last section of `docs/01-research.md`. Commit the PDF with the docs when those docs change.
 
 Page check after a PDF edit: render at least the cover, a middle page, and the last page, and read them. On a machine with `pdftoppm`:
 
