@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """Compile the design-pack PDF from the markdown sources.
 
-The printed pack uses APA page form: Times 12 point, double spaced, left
-aligned, 1 inch margins, APA heading levels, and a reference list with a
-hanging indent. The reference list is the last part of 01-research.md.
+The body is a research note: headings keep the wording of the sources, and
+the type is 10 point. The reference list stays in APA and is the last part
+of 01-research.md. It closes the pack.
 
 The copyright notice and the pack line share one footer. There is no running
 header. Body text flows. A heading stays with the line under it. A table or a
 code listing moves to the next page only when that whole block fits on one
-page and does not fit in the space left.
+page and does not fit in the space left. A heading that follows a chart has
+a break before it, and starts on the next page when less than two inches
+remain.
 """
 
 from __future__ import annotations
@@ -24,8 +26,8 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.platypus import (
     BaseDocTemplate,
+    Flowable,
     Frame,
-    PageBreak,
     PageTemplate,
     Paragraph,
     Preformatted,
@@ -33,6 +35,7 @@ from reportlab.platypus import (
     Table,
     TableStyle,
 )
+from reportlab.platypus.doctemplate import FrameBreak
 from reportlab.platypus.flowables import KeepTogether, PageBreakIfNotEmpty
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -61,95 +64,121 @@ FRAME_HEIGHT = PAGE_H - TOP - CONTENT_BOTTOM
 # Courier 9 pt is 5.4 pt wide.
 CODE_COLS = int((FRAME_WIDTH - 8) / 5.4)
 
-INK = colors.black
-BODY = 12
-LEADING = 24
+INK = colors.HexColor("#1a1a1a")
+RULE = colors.HexColor("#b9b2a4")
+HEADING_AFTER_CHART = 2.0 * inch
+
+
+class BreakAfterChart(Flowable):
+    """Gap and rule after a chart. If the next heading would be cramped, start a new page."""
+
+    def wrap(self, availWidth, availHeight):
+        if availHeight < HEADING_AFTER_CHART:
+            frame = self._doctemplateAttr("frame")
+            if frame is not None:
+                frame.add_generated_content(FrameBreak)
+            return 0, 0
+        self.width = availWidth
+        self.height = 16
+        return availWidth, 16
+
+    def draw(self):
+        self.canv.setStrokeColor(RULE)
+        self.canv.setLineWidth(0.4)
+        self.canv.line(0, 8, self.width, 8)
 
 
 def styles():
     serif = "Times-Roman"
     serif_b = "Times-Bold"
-    serif_bi = "Times-BoldItalic"
     return {
         "h1": ParagraphStyle(
             "H1",
             fontName=serif_b,
-            fontSize=BODY,
-            leading=LEADING,
-            alignment=TA_CENTER,
-            spaceBefore=0,
-            spaceAfter=0,
+            fontSize=16,
+            leading=20,
+            alignment=TA_LEFT,
+            spaceBefore=12,
+            spaceAfter=6,
             textColor=INK,
         ),
         "h2": ParagraphStyle(
             "H2",
             fontName=serif_b,
-            fontSize=BODY,
-            leading=LEADING,
+            fontSize=13,
+            leading=16,
             alignment=TA_LEFT,
-            spaceBefore=0,
-            spaceAfter=0,
+            spaceBefore=10,
+            spaceAfter=4,
             textColor=INK,
         ),
         "h3": ParagraphStyle(
             "H3",
-            fontName=serif_bi,
-            fontSize=BODY,
-            leading=LEADING,
+            fontName=serif_b,
+            fontSize=11,
+            leading=14,
             alignment=TA_LEFT,
-            spaceBefore=0,
-            spaceAfter=0,
+            spaceBefore=8,
+            spaceAfter=3,
             textColor=INK,
         ),
         "title": ParagraphStyle(
             "Title",
             fontName=serif_b,
-            fontSize=BODY,
-            leading=LEADING,
-            alignment=TA_CENTER,
+            fontSize=22,
+            leading=26,
+            alignment=TA_LEFT,
             spaceBefore=0,
-            spaceAfter=0,
+            spaceAfter=6,
             textColor=INK,
         ),
-        "center": ParagraphStyle(
-            "Center",
+        "cover_sub": ParagraphStyle(
+            "CoverSub",
             fontName=serif,
-            fontSize=BODY,
-            leading=LEADING,
-            alignment=TA_CENTER,
+            fontSize=12,
+            leading=16,
+            alignment=TA_LEFT,
             spaceBefore=0,
-            spaceAfter=0,
-            textColor=INK,
+            spaceAfter=8,
+            textColor=colors.HexColor("#333333"),
         ),
         "body": ParagraphStyle(
             "Body",
             fontName=serif,
-            fontSize=BODY,
-            leading=LEADING,
+            fontSize=10,
+            leading=13,
             alignment=TA_LEFT,
-            firstLineIndent=0.5 * inch,
             spaceBefore=0,
-            spaceAfter=0,
+            spaceAfter=6,
             textColor=INK,
         ),
         "bullet": ParagraphStyle(
             "BulletBody",
             fontName=serif,
-            fontSize=BODY,
-            leading=LEADING,
+            fontSize=10,
+            leading=13,
             alignment=TA_LEFT,
-            leftIndent=0.5 * inch,
-            bulletIndent=0.25 * inch,
+            leftIndent=12,
             firstLineIndent=0,
             spaceBefore=0,
-            spaceAfter=0,
+            spaceAfter=2,
+            textColor=INK,
+        ),
+        "refhead": ParagraphStyle(
+            "RefHead",
+            fontName=serif_b,
+            fontSize=12,
+            leading=24,
+            alignment=TA_CENTER,
+            spaceBefore=0,
+            spaceAfter=12,
             textColor=INK,
         ),
         "ref": ParagraphStyle(
             "Reference",
             fontName=serif,
-            fontSize=BODY,
-            leading=LEADING,
+            fontSize=12,
+            leading=24,
             alignment=TA_LEFT,
             leftIndent=0.5 * inch,
             firstLineIndent=-0.5 * inch,
@@ -160,8 +189,8 @@ def styles():
         "refnote": ParagraphStyle(
             "ReferenceNote",
             fontName=serif,
-            fontSize=BODY,
-            leading=LEADING,
+            fontSize=12,
+            leading=24,
             alignment=TA_LEFT,
             leftIndent=0.5 * inch,
             firstLineIndent=0,
@@ -172,16 +201,16 @@ def styles():
         "cell": ParagraphStyle(
             "Cell",
             fontName=serif,
-            fontSize=10,
-            leading=12,
+            fontSize=8,
+            leading=10,
             alignment=TA_LEFT,
             textColor=INK,
         ),
         "cellh": ParagraphStyle(
             "CellH",
             fontName=serif_b,
-            fontSize=10,
-            leading=12,
+            fontSize=8,
+            leading=10,
             alignment=TA_LEFT,
             textColor=INK,
         ),
@@ -192,8 +221,9 @@ def styles():
             leading=11,
             leftIndent=0,
             rightIndent=0,
-            spaceBefore=0,
-            spaceAfter=0,
+            spaceBefore=4,
+            spaceAfter=6,
+            backColor=colors.HexColor("#f4f1ea"),
             textColor=INK,
         ),
     }
@@ -201,54 +231,14 @@ def styles():
 
 def inline(text: str) -> str:
     text = html.escape(text)
-    text = re.sub(r"`([^`]+)`", r"<font face='Courier' size='10'>\1</font>", text)
+    text = re.sub(r"`([^`]+)`", r"<font face='Courier' size='9'>\1</font>", text)
     text = re.sub(r"\*\*([^*]+)\*\*", r"<b>\1</b>", text)
     text = re.sub(r"(?<!\*)\*([^*]+)\*(?!\*)", r"<i>\1</i>", text)
     return text
 
 
-SMALL_WORDS = {
-    "a", "an", "the", "and", "but", "or", "for", "nor",
-    "on", "at", "to", "from", "by", "of", "in", "as", "with",
-}
-
-
-def apa_title(text: str) -> str:
-    """APA title case. Tokens that already contain a digit or a slash stay as written."""
-    tokens = re.findall(r"\s+|\S+", text)
-    words = [token for token in tokens if not token.isspace()]
-    last = len(words) - 1
-    seen = 0
-    out = []
-    for token in tokens:
-        if token.isspace():
-            out.append(token)
-            continue
-        force = seen == 0 or seen == last
-        if any(ch.isdigit() for ch in token) or "/" in token or (token.isupper() and len(token) > 1):
-            out.append(token)
-        elif "-" in token:
-            parts = []
-            for piece in token.split("-"):
-                if piece.lower() in SMALL_WORDS and not force:
-                    parts.append(piece.lower())
-                elif piece:
-                    parts.append(piece[0].upper() + piece[1:])
-                else:
-                    parts.append(piece)
-            out.append("-".join(parts))
-        elif token.lower() in SMALL_WORDS and not force:
-            out.append(token.lower())
-        elif token:
-            out.append(token[0].upper() + token[1:])
-        else:
-            out.append(token)
-        seen += 1
-    return "".join(out)
-
-
 def heading(text: str, style) -> Paragraph:
-    paragraph = Paragraph(inline(apa_title(text)), style)
+    paragraph = Paragraph(inline(text), style)
     paragraph.keepWithNext = True
     return paragraph
 
@@ -292,12 +282,13 @@ def place_block(flow, block):
     try:
         height = measured_height(block)
     except Exception:
+        block.is_chart = True
         flow.append(block)
         return
     if height <= FRAME_HEIGHT - 12:
-        flow.append(KeepTogether([block]))
-    else:
-        flow.append(block)
+        block = KeepTogether([block])
+    block.is_chart = True
+    flow.append(block)
 
 
 def add_table(flow, rows, st):
@@ -313,9 +304,8 @@ def add_table(flow, rows, st):
     table.setStyle(
         TableStyle(
             [
-                ("LINEABOVE", (0, 0), (-1, 0), 1, INK),
-                ("LINEBELOW", (0, 0), (-1, 0), 0.5, INK),
-                ("LINEBELOW", (0, -1), (-1, -1), 1, INK),
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e6e0d4")),
+                ("GRID", (0, 0), (-1, -1), 0.3, RULE),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 3),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 3),
@@ -324,7 +314,6 @@ def add_table(flow, rows, st):
             ]
         )
     )
-    # A one-line label such as "Knobs:" stays with the table.
     if flow and not getattr(flow[-1], "keepWithNext", False):
         previous = flow[-1]
         if isinstance(previous, Paragraph) and len(previous.getPlainText()) < 80:
@@ -333,7 +322,7 @@ def add_table(flow, rows, st):
 
 
 def split_references(text: str) -> tuple[str, str]:
-    """APA puts the reference list after the rest of the paper."""
+    """The reference list closes the pack."""
     lines = text.splitlines(keepends=True)
     for index, line in enumerate(lines):
         if line.strip().lower() in {"## references", "## bibliography"}:
@@ -399,8 +388,12 @@ def markdown_to_flow(text: str, st) -> list:
             in_references = title.lower() in {"references", "bibliography"}
             if in_references:
                 flow.append(PageBreakIfNotEmpty())
-                flow.append(heading("References", st["h1"]))
+                paragraph = Paragraph("References", st["refhead"])
+                paragraph.keepWithNext = True
+                flow.append(paragraph)
             else:
+                if flow and getattr(flow[-1], "is_chart", False):
+                    flow.append(BreakAfterChart())
                 key = {1: "h1", 2: "h2"}.get(min(level, 3), "h3")
                 flow.append(heading(title, st[key]))
             index += 1
@@ -408,10 +401,13 @@ def markdown_to_flow(text: str, st) -> list:
         if line.lstrip().startswith(("- ", "* ")):
             while index < len(lines) and lines[index].lstrip().startswith(("- ", "* ")):
                 item = lines[index].lstrip()[2:].strip()
-                style = st["ref"] if in_references else st["bullet"]
-                bullet = None if in_references else "•"
-                flow.append(Paragraph(inline(item), style, bulletText=bullet))
+                if in_references:
+                    flow.append(Paragraph(inline(item), st["ref"]))
+                else:
+                    flow.append(Paragraph("- " + inline(item), st["bullet"]))
                 index += 1
+            if not in_references:
+                flow.append(Spacer(1, 4))
             continue
         buf = [line.strip()]
         index += 1
@@ -460,13 +456,9 @@ def draw_page(canvas, _doc):
 def build():
     st = styles()
     story = []
-    story.append(Spacer(1, 24))
+    story.append(Spacer(1, 8))
     story.append(Paragraph("MS-50 Modular", st["title"]))
-    story.append(Paragraph("Design Pack for a White-Box Modular FX Instrument", st["center"]))
-    story.append(Spacer(1, 24))
-    story.append(Paragraph("Martial Systems LLC", st["center"]))
-    story.append(Spacer(1, 2.2 * inch))
-    story.append(Paragraph("Author Note", st["title"]))
+    story.append(Paragraph("Design pack for a white-box modular FX instrument", st["cover_sub"]))
     story.append(Paragraph(
         "The Korg MS-50, the MS-50 name, and the circuit designs of that instrument are the property of Korg Inc. "
         "Martial Systems LLC claims copyright only in the original text of this repository and in any code later written here. "
@@ -476,15 +468,13 @@ def build():
         "The instrument's name is used only to identify the subject of the study.",
         st["body"],
     ))
-    story.append(Paragraph("Document date: September 21, 2026.", st["body"]))
-    story.append(PageBreak())
-
+    story.append(Paragraph("Document date: 2026-09-21.", st["body"]))
     story.append(heading("Revisions", st["h1"]))
     for line in (
-        "September 21, 2026: First compiled pack. Title page, methodology, research summary, software schematic, build guide, test plan, and reference list.",
-        "September 21, 2026: Copyright and the Korg notice placed on every page. The repository is public.",
-        "September 21, 2026: Rights statement set out in full. Korg Inc. is named as owner of the MS-50, its name, and its circuit designs. Martial Systems LLC claims copyright only in the original text and code of this repository.",
-        "September 21, 2026: APA page form. Body text is Times 12 point, double spaced, and left aligned, with a half-inch first-line indent. Headings follow APA levels. The reference list uses a hanging indent and starts on its own page. The copyright notice, the Korg notice, the pack title, the date, and the page number share one footer. A heading stays with the line under it. A table or a code listing moves to the next page only when that block fits on one page and does not fit in the space left.",
+        "2026-09-21: First compiled pack. Methodology, research summary, software schematic, build guide, test plan, and reference list.",
+        "2026-09-21: Copyright and the Korg notice placed on every page. The repository is public.",
+        "2026-09-21: Rights statement set out in full. Korg Inc. is named as owner of the MS-50, its name, and its circuit designs. Martial Systems LLC claims copyright only in the original text and code of this repository.",
+        "2026-09-21: Research page form. Headings use the wording of the notes. Body text is 10 point. The footer is one block: the copyright notice, the Korg notice, the pack title, the date, and the page number. A heading stays with the line under it. A table or a code listing moves when it does not fit. A heading after a chart has a break before it, and starts on the next page when less than two inches remain. The reference list stays in APA and closes the pack.",
     ):
         story.append(Paragraph(line, st["body"]))
     story.append(Paragraph(
