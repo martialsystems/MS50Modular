@@ -2,6 +2,11 @@
 """Compile the design-pack PDF from the markdown sources.
 
 Reading order is fixed. The bibliography is the last part of 01-research.md.
+
+Page geometry is one set of constants. The header rule, the body column, and
+the footer rule share the same left and right edges. Each markdown heading
+starts a page. A heading that is already at the top of a page does not insert
+a blank page.
 """
 
 from __future__ import annotations
@@ -13,21 +18,20 @@ from pathlib import Path
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_JUSTIFY, TA_LEFT
 from reportlab.lib.pagesizes import letter
-from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.platypus import (
-    CondPageBreak,
+    BaseDocTemplate,
+    Frame,
     HRFlowable,
-    ListFlowable,
-    ListItem,
-    PageBreak,
+    PageTemplate,
     Paragraph,
     Preformatted,
-    SimpleDocTemplate,
     Spacer,
     Table,
     TableStyle,
 )
+from reportlab.platypus.flowables import PageBreakIfNotEmpty
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
@@ -41,9 +45,30 @@ CHAPTERS = [
     ("Test plan", DOCS / "TESTPLAN.md"),
 ]
 
+PAGE_W, PAGE_H = letter
+LEFT = 0.75 * inch
+RIGHT = 0.75 * inch
+# Distances from the top of the page.
+HEADER_LINE_1 = 0.40 * inch
+HEADER_LINE_2 = 0.54 * inch
+HEADER_LINE_3 = 0.68 * inch
+HEADER_RULE = 0.84 * inch
+CONTENT_TOP = 1.04 * inch
+# Distances from the bottom of the page.
+FOOTER_RULE = 0.58 * inch
+FOOTER_BASELINE = 0.36 * inch
+CONTENT_BOTTOM = FOOTER_RULE + 0.20 * inch
+FRAME_WIDTH = PAGE_W - LEFT - RIGHT
+FRAME_HEIGHT = PAGE_H - CONTENT_TOP - CONTENT_BOTTOM
+# Courier at 7.5 pt is 4.5 pt wide. Leave the code indent inside the column.
+CODE_COLS = int((FRAME_WIDTH - 12) / 4.5)
+
+INK = colors.HexColor("#1a1a1a")
+RULE = colors.HexColor("#1a1a1a")
+FOOTER_INK = colors.HexColor("#333333")
+
 
 def styles():
-    base = getSampleStyleSheet()
     serif = "Times-Roman"
     serif_b = "Times-Bold"
     mono = "Courier"
@@ -53,25 +78,27 @@ def styles():
             fontName=serif_b,
             fontSize=16,
             leading=20,
-            spaceBefore=14,
+            spaceBefore=0,
             spaceAfter=8,
-            textColor=colors.HexColor("#1a1a1a"),
+            textColor=INK,
         ),
         "h2": ParagraphStyle(
             "H2",
             fontName=serif_b,
             fontSize=13,
             leading=16,
-            spaceBefore=12,
+            spaceBefore=0,
             spaceAfter=6,
+            textColor=INK,
         ),
         "h3": ParagraphStyle(
             "H3",
             fontName=serif_b,
             fontSize=11,
             leading=14,
-            spaceBefore=10,
+            spaceBefore=0,
             spaceAfter=4,
+            textColor=INK,
         ),
         "body": ParagraphStyle(
             "Body",
@@ -108,6 +135,7 @@ def styles():
             leading=26,
             alignment=TA_LEFT,
             spaceAfter=8,
+            textColor=INK,
         ),
         "cover_sub": ParagraphStyle(
             "CoverSub",
@@ -134,12 +162,6 @@ def styles():
             spaceAfter=8,
             backColor=colors.HexColor("#f4f1ea"),
         ),
-        "footer": ParagraphStyle(
-            "Footer",
-            fontName=serif,
-            fontSize=8,
-            textColor=colors.HexColor("#444444"),
-        ),
     }
 
 
@@ -156,37 +178,41 @@ def is_table_line(line: str) -> bool:
 
 
 def split_row(line: str) -> list[str]:
-    parts = [p.strip() for p in line.strip().strip("|").split("|")]
-    return parts
+    return [p.strip() for p in line.strip().strip("|").split("|")]
 
 
 def is_separator(line: str) -> bool:
-    return bool(re.match(r"^\s*\|?\s*:?-{3,}", line)) and set(line.replace("|", "").replace(":", "").replace("-", "").replace(" ", "")) == set()
+    return bool(re.match(r"^\s*\|?\s*:?-{3,}", line)) and set(
+        line.replace("|", "").replace(":", "").replace("-", "").replace(" ", "")
+    ) == set()
+
+
+def column_widths(cols: int, width: float) -> list[float]:
+    # Shares of the body column, not of the paper. A 7 inch table on a
+    # narrower frame is what pushed rows past the footer rule.
+    shares = {
+        2: [1.6, 5.4],
+        3: [1.3, 2.2, 3.5],
+        4: [1.15, 1.7, 1.7, 2.45],
+        5: [0.7, 1.5, 1.3, 1.5, 2.0],
+    }
+    parts = shares.get(cols)
+    if parts is None:
+        return [width / cols] * cols
+    scale = width / sum(parts)
+    return [part * scale for part in parts]
 
 
 def add_table(flow, rows, st):
     if not rows:
         return
-    width = 7.0 * inch
     cols = max(len(r) for r in rows)
-    # Pad short rows.
     norm = [r + [""] * (cols - len(r)) for r in rows]
-    # Weight the last column when there are many columns.
-    if cols == 2:
-        widths = [1.6 * inch, 5.4 * inch]
-    elif cols == 3:
-        widths = [1.3 * inch, 2.2 * inch, 3.5 * inch]
-    elif cols == 4:
-        widths = [1.15 * inch, 1.7 * inch, 1.7 * inch, 2.45 * inch]
-    elif cols == 5:
-        widths = [0.7 * inch, 1.5 * inch, 1.3 * inch, 1.5 * inch, 2.0 * inch]
-    else:
-        widths = [width / cols] * cols
     data = []
     for i, row in enumerate(norm):
         style = st["cellh"] if i == 0 else st["cell"]
         data.append([Paragraph(inline(c) if c else "&nbsp;", style) for c in row])
-    table = Table(data, colWidths=widths, repeatRows=1)
+    table = Table(data, colWidths=column_widths(cols, FRAME_WIDTH), repeatRows=1)
     table.setStyle(
         TableStyle(
             [
@@ -223,12 +249,11 @@ def markdown_to_flow(text: str, st, skip_first_h1: bool = False) -> list:
                 i += 1
             i += 1
             block = "\n".join(buf)
-            # Preformatted does not wrap. Break long lines.
             wrapped = []
             for raw in block.splitlines() or [""]:
-                while len(raw) > 96:
-                    wrapped.append(raw[:96])
-                    raw = raw[96:]
+                while len(raw) > CODE_COLS:
+                    wrapped.append(raw[:CODE_COLS])
+                    raw = raw[CODE_COLS:]
                 wrapped.append(raw)
             flow.append(Preformatted("\n".join(wrapped), st["code"]))
             continue
@@ -248,6 +273,10 @@ def markdown_to_flow(text: str, st, skip_first_h1: bool = False) -> list:
                 i += 1
                 continue
             first_h1 = False
+            level = min(level, 3)
+            # Already-empty pages drop this break, so two headings in a row
+            # do not produce a blank sheet.
+            flow.append(PageBreakIfNotEmpty())
             key = {1: "h1", 2: "h2"}.get(level, "h3")
             flow.append(Paragraph(inline(title), st[key]))
             i += 1
@@ -259,7 +288,6 @@ def markdown_to_flow(text: str, st, skip_first_h1: bool = False) -> list:
                 i += 1
             flow.append(Spacer(1, 4))
             continue
-        # Paragraph. Join following non-special lines.
         buf = [line.strip()]
         i += 1
         while i < len(lines) and lines[i].strip() and not lines[i].startswith(("#", "```", "|", "- ", "* ")):
@@ -271,40 +299,39 @@ def markdown_to_flow(text: str, st, skip_first_h1: bool = False) -> list:
 
 def draw_page(canvas, doc):
     canvas.saveState()
-    width, height = letter
-    canvas.setFillColor(colors.HexColor("#1a1a1a"))
+    canvas.setFillColor(INK)
     canvas.setFont("Times-Bold", 8)
-    canvas.drawString(
-        0.85 * inch,
-        height - 0.40 * inch,
-        "Copyright (c) 2026 Martial Systems LLC. All rights reserved.",
-    )
+    canvas.drawString(LEFT, PAGE_H - HEADER_LINE_1, "Copyright (c) 2026 Martial Systems LLC. All rights reserved.")
     canvas.setFont("Times-Roman", 7.5)
     canvas.drawString(
-        0.85 * inch,
-        height - 0.55 * inch,
+        LEFT,
+        PAGE_H - HEADER_LINE_2,
         "The Korg MS-50, its name, and its circuit designs are the property of Korg Inc.",
     )
     canvas.drawString(
-        0.85 * inch,
-        height - 0.68 * inch,
+        LEFT,
+        PAGE_H - HEADER_LINE_3,
         "This independent study is not produced or endorsed by Korg, and it grants no license to those designs.",
     )
-    canvas.setStrokeColor(colors.HexColor("#1a1a1a"))
-    canvas.line(0.85 * inch, height - 0.80 * inch, width - 0.85 * inch, height - 0.80 * inch)
-    canvas.setFillColor(colors.HexColor("#444444"))
-    canvas.setFont("Times-Roman", 8)
-    canvas.drawString(0.85 * inch, 0.48 * inch, "MS-50 Modular design pack  |  2026-09-21")
-    canvas.drawRightString(width - 0.85 * inch, 0.48 * inch, f"{doc.page}")
-    canvas.setStrokeColor(colors.HexColor("#c8c2b4"))
-    canvas.line(0.85 * inch, 0.64 * inch, width - 0.85 * inch, 0.64 * inch)
+    canvas.setStrokeColor(RULE)
+    canvas.setLineWidth(0.6)
+    canvas.line(LEFT, PAGE_H - HEADER_RULE, PAGE_W - RIGHT, PAGE_H - HEADER_RULE)
+
+    canvas.setStrokeColor(RULE)
+    canvas.setLineWidth(0.6)
+    canvas.line(LEFT, FOOTER_RULE, PAGE_W - RIGHT, FOOTER_RULE)
+    canvas.setFillColor(FOOTER_INK)
+    canvas.setFont("Times-Roman", 9)
+    canvas.drawString(LEFT, FOOTER_BASELINE, "MS-50 Modular design pack")
+    canvas.drawCentredString(PAGE_W / 2.0, FOOTER_BASELINE, "2026-09-21")
+    canvas.drawRightString(PAGE_W - RIGHT, FOOTER_BASELINE, str(canvas.getPageNumber()))
     canvas.restoreState()
 
 
 def build():
     st = styles()
     story = []
-    story.append(Spacer(1, 0.15 * inch))
+    story.append(Spacer(1, 0.12 * inch))
     story.append(Paragraph("MS-50 Modular", st["cover_title"]))
     story.append(Paragraph("Design pack for a white-box modular FX VST", st["cover_sub"]))
     story.append(Paragraph(
@@ -316,16 +343,16 @@ def build():
         "The instrument's name is used only to identify the subject of the study.",
         st["body"],
     ))
-    story.append(Spacer(1, 0.2 * inch))
-    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#1a1a1a")))
     story.append(Spacer(1, 0.15 * inch))
+    story.append(HRFlowable(width="100%", thickness=1, color=RULE, spaceBefore=0, spaceAfter=0))
+    story.append(Spacer(1, 0.12 * inch))
     story.append(Paragraph("Document date: 2026-09-21", st["body"]))
     story.append(Paragraph(
         "Stack specified here: C++20, JUCE 8, CMake, VST3 effect, stereo in and stereo out, "
         "mono module graph, public git repository.",
         st["body"],
     ))
-    story.append(Spacer(1, 0.15 * inch))
+    story.append(Spacer(1, 0.12 * inch))
     story.append(Paragraph("Revisions", st["h2"]))
     story.append(Paragraph(
         "2026-09-21: first compiled pack. Cover, methodology, research summary, software "
@@ -343,36 +370,49 @@ def build():
         st["body"],
     ))
     story.append(Paragraph(
+        "2026-09-21: page layout. Each heading starts on a new page. The footer is one rule, "
+        "the pack title, the date, and the page number, on the same baselines on every page. "
+        "The body column stops above that rule.",
+        st["body"],
+    ))
+    story.append(Paragraph(
         "A generated timestamp is not a revision. Later edits add a line here and a date "
         "on the changed section heading in the markdown.",
         st["body"],
     ))
-    story.append(Spacer(1, 0.2 * inch))
+    story.append(Spacer(1, 0.12 * inch))
     story.append(Paragraph("Contents", st["h2"]))
     for name, _path in CHAPTERS:
         story.append(Paragraph(name, st["toc"]))
     story.append(Paragraph("Bibliography (end of the research summary)", st["toc"]))
-    story.append(PageBreak())
 
     for title, path in CHAPTERS:
+        story.append(PageBreakIfNotEmpty())
         story.append(Paragraph(title, st["h1"]))
-        story.append(HRFlowable(width="100%", thickness=0.4, color=colors.HexColor("#1a1a1a")))
-        story.append(Spacer(1, 6))
+        story.append(HRFlowable(width="100%", thickness=0.6, color=RULE, spaceBefore=2, spaceAfter=8))
         text = path.read_text(encoding="utf-8")
         story.extend(markdown_to_flow(text, st, skip_first_h1=True))
-        story.append(PageBreak())
 
-    doc = SimpleDocTemplate(
+    frame = Frame(
+        LEFT,
+        CONTENT_BOTTOM,
+        FRAME_WIDTH,
+        FRAME_HEIGHT,
+        leftPadding=0,
+        rightPadding=0,
+        topPadding=0,
+        bottomPadding=0,
+        id="body",
+        showBoundary=0,
+    )
+    doc = BaseDocTemplate(
         str(OUT),
         pagesize=letter,
-        leftMargin=0.85 * inch,
-        rightMargin=0.85 * inch,
-        topMargin=1.05 * inch,
-        bottomMargin=0.8 * inch,
         title="MS-50 Modular design pack",
         author="Martial Systems LLC",
+        pageTemplates=[PageTemplate(id="main", frames=[frame], onPage=draw_page)],
     )
-    doc.build(story, onFirstPage=draw_page, onLaterPages=draw_page)
+    doc.build(story)
     print(OUT)
 
 
