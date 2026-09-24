@@ -30,7 +30,9 @@ target_sources(MS50Modular PRIVATE
   Source/Modular/Module.cpp
   Source/Modular/PatchGraph.cpp
   Source/Modular/ExtIn.cpp
-  Source/Modular/OutputModule.cpp)
+  Source/Modular/OutputModule.cpp
+  Source/UI/JackView.cpp
+  Source/UI/RackView.cpp)
 
 target_include_directories(MS50Modular PRIVATE Source)
 

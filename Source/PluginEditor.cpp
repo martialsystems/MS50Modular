@@ -10,28 +10,23 @@ MS50ModularAudioProcessorEditor::MS50ModularAudioProcessorEditor (MS50ModularAud
     titleLabel.setColour (juce::Label::textColourId, juce::Colours::white);
     titleLabel.setInterceptsMouseClicks (false, false);
     addAndMakeVisible (titleLabel);
+    addAndMakeVisible (rack);
 
-    statusLabel.setText ("no patch yet", juce::dontSendNotification);
-    statusLabel.setJustificationType (juce::Justification::centred);
-    statusLabel.setColour (juce::Label::textColourId, juce::Colours::white);
-    statusLabel.setInterceptsMouseClicks (false, false);
-    addAndMakeVisible (statusLabel);
-
-    setResizable (false, false);
-    setSize (420, 180);
+    setResizable (true, true);
+    setResizeLimits (720, 480, 1800, 1200);
+    setSize (1100, 720);
 }
 
 MS50ModularAudioProcessorEditor::~MS50ModularAudioProcessorEditor() = default;
 
 void MS50ModularAudioProcessorEditor::paint (juce::Graphics& g)
 {
-    g.fillAll (juce::Colour (0xff1c1c1c));
+    g.fillAll (juce::Colour (0xff121212));
 }
 
 void MS50ModularAudioProcessorEditor::resized()
 {
-    auto area = getLocalBounds().reduced (24);
-    titleLabel.setBounds (area.removeFromTop (36));
-    area.removeFromTop (8);
-    statusLabel.setBounds (area.removeFromTop (28));
+    auto area = getLocalBounds();
+    titleLabel.setBounds (area.removeFromTop (28));
+    rack.setBounds (area);
 }

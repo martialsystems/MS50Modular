@@ -3,6 +3,8 @@
 #pragma once
 
 #include "PluginProcessor.h"
+#include "UI/RackView.h"
+
 #include <juce_gui_basics/juce_gui_basics.h>
 
 class MS50ModularAudioProcessorEditor : public juce::AudioProcessorEditor
@@ -16,7 +18,7 @@ public:
 
 private:
     juce::Label titleLabel;
-    juce::Label statusLabel;
+    RackView rack;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MS50ModularAudioProcessorEditor)
 };
