@@ -134,6 +134,7 @@ Read these three files before editing code: `docs/01-research.md`, `docs/METHODO
 *   `process()` and `processSample()` do not allocate, lock, or log.
 *   One cable per input. Reject the second cable in the graph, not only in the UI.
 *   Branch `feat/step-XX` off `main`. One step per branch. Do not start step N+1 on a branch whose acceptance test fails.
+*   When that step's acceptance checks pass, merge the branch into `main` and push `main` before the next step. Leave it unmerged only when the user says to keep it on the branch.
 *   Do not commit DAW projects, samples, `.env` files, or scans of the Korg schematics.
 *   UI work that changes a control or a cable must be clicked through in a real plugin host or a standalone window before the step is called done. Say which host.
 
