@@ -2,7 +2,9 @@
 
 #include "RackView.h"
 #include "JackView.h"
+#include "PluginProcessor.h"
 
+#include <cstring>
 #include <iterator>
 
 namespace {
@@ -111,6 +113,10 @@ constexpr JackSpec kIntegrator[] = {
     { "Out", PortType::CV, PortDir::Out },
 };
 
+// Faceplate order. These slots are not PatchGraph indices.
+constexpr int kExtInSlot = 0;
+constexpr int kOutputSlot = 5;
+
 constexpr PlateSpec kPlates[] = {
     { "Ext In", kExtIn, 4 },
     { "VCO", kVco, 8 },
@@ -185,8 +191,13 @@ struct RackView::Faceplate : public juce::Component
     }
 };
 
-RackView::RackView()
+RackView::RackView (MS50ModularAudioProcessor& audioProcessor)
+    : processor (audioProcessor),
+      cables (*this, audioProcessor)
 {
+    jassert (std::strcmp (kPlates[kExtInSlot].name, "Ext In") == 0);
+    jassert (std::strcmp (kPlates[kOutputSlot].name, "Output") == 0);
+
     for (int slot = 0; slot < static_cast<int> (std::size (kPlates)); ++slot)
     {
         const PlateSpec& spec = kPlates[slot];
@@ -200,6 +211,8 @@ RackView::RackView()
         }
         addAndMakeVisible (plate);
     }
+
+    addAndMakeVisible (cables);
 }
 
 RackView::~RackView() = default;
@@ -211,6 +224,8 @@ void RackView::paint (juce::Graphics& g)
 
 void RackView::resized()
 {
+    cables.setBounds (getLocalBounds());
+
     auto area = getLocalBounds().reduced (8);
     const int count = plates.size();
     if (count == 0 || area.isEmpty())
@@ -232,4 +247,37 @@ void RackView::resized()
                               cellWidth,
                               cellHeight);
     }
+}
+
+CableEnd RackView::jackCentre (int graphModule, int port) const
+{
+    CableEnd end;
+    if (graphModule < 0 || port < 0)
+        return end;
+
+    int slot = -1;
+    if (graphModule == processor.extInGraphIndex())
+        slot = kExtInSlot;
+    else if (graphModule == processor.outputGraphIndex())
+        slot = kOutputSlot;
+    if (slot < 0 || slot >= plates.size())
+        return end;
+
+    const Faceplate* plate = plates[slot];
+    if (plate == nullptr || port >= plate->jacks.size())
+        return end;
+
+    const JackView* jack = plate->jacks[port];
+    if (jack == nullptr || jack->getWidth() <= 0 || jack->getHeight() <= 0)
+        return end;
+    if (jack->getPortIndex() != port)
+        return end;
+
+    const auto inPlate = jack->getHitBounds().toFloat().getCentre();
+    const auto inRack = getLocalPoint (plate, inPlate);
+    end.x = inRack.x;
+    end.y = inRack.y;
+    end.type = jack->getPortType();
+    end.found = true;
+    return end;
 }

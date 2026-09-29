@@ -3,7 +3,8 @@
 #include "PluginEditor.h"
 
 MS50ModularAudioProcessorEditor::MS50ModularAudioProcessorEditor (MS50ModularAudioProcessor& audioProcessor)
-    : AudioProcessorEditor (audioProcessor)
+    : AudioProcessorEditor (audioProcessor),
+      rack (audioProcessor)
 {
     titleLabel.setText ("MS-50 Modular", juce::dontSendNotification);
     titleLabel.setJustificationType (juce::Justification::centred);

@@ -302,6 +302,34 @@ int testDisconnectMissingIsNoop()
     return finish ("testDisconnectMissingIsNoop");
 }
 
+int testPublishedSnapshotCopy()
+{
+    PatchGraph graph;
+    GainModule a;
+    GainModule b;
+    GainModule c;
+    const int ia = graph.addModule (a);
+    const int ib = graph.addModule (b);
+    const int ic = graph.addModule (c);
+
+    Cable scratch[4];
+    check (graph.copyPublishedCables (nullptr, 4) == 0, "null dest");
+    check (graph.copyPublishedCables (scratch, 0) == 0, "zero capacity");
+    check (graph.copyPublishedCables (scratch, 4) == 0, "empty snapshot");
+
+    check (graph.connect (ia, 1, ib, 0), "first cable");
+    check (graph.connect (ia, 1, ic, 0), "fan-out cable");
+    check (graph.copyPublishedCables (scratch, 4) == 2, "two published cables");
+    check (scratch[0].sourceModule == ia && scratch[0].sourcePort == 1, "first source");
+    check (scratch[0].destModule == ib && scratch[0].destPort == 0, "first dest");
+    check (scratch[1].sourceModule == ia && scratch[1].destModule == ic, "second cable");
+
+    Cable onlyFirst[1];
+    check (graph.copyPublishedCables (onlyFirst, 1) == 1, "capacity truncates");
+    check (onlyFirst[0].destModule == ib, "truncation keeps the first cable");
+    return finish ("testPublishedSnapshotCopy");
+}
+
 }
 
 int testDryMixPassesStereo();
@@ -319,6 +347,7 @@ int main()
     failed += testRejectCycle();
     failed += testSnapshotSwapDoesNotAllocate();
     failed += testDisconnectMissingIsNoop();
+    failed += testPublishedSnapshotCopy();
     failed += testDryMixPassesStereo();
     failed += testExtInMonoAveragesStereo();
     failed += testWetMixIgnoresDry();

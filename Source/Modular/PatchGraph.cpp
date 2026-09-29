@@ -218,6 +218,26 @@ void PatchGraph::publish()
     published_.store (back, std::memory_order_release);
 }
 
+int PatchGraph::copyPublishedCables (Cable* dest, int capacity) const
+{
+    if (dest == nullptr || capacity <= 0)
+        return 0;
+
+    const int published = published_.load (std::memory_order_acquire);
+    const int index = (published == 1) ? 1 : 0;
+    const Snapshot& snapshot = snapshots_[index];
+    int count = snapshot.cableCount;
+    if (count > capacity)
+        count = capacity;
+    if (count > kMaxCables)
+        count = kMaxCables;
+    if (count < 0)
+        count = 0;
+    for (int i = 0; i < count; ++i)
+        dest[i] = snapshot.cables[i];
+    return count;
+}
+
 void PatchGraph::process()
 {
     const Snapshot& snapshot = snapshots_[published_.load (std::memory_order_acquire)];

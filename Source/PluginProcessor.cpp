@@ -8,10 +8,15 @@ MS50ModularAudioProcessor::MS50ModularAudioProcessor()
                           .withInput ("Input", juce::AudioChannelSet::stereo(), true)
                           .withOutput ("Output", juce::AudioChannelSet::stereo(), true))
 {
-    const int extIndex = graph.addModule (extIn);
-    const int outIndex = graph.addModule (output);
-    graph.connect (extIndex, 0, outIndex, 0);
-    graph.connect (extIndex, 1, outIndex, 1);
+    extModuleIndex_ = graph.addModule (extIn);
+    outputModuleIndex_ = graph.addModule (output);
+    graph.connect (extModuleIndex_, 0, outputModuleIndex_, 0);
+    graph.connect (extModuleIndex_, 1, outputModuleIndex_, 1);
+}
+
+int MS50ModularAudioProcessor::copyPublishedCables (Cable* dest, int capacity) const
+{
+    return graph.copyPublishedCables (dest, capacity);
 }
 
 MS50ModularAudioProcessor::~MS50ModularAudioProcessor() = default;

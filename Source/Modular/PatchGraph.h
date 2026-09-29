@@ -26,6 +26,9 @@ public:
     int moduleCount() const { return moduleCount_; }
     int cableCount() const { return editCableCount_; }
 
+    // Copies the published snapshot. The caller supplies storage. No allocation.
+    int copyPublishedCables (Cable* dest, int capacity) const;
+
 private:
     struct Snapshot {
         Cable cables[kMaxCables] {};
