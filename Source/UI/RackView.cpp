@@ -304,13 +304,52 @@ void RackView::showStatus (const char* text)
         statusTarget->showPatchStatus (text != nullptr ? text : "");
 }
 
+void RackView::clearDrag()
+{
+    dragging = false;
+    dragMapped = false;
+    dragKind = DragKind::None;
+    dragModule = -1;
+    dragPort = -1;
+    grabDestModule = -1;
+    grabDestPort = -1;
+    cables.clearLiftedCable();
+    cables.clearRubberBand();
+}
+
+void RackView::finishGrab (const juce::MouseEvent& event, int sourceModule, int sourcePort,
+                           int oldDestModule, int oldDestPort)
+{
+    const JackHit hit = jackAt (event.position);
+    int destModule = -1;
+    int destPort = -1;
+    const bool destIsInput = hit.jack != nullptr && hit.jack->getPortDir() == PortDir::In;
+    const bool destMapped = destIsInput && graphEndpoint (*hit.jack, destModule, destPort);
+    if (destMapped && destModule == oldDestModule && destPort == oldDestPort)
+    {
+        showStatus ("");
+        cables.repaint();
+        return;
+    }
+
+    processor.disconnectJacks (sourceModule, sourcePort, oldDestModule, oldDestPort);
+    if (! destMapped)
+    {
+        showStatus ("");
+        cables.repaint();
+        return;
+    }
+
+    const auto result = processor.connectJacks (sourceModule, sourcePort, destModule, destPort);
+    showStatus (PatchGraph::connectResultText (result));
+    cables.repaint();
+}
+
 void RackView::mouseDown (const juce::MouseEvent& event)
 {
     if (event.mods.isPopupMenu())
     {
-        dragging = false;
-        dragMapped = false;
-        cables.clearRubberBand();
+        clearDrag();
         int sourceModule = -1;
         int sourcePort = -1;
         int destModule = -1;
@@ -327,18 +366,45 @@ void RackView::mouseDown (const juce::MouseEvent& event)
     if (! event.mods.isLeftButtonDown())
         return;
 
+    // The wire is tested before output jacks. A jack circle still starts a new cable,
+    // so fan-out from an output that already has a cable keeps working.
     const JackHit hit = jackAt (event.position);
+    const bool onJack = hit.jack != nullptr;
+    int sourceModule = -1;
+    int sourcePort = -1;
+    int destModule = -1;
+    int destPort = -1;
+    if (! onJack && cables.cableAt (event.position, sourceModule, sourcePort, destModule, destPort))
+    {
+        const CableEnd from = jackCentre (sourceModule, sourcePort);
+        dragging = true;
+        dragKind = DragKind::Grab;
+        dragMapped = from.found;
+        dragModule = sourceModule;
+        dragPort = sourcePort;
+        grabDestModule = destModule;
+        grabDestPort = destPort;
+        dragX = from.found ? from.x : event.position.x;
+        dragY = from.found ? from.y : event.position.y;
+        cables.setLiftedCable (sourceModule, sourcePort, destModule, destPort);
+        cables.setRubberBand ({ dragX, dragY }, event.position);
+        return;
+    }
+
     if (hit.jack == nullptr || hit.plate == nullptr || hit.jack->getPortDir() != PortDir::Out)
         return;
 
     const auto from = jackCentreInRack (*hit.plate, *hit.jack);
     dragging = true;
+    dragKind = DragKind::Create;
     dragMapped = graphEndpoint (*hit.jack, dragModule, dragPort);
     if (! dragMapped)
     {
         dragModule = -1;
         dragPort = -1;
     }
+    grabDestModule = -1;
+    grabDestPort = -1;
     dragX = from.x;
     dragY = from.y;
     cables.setRubberBand (from, event.position);
@@ -356,22 +422,23 @@ void RackView::mouseUp (const juce::MouseEvent& event)
     if (! dragging || event.mods.isPopupMenu())
     {
         if (dragging)
-        {
-            dragging = false;
-            dragMapped = false;
-            cables.clearRubberBand();
-        }
+            clearDrag();
         return;
     }
 
+    const DragKind kind = dragKind;
     const bool mapped = dragMapped;
     const int sourceModule = dragModule;
     const int sourcePort = dragPort;
-    dragging = false;
-    dragMapped = false;
-    dragModule = -1;
-    dragPort = -1;
-    cables.clearRubberBand();
+    const int oldDestModule = grabDestModule;
+    const int oldDestPort = grabDestPort;
+    clearDrag();
+
+    if (kind == DragKind::Grab)
+    {
+        finishGrab (event, sourceModule, sourcePort, oldDestModule, oldDestPort);
+        return;
+    }
 
     const JackHit hit = jackAt (event.position);
     int destModule = -1;

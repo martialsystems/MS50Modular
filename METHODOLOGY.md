@@ -106,7 +106,7 @@ Rules:
 | S-24 | Feedback edge | In a cycle, the newest cable is the back-edge and delays one sample | A different deterministic rule, if documented in the same change as the tests |
 | S-25 | Control rate | Knobs and CV are read every audio sample. There is no slower CV block | A profiled need for a coarser rate. Do not add one for style |
 | S-26 | EG2 timeline | See SCHEMATICS, EG2. No sustain plateau | An owner's sentence or a scope shot of hold versus delay |
-| S-27 | Output fan-out | One output may feed many inputs. One input accepts one cable | If a later pass removes fan-out because the hardware jacks do not stack, the multiples module (phase 2) becomes required first |
+| S-27 | Output fan-out | One output may feed many inputs. An input sums every cable that lands on it. Stacking on an input is a VST convenience: a 1978 MS-50 jack took one plug | If a later pass removes fan-out, the multiples module (phase 2) becomes required first |
 
 Footage frequencies used with S-03 and S-04, equal-tempered C, A440. These pitches are a stand-in for what "32'" meant at the jack with no cable inserted. The switch positions 32', 16', 8', 4' are confirmed. The hertz numbers are not.
 

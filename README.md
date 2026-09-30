@@ -49,7 +49,8 @@ The current editor is a development rack: fourteen tiles, Integrator included. T
 ## Features in the finished phase 1 plugin
 
 *   Stereo in and stereo out. Processing modules are mono.
-*   Click-drag patch cables, one cable per input. An output may feed several inputs (stand-in S-27).
+*   Click-drag patch cables. An input sums every cable on it. An output may feed several inputs (stand-in S-27).
+*   Stacking on one jack is a VST convenience: a 1978 MS-50 jack took one plug. Drag a cable onto empty space to unpatch it, or right-click the cable.
 *   Animated cables drawn on the message thread.
 *   Port colors: audio, CV, gate. Illegal cables are refused.
 *   No heap allocation on the audio thread.
@@ -126,7 +127,7 @@ Requirements: CMake 3.22 or newer, a C++20 compiler, git (JUCE 8 is fetched by C
 
 Tests: `docs/TESTPLAN.md`. Each build-guide step names one acceptance command or one listening check. Do not skip to a later step because a later feature seems small.
 
-Run `MS50ModularTests` and look for `SINE_DRY PASS`.
+Run `MS50ModularTests` and look for `SINE_DRY PASS`. Stacking does not replace the default dry cables.
 
 ## Work rules for coding agents
 
@@ -138,7 +139,7 @@ Read these three files before editing code: `docs/01-research.md`, `docs/METHODO
 *   Keep the integrator on the rack. Do not fold lag into the VCO.
 *   DSP modules do not include JUCE headers. The processor copies buffers in and out.
 *   `process()` and `processSample()` do not allocate, lock, or log.
-*   One cable per input. Reject the second cable in the graph, not only in the UI.
+*   Inputs sum. A second cable into an input stays in the graph.
 *   Branch `feat/step-XX` off `main`. One step per branch. Do not start step N+1 on a branch whose acceptance test fails.
 *   When that step's acceptance checks pass, merge the branch into `main` and push `main` before the next step. Leave it unmerged only when the user says to keep it on the branch.
 *   Do not commit DAW projects, samples, `.env` files, or scans of the Korg schematics.

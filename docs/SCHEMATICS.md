@@ -60,7 +60,7 @@ Phase 2 faces are not drawn and have no ports in the graph.
 
 *   Fixed module list. No add-module command in phase 1.
 *   Each module owns a fixed `float portValue[]`. Unpatched Audio and CV inputs are set to 0 V before the sample, except EG `Trig` jacks. An unpatched `Trig` is set to +5 V so it rests released. 0 V on a trigger means "shorted," and a missing cable must not hold the envelope forever (S-15). A Gate input that received a promoted Gate uses the promotion rule below.
-*   One cable per input. A second `connect` returns false and changes nothing.
+*   An input sums every cable that lands on it. A second `connect` appends another cable and publishes. See Input summing.
 *   An output may feed several inputs (S-27). That fan-out is a software convenience so EG 1 can reach both the VCA and the filter before the multiples module exists.
 *   Cable creation and deletion happen on the message thread. The audio thread reads a published snapshot.
 *   Snapshot storage is two preallocated graphs plus an atomic index. Swapping snapshots does not allocate. `processBlock` does not allocate, lock, take a mutex, or log.
@@ -68,11 +68,17 @@ Phase 2 faces are not drawn and have no ports in the graph.
 *   Until step 19, a cable that would close a cycle is rejected. From step 19, a cycle is accepted: the newest cable in the cycle is the back-edge (S-24) and carries a one-sample delay. Every other cable in that snapshot is zero-delay.
 *   Port types: `Audio`, `CV`, `Gate`.
 *   Allowed: Audio to Audio, Audio to CV, CV to CV, CV to Audio, Gate to Gate, Gate to CV, Gate to Audio.
-*   Rejected: Audio or CV into a Gate-only input. Two cables into one input. A cable from a port to itself with no module in between.
+*   Rejected: Audio or CV into a Gate-only input. A cable from a port to itself with no module in between.
 *   Gate promotion into a CV or Audio input uses S-15: held gate writes 0 V, released gate writes +5 V. That matches an active-low S-trig electrical picture. Logical "held" inside an EG still means the trigger condition is true.
 *   EG `Trig` jacks are type CV, not Gate-only, because the hardware detector accepts a voltage. Ext In `Gate` is type Gate and may be patched into `Trig` through the promotion above. MG pulse is type CV (0 V to +5 V) and may be patched into `Trig` directly. Divider outputs are type CV.
 *   Gate-only inputs in phase 1: none on the modules. Ext In's gate output is the Gate source. EG 2 `DelayTrig` is type Gate. Output has no gate jack.
 *   Sample rate lives on the graph. `prepare(sampleRate)` runs on the message thread before audio starts, and again if the host changes rate. It may allocate. `processSample` may not.
+
+## Input summing (2026-09-29)
+
+An input starts at 0 V on each sample. Every cable into that input adds the source port. A second connect appends a cable and publishes the snapshot. Stacking is a VST convenience: a 1978 MS-50 jack took one plug. Fan-out from one output remains allowed.
+
+Unpatch by dragging the cable onto empty space, or by right-clicking it. A drag that lands on a legal input moves the cable. The default dry cables are created once, in the processor constructor. A later publish does not put a removed dry cable back.
 
 Sketch, not a finished class:
 

@@ -145,6 +145,28 @@ void CableView::clearRubberBand()
     repaint();
 }
 
+void CableView::setLiftedCable (int sourceModule, int sourcePort, int destModule, int destPort)
+{
+    liftActive_ = true;
+    liftSourceModule_ = sourceModule;
+    liftSourcePort_ = sourcePort;
+    liftDestModule_ = destModule;
+    liftDestPort_ = destPort;
+    repaint();
+}
+
+void CableView::clearLiftedCable()
+{
+    if (! liftActive_)
+        return;
+    liftActive_ = false;
+    liftSourceModule_ = -1;
+    liftSourcePort_ = -1;
+    liftDestModule_ = -1;
+    liftDestPort_ = -1;
+    repaint();
+}
+
 bool CableView::cableAt (juce::Point<float> point, int& sourceModule, int& sourcePort, int& destModule, int& destPort)
 {
     refreshGeometry();
@@ -184,8 +206,19 @@ void CableView::refreshGeometry()
 
     Cubic next[PatchGraph::kMaxCables];
     int count = 0;
+    bool skippedLift = false;
     for (int i = 0; i < publishedCount; ++i)
     {
+        if (liftActive_ && ! skippedLift
+            && published[i].sourceModule == liftSourceModule_
+            && published[i].sourcePort == liftSourcePort_
+            && published[i].destModule == liftDestModule_
+            && published[i].destPort == liftDestPort_)
+        {
+            skippedLift = true;
+            continue;
+        }
+
         const CableEnd source = jacks.jackCentre (published[i].sourceModule, published[i].sourcePort);
         const CableEnd dest = jacks.jackCentre (published[i].destModule, published[i].destPort);
         if (! source.found || ! dest.found)

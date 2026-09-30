@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
+#include "Modular/OutputModule.h"
 #include "Modular/PatchGraph.h"
 
 #include <atomic>
@@ -136,25 +137,56 @@ int finish (const char* name)
     return failed == 0 ? 0 : 1;
 }
 
-int testOneCablePerInput()
+int testInputSumsTwoCables()
 {
     PatchGraph graph;
     ConstantModule a (1.0f, PortType::Audio);
-    GainModule b;
-    ConstantModule c (2.0f, PortType::Audio);
+    ConstantModule b (0.5f, PortType::Audio);
+    GainModule dest;
     const int ia = graph.addModule (a);
     const int ib = graph.addModule (b);
-    const int ic = graph.addModule (c);
+    const int id = graph.addModule (dest);
 
-    check (graph.attemptConnect (ia, 1, ib, 0) == PatchGraph::ConnectResult::Ok, "first cable");
-    const int cables = graph.cableCount();
-    check (graph.attemptConnect (ic, 1, ib, 0) == PatchGraph::ConnectResult::Occupied, "second cable into B.in");
-    check (graph.cableCount() == cables, "first cable remains");
-
+    check (graph.attemptConnect (ia, 1, id, 0) == PatchGraph::ConnectResult::Ok, "first into dest");
+    check (graph.attemptConnect (ib, 1, id, 0) == PatchGraph::ConnectResult::Ok, "second into dest");
     graph.prepare (48000.0);
     graph.process();
-    check (b.portValue[1] == 1.0f, "B still follows A");
-    return finish ("testOneCablePerInput");
+    check (dest.portValue[0] == 1.5f, "dest input is 1.5");
+    return finish ("testInputSumsTwoCables");
+}
+
+int testSecondCableDoesNotReplaceFirst()
+{
+    PatchGraph graph;
+    ConstantModule a (1.0f, PortType::Audio);
+    ConstantModule b (0.5f, PortType::Audio);
+    OutputModule output;
+    const int ia = graph.addModule (a);
+    const int ib = graph.addModule (b);
+    const int iOut = graph.addModule (output);
+
+    check (graph.connect (ia, 1, iOut, 2), "first wet cable");
+    check (graph.connect (ib, 1, iOut, 2), "second wet cable");
+
+    Cable published[8];
+    const int count = graph.copyPublishedCables (published, 8);
+    int wet = 0;
+    bool sawA = false;
+    bool sawB = false;
+    for (int i = 0; i < count; ++i)
+    {
+        if (published[i].destModule != iOut || published[i].destPort != 2)
+            continue;
+        ++wet;
+        if (published[i].sourceModule == ia && published[i].sourcePort == 1)
+            sawA = true;
+        if (published[i].sourceModule == ib && published[i].sourcePort == 1)
+            sawB = true;
+    }
+    check (count == 2, "snapshot has both cables");
+    check (wet == 2, "both land on Output Wet");
+    check (sawA && sawB, "neither source was replaced");
+    return finish ("testSecondCableDoesNotReplaceFirst");
 }
 
 int testFanOutAllowed()
@@ -220,11 +252,10 @@ int testConnectStatusStrings()
     const auto first = graph.attemptConnect (ia, 1, ib, 0);
     check (first == PatchGraph::ConnectResult::Ok, "status path first cable");
     check (PatchGraph::connectResultText (first)[0] == '\0', "success clears the status");
-    const auto occupied = graph.attemptConnect (ic, 1, ib, 0);
-    check (occupied == PatchGraph::ConnectResult::Occupied, "second cable is occupied");
-    check (std::strcmp (PatchGraph::connectResultText (occupied), "input already has a cable") == 0,
-           "occupied string");
-    check (graph.cableCount() == 1, "occupied connect added nothing");
+    const auto stacked = graph.attemptConnect (ic, 1, ib, 0);
+    check (stacked == PatchGraph::ConnectResult::Ok, "second cable stacks");
+    check (PatchGraph::connectResultText (stacked)[0] == '\0', "stack clears the status");
+    check (graph.cableCount() == 2, "second cable appended");
 
     check (graph.attemptConnect (ia, 0, ib, 0) == PatchGraph::ConnectResult::BadType, "in to in");
     check (graph.attemptConnect (ia, 1, ic, 1) == PatchGraph::ConnectResult::BadType, "out to out");
@@ -262,10 +293,12 @@ int testConnectStatusStrings()
     const int iMid = both.addModule (mid);
     const int iOther = both.addModule (other);
     check (both.attemptConnect (iSrc, 1, iMid, 0) == PatchGraph::ConnectResult::Ok, "path for both");
-    check (both.attemptConnect (iOther, 1, iSrc, 0) == PatchGraph::ConnectResult::Ok, "src input taken");
+    check (both.attemptConnect (iOther, 1, iSrc, 0) == PatchGraph::ConnectResult::Ok, "src input cabled");
     const auto takenAndCycle = both.attemptConnect (iMid, 1, iSrc, 0);
-    check (takenAndCycle == PatchGraph::ConnectResult::Occupied, "taken input wins over a cycle");
-    check (both.cableCount() == 2, "taken-and-cycle added nothing");
+    check (takenAndCycle == PatchGraph::ConnectResult::Cycle, "cycle still refused on a patched input");
+    check (std::strcmp (PatchGraph::connectResultText (takenAndCycle), "feedback is not available until step 19") == 0,
+           "cycle string on a patched input");
+    check (both.cableCount() == 2, "cycle added nothing");
 
     check (graph.attemptConnect (-1, 0, 0, 0) == PatchGraph::ConnectResult::Rejected, "missing module");
     check (PatchGraph::connectResultText (PatchGraph::ConnectResult::Rejected)[0] == '\0', "rejected has no string");
@@ -416,7 +449,8 @@ int testSineRmsInRange();
 int main()
 {
     int failed = 0;
-    failed += testOneCablePerInput();
+    failed += testInputSumsTwoCables();
+    failed += testSecondCableDoesNotReplaceFirst();
     failed += testFanOutAllowed();
     failed += testRejectSignalIntoGate();
     failed += testRejectCycle();

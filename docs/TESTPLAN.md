@@ -50,7 +50,7 @@ Run the named tests when the matching build step lands. "Finite" means every sam
 |---|---|---|
 | Ext In | `testExtInMonoAveragesStereo`, `testExtInGateFiresAboveThreshold`, `testExtInButtonForcesGate` | Button is on the Ext In faceplate, not a hidden key |
 | Output | `testDryMixPassesStereo`, `testWetMixIgnoresDry`, `testLevelZeroIsSilence` | Stereo image collapses only as mix rises |
-| Graph | `testOneCablePerInput`, `testFanOutAllowed`, `testRejectSignalIntoGate`, `testRejectCycle` until step 19, then `testFeedbackIsOneSample` | Second cable does not replace the first |
+| Graph | `testInputSumsTwoCables`, `testSecondCableDoesNotReplaceFirst`, `testFanOutAllowed`, `testRejectSignalIntoGate`, `testRejectCycle` until step 19, then `testFeedbackIsOneSample` | Second cable stays. The input is the sum |
 | Noise | `testNoiseBothJacksMove`, `testNoiseSeedRepeats`, `testNoisePinkIsDarkerThanWhite`, `testNoiseHasNoKnobs` | No level control on the panel |
 | VCF step 8 | `testVcfPassesDcOrLow`, `testVcfPeakIncreasesResonance`, `testVcfPositiveCvRaisesCutoff` | Peak at 1 stays finite. No highpass switch |
 | VCF step 20 | `testVcfStaysFiniteWhenDrivenHard`, `testVcfHotInputMovesSpectrum` | Listening note `docs/listening/step-20.md` exists. No constant 250 |
@@ -76,7 +76,7 @@ Default patch smoke, after step 10 and again after step 20:
 
 | Attempt | Result |
 |---|---|
-| Second cable into Output Wet | Rejected. First cable stays. Status string on the message thread |
+| Second cable into Output Wet | Accepted. Both cables stay in the published snapshot. Wet is the sum |
 | Audio or CV into EG 2 DelayTrig, which is Gate | Rejected |
 | Gate into VCA 1 Env, which is CV | Allowed. Held gate writes 0 V (S-15), so the VCA closes while the gate is held. This is surprising and must be stated in the status line the first time it happens: "gate patched as active-low voltage" |
 | Cable that closes a cycle, before step 19 | Rejected |
@@ -88,11 +88,23 @@ UI and graph must agree. A test calls the same `connect` the mouse-up handler ca
 
 ## UI (2026-09-29)
 
-Step 6 keeps cable edits on the message thread. `testOneCablePerInput` calls `PatchGraph::attemptConnect`, and the mouse-up handler calls that same function.
+Step 6 keeps cable edits on the message thread. The mouse-up handler calls `PatchGraph::attemptConnect`. `testInputSumsTwoCables` and `testSecondCableDoesNotReplaceFirst` call that same function.
 
 *   A drag starts on an output jack. Mouse-up on a legal input connects and publishes. Mouse-up on empty space, an output, or an illegal jack does not connect.
-*   A right-click on a drawn cable disconnects and publishes. A right-click on empty space does nothing. Disconnect of a missing cable does nothing.
-*   Status text on the message thread, cleared after a successful change: "that jack does not take this cable", "input already has a cable", "feedback is not available until step 19".
+*   A drag that starts on a drawn cable unpatches that cable when it ends on empty space. A right-click on a drawn cable disconnects and publishes. A right-click on empty space does nothing. Disconnect of a missing cable does nothing.
+*   Status text on the message thread, cleared after a successful change: "that jack does not take this cable", "feedback is not available until step 19". A legal second cable clears the status.
+
+## Stackable inputs (2026-09-29)
+
+`testInputSumsTwoCables`: two audio outputs, 1.0 and 0.5, into one audio input. After `process` the destination port is 1.5.
+
+`testSecondCableDoesNotReplaceFirst`: two cables into Output Wet. Both are in the published snapshot.
+
+`testSineDryStereoPasses` and the other `SINE_*` lines still pass on the default graph: Ext In L to Output L, Ext In R to Output R, mix 0. `SINE_DRY` remains the agent check.
+
+`testRejectCycle` still passes. `testFanOutAllowed` and `testRejectSignalIntoGate` stay.
+
+Unpatch: drag a drawn cable onto empty space, or right-click it. Stacking on one jack is a VST convenience: a 1978 MS-50 jack took one plug.
 
 After Step UI-A:
 

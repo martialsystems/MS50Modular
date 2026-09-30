@@ -24,7 +24,6 @@ public:
     enum class ConnectResult {
         Ok,
         BadType,
-        Occupied,
         Cycle,
         Rejected
     };

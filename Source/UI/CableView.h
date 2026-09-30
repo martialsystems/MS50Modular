@@ -48,6 +48,10 @@ public:
     void setRubberBand (juce::Point<float> from, juce::Point<float> to);
     void clearRubberBand();
 
+    // Hides one published cable while it is being dragged. The snapshot stays.
+    void setLiftedCable (int sourceModule, int sourcePort, int destModule, int destPort);
+    void clearLiftedCable();
+
     // Fills the graph ids of the nearest drawn cable within the stroke. No allocation.
     bool cableAt (juce::Point<float> point, int& sourceModule, int& sourcePort, int& destModule, int& destPort);
 
@@ -86,4 +90,9 @@ private:
     juce::Path curves_[3];
     juce::Path rubber_;
     bool rubberVisible_ = false;
+    bool liftActive_ = false;
+    int liftSourceModule_ = -1;
+    int liftSourcePort_ = -1;
+    int liftDestModule_ = -1;
+    int liftDestPort_ = -1;
 };

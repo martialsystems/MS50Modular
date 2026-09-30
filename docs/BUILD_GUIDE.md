@@ -97,11 +97,11 @@ Rollback: remove `CMakeLists.txt` and `Source/` and the `build/` directory. `bui
 
 Files: `Source/Modular/Port.h`, `Module.h`, `Module.cpp`, `Cable.h`, `PatchGraph.h`, `PatchGraph.cpp`, `Source/Tests/GraphTests.cpp`, and a CMake target `MS50ModularTests` that is a console app, not a plugin. It links the modular sources and does not link the plugin target.
 
-Implement the rules in `SCHEMATICS.md` up to, but not including, delayed feedback. A cycle is rejected. One cable per input. Fan-out allowed. Type matrix enforced. Two snapshots, atomic index, no alloc in a method named `process`.
+Implement the rules in `SCHEMATICS.md` up to, but not including, delayed feedback. A cycle is rejected. Inputs sum. Fan-out allowed. Type matrix enforced. Two snapshots, atomic index, no alloc in a method named `process`.
 
 `Module` is the base from the schematic sketch. No concrete synth modules yet. Tests use a `GainModule` in the test file only, gain fixed at 1, not on the rack.
 
-Acceptance: `MS50ModularTests` runs `testOneCablePerInput`, `testFanOutAllowed`, `testRejectSignalIntoGate`, `testRejectCycle`, `testSnapshotSwapDoesNotAllocate` (the process function's source does not call `new` or `push_back`; a debug counter of allocations stays 0 across 1000 samples).
+Acceptance: `MS50ModularTests` runs `testInputSumsTwoCables`, `testSecondCableDoesNotReplaceFirst`, `testFanOutAllowed`, `testRejectSignalIntoGate`, `testRejectCycle`, `testSnapshotSwapDoesNotAllocate` (the process function's source does not call `new` or `push_back`; a debug counter of allocations stays 0 across 1000 samples).
 
 Do not touch: `PluginProcessor` audio behavior, the editor layout.
 
@@ -127,7 +127,7 @@ Every DSP step reruns the sine harness:
 cmake --build build --config Debug --target MS50ModularTests && ./build/MS50ModularTests
 ```
 
-Dry mix 0 must still pass unless that step documents a default-mix change. `SINE_* FAIL` fails the step. `SINE_HOST SKIP` is allowed when pedalboard or the VST3 bundle is absent. The host command is `python3 scripts/sine_through_fx.py --vst3 <debug-vst3>`.
+Dry mix 0 must still pass unless that step documents a default-mix change. `SINE_* FAIL` fails the step. Stacking cables does not change the default dry pair, so `SINE_DRY` still has to pass. `SINE_HOST SKIP` is allowed when pedalboard or the VST3 bundle is absent. The host command is `python3 scripts/sine_through_fx.py --vst3 <debug-vst3>`.
 
 ## Step 4: GUI rack and jacks, no DSP change
 
@@ -153,13 +153,27 @@ Rollback: draw nothing. Cables still exist in the graph.
 
 Files: `RackView` mouse handlers, `PatchGraph::connect` / `disconnect` called only from the message thread.
 
-Drag from an output to an input. On illegal pairs, refuse and show a one-line status string: "that jack does not take this cable" or "input already has a cable". Right-click a cable to remove it. Creating a cycle shows "feedback is not available until step 19" and does not connect. That string changes in step 19.
+Drag from an output to an input. On an illegal pair, refuse and show "that jack does not take this cable". Right-click a cable to remove it. Creating a cycle shows "feedback is not available until step 19" and does not connect. That string changes in step 19. A second cable into the same input is legal: see Stackable inputs.
 
-Acceptance: `testOneCablePerInput` still passes when the UI path is used (call `connect` the way the UI calls it). A manual check: drag Ext In Mono onto Output Wet, then set mix to 1, and a mono sum is heard on both speakers. Drag a second cable onto Output Wet and the first remains.
+Acceptance: the mouse-up path calls `PatchGraph::attemptConnect`. A manual check: drag Ext In Mono onto Output Wet, then set mix to 1, and a mono sum is heard on both speakers. A second cable onto Output Wet stays, and Wet is the sum of the two sources.
 
 Do not touch: module DSP that does not exist yet. Do not start Step UI-A in the same branch.
 
 Rollback: ignore mouse-up. Keyboard of cables is not required.
+
+## Stackable inputs (2026-09-29)
+
+An input sums every cable. A second `connect` to the same input succeeds, appends a cable, and publishes. This is a VST convenience: a 1978 MS-50 jack took one plug. Fan-out from one output stays allowed. Cycles, a cable from a port to itself, in-to-in, out-to-out, and the type matrix stay rejected.
+
+Status strings stay "that jack does not take this cable" and "feedback is not available until step 19". A legal second cable does not use "input already has a cable".
+
+Unpatch: drag a drawn cable onto empty space, or right-click it. Mouse-down on the cable, away from a jack circle, grabs that cable. A click on an output jack still starts a new cable, so fan-out from a busy output still works. Dropping a grabbed cable on a legal input moves it. The default dry cables are Ext In L to Output L and Ext In R to Output R, created once in the processor constructor. Removing one does not put it back on the next publish.
+
+Agent verify: `SINE_DRY` must still pass. The default graph is still those two dry cables at mix 0.
+
+Tests: `testInputSumsTwoCables`, `testSecondCableDoesNotReplaceFirst`. `testFanOutAllowed`, `testRejectSignalIntoGate`, `testRejectCycle`, and the `SINE_*` lines stay.
+
+Do not touch: Noise, VCF DSP, Step UI-A.
 
 ## Step 7: Noise
 

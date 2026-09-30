@@ -104,12 +104,6 @@ bool PatchGraph::connect (int sourceModule, int sourcePort, int destModule, int 
     if (editCableCount_ >= kMaxCables)
         return false;
 
-    for (int i = 0; i < editCableCount_; ++i)
-    {
-        if (editCables_[i].destModule == destModule && editCables_[i].destPort == destPort)
-            return false;
-    }
-
     Cable& cable = editCables_[editCableCount_];
     cable.sourceModule = sourceModule;
     cable.sourcePort = sourcePort;
@@ -126,8 +120,6 @@ const char* PatchGraph::connectResultText (ConnectResult result) noexcept
     {
         case ConnectResult::BadType:
             return "that jack does not take this cable";
-        case ConnectResult::Occupied:
-            return "input already has a cable";
         case ConnectResult::Cycle:
             return "feedback is not available until step 19";
         case ConnectResult::Ok:
@@ -157,12 +149,6 @@ PatchGraph::ConnectResult PatchGraph::attemptConnect (int sourceModule, int sour
         return ConnectResult::BadType;
     if (! typesAllowed (sourceDesc.type, destDesc.type))
         return ConnectResult::BadType;
-
-    for (int i = 0; i < editCableCount_; ++i)
-    {
-        if (editCables_[i].destModule == destModule && editCables_[i].destPort == destPort)
-            return ConnectResult::Occupied;
-    }
 
     if (closesCycle (sourceModule, destModule))
         return ConnectResult::Cycle;
@@ -312,10 +298,9 @@ void PatchGraph::process()
             const PortDesc desc = module->port (portIndex);
             if (desc.dir != PortDir::In)
                 continue;
-            if (desc.type == PortType::Gate)
+            if (desc.type == PortType::Gate && ! patched[moduleIndex][portIndex])
                 continue;
-            if (! patched[moduleIndex][portIndex])
-                module->portValue[portIndex] = 0.0f;
+            module->portValue[portIndex] = 0.0f;
         }
     }
 
@@ -329,7 +314,8 @@ void PatchGraph::process()
             const Cable& cable = snapshot.cables[i];
             if (cable.destModule != moduleIndex)
                 continue;
-            module->portValue[cable.destPort] = modules_[cable.sourceModule]->portValue[cable.sourcePort];
+            const Module* source = modules_[cable.sourceModule];
+            module->portValue[cable.destPort] += source->portValue[cable.sourcePort];
         }
 
         module->processSample();
