@@ -15,6 +15,7 @@ constexpr float kDashAdvance = 6.0f;
 constexpr float kBodyThickness = 5.2f;
 constexpr float kCoreThickness = 1.8f;
 constexpr int kCurveSteps = 28;
+constexpr float kHitRadius = 8.0f;
 
 int typeSlot (PortType type)
 {
@@ -56,7 +57,11 @@ bool CableView::sameCubic (const Cubic& a, const Cubic& b)
         && std::abs (a.c2y - b.c2y) < tol
         && std::abs (a.x1 - b.x1) < tol
         && std::abs (a.y1 - b.y1) < tol
-        && a.type == b.type;
+        && a.type == b.type
+        && a.sourceModule == b.sourceModule
+        && a.sourcePort == b.sourcePort
+        && a.destModule == b.destModule
+        && a.destPort == b.destPort;
 }
 
 juce::Point<float> CableView::pointOnCubic (const Cubic& cubic, float t)
@@ -77,6 +82,17 @@ juce::Point<float> CableView::pointOnCubic (const Cubic& cubic, float t)
     return { x, y };
 }
 
+float CableView::distanceToCubic (const Cubic& cubic, juce::Point<float> point)
+{
+    float best = 1.0e9f;
+    for (int step = 0; step <= kCurveSteps; ++step)
+    {
+        const auto onCurve = pointOnCubic (cubic, static_cast<float> (step) / static_cast<float> (kCurveSteps));
+        best = std::min (best, point.getDistanceFrom (onCurve));
+    }
+    return best;
+}
+
 CableView::CableView (CableJackLookup& lookup, MS50ModularAudioProcessor& audioProcessor)
     : jacks (lookup),
       processor (audioProcessor)
@@ -85,6 +101,7 @@ CableView::CableView (CableJackLookup& lookup, MS50ModularAudioProcessor& audioP
     setOpaque (false);
     for (auto& curve : curves_)
         curve.preallocateSpace (PatchGraph::kMaxCables * 12);
+    rubber_.preallocateSpace (48);
     startTimerHz (30);
 }
 
@@ -103,6 +120,52 @@ bool CableView::drawnCable (int index, float& x0, float& y0, float& x1, float& y
     x1 = cubic.x1;
     y1 = cubic.y1;
     type = cubic.type;
+    return true;
+}
+
+void CableView::setRubberBand (juce::Point<float> from, juce::Point<float> to)
+{
+    const float dx = to.x - from.x;
+    const float dy = to.y - from.y;
+    const float dist = std::sqrt (dx * dx + dy * dy);
+    const float sag = std::max (14.0f, dist * 0.22f);
+    rubber_.clear();
+    rubber_.startNewSubPath (from.x, from.y);
+    rubber_.cubicTo (from.x + dx * 0.33f, from.y + dy * 0.33f + sag,
+                     from.x + dx * 0.66f, from.y + dy * 0.66f + sag,
+                     to.x, to.y);
+    rubberVisible_ = true;
+    repaint();
+}
+
+void CableView::clearRubberBand()
+{
+    rubber_.clear();
+    rubberVisible_ = false;
+    repaint();
+}
+
+bool CableView::cableAt (juce::Point<float> point, int& sourceModule, int& sourcePort, int& destModule, int& destPort)
+{
+    refreshGeometry();
+    int best = -1;
+    float bestDist = kHitRadius;
+    for (int i = 0; i < cubicCount_; ++i)
+    {
+        const float dist = distanceToCubic (cubics_[i], point);
+        if (dist <= bestDist)
+        {
+            bestDist = dist;
+            best = i;
+        }
+    }
+    if (best < 0)
+        return false;
+
+    sourceModule = cubics_[best].sourceModule;
+    sourcePort = cubics_[best].sourcePort;
+    destModule = cubics_[best].destModule;
+    destPort = cubics_[best].destPort;
     return true;
 }
 
@@ -142,6 +205,10 @@ void CableView::refreshGeometry()
         cubic.c2x = source.x + dx * 0.66f;
         cubic.c2y = source.y + dy * 0.66f + sag;
         cubic.type = source.type;
+        cubic.sourceModule = published[i].sourceModule;
+        cubic.sourcePort = published[i].sourcePort;
+        cubic.destModule = published[i].destModule;
+        cubic.destPort = published[i].destPort;
         ++count;
     }
 
@@ -243,4 +310,9 @@ void CableView::paint (juce::Graphics& g)
     refreshGeometry();
     strokeBody (g);
     strokeDashes (g);
+    if (rubberVisible_ && ! rubber_.isEmpty())
+    {
+        g.setColour (juce::Colours::white.withAlpha (0.9f));
+        g.strokePath (rubber_, juce::PathStrokeType (2.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    }
 }

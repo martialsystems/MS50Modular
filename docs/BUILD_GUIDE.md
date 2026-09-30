@@ -157,7 +157,7 @@ Drag from an output to an input. On illegal pairs, refuse and show a one-line st
 
 Acceptance: `testOneCablePerInput` still passes when the UI path is used (call `connect` the way the UI calls it). A manual check: drag Ext In Mono onto Output Wet, then set mix to 1, and a mono sum is heard on both speakers. Drag a second cable onto Output Wet and the first remains.
 
-Do not touch: module DSP that does not exist yet.
+Do not touch: module DSP that does not exist yet. Do not start Step UI-A in the same branch.
 
 Rollback: ignore mouse-up. Keyboard of cables is not required.
 
@@ -316,3 +316,25 @@ Rollback: restore the step 8 biquad in `Vcf.cpp` and say "S-10 reverted" in the 
 ## After step 20
 
 Stop. Phase 2 is a new packet. Do not start the adding amplifier because fan-out made it look easy.
+
+## Step UI-A: original panel pass (2026-09-29)
+
+Goal: replace the tile rack with one landscape chassis copied from the 1978 MS-50. Knobs sit in an upper band. Two continuous jack rows run along the bottom. Modules are labeled columns.
+
+When: after Step 6 works, and after at least the VCO, VCF, and VCA make sound, so the knobs have a signal to control. Do not block steps 7 to 20 on this pass.
+
+Files: `RackView`, `JackView`, `CableView`, `PluginEditor`. No `PatchGraph` API change. Jack ids stay the schematic ids. Only x/y and paint change.
+
+Layout, left to right: VCO, VCF, VCA 1, VCA 2, MG, EG 1, EG 2, Ring, Noise, Divider, Inverter, Integrator. Ext In is the far left column. Output is the far right column.
+
+Phase 2 gaps (mixer, sample and hold, meter) may be empty labeled slots so the spacing stays honest.
+
+Jacks: one size, silver body. Type is a small ring on that body: amber for audio, blue for CV, white for gate.
+
+Cables: a type family plus a stored per-cable hue, so two audio cables can carry different hues. The hue is assigned at connect and saved with the cable. A frame does not assign a new hue. Cables paint in a top layer over the panel.
+
+Do not touch: DSP, port order, the type matrix, snapshot rules.
+
+Acceptance: the same dry cables, the same connect rules, all tests still pass, and the window is landscape at about 2.5:1.
+
+Rollback: restore the tile rack.

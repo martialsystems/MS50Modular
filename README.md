@@ -33,6 +33,10 @@ Phase 1 rack, fixed, not a spawner:
 | Ring | RM, KOD-A40040 | RC4200 four-quadrant multiplier |
 | Output | Plugin I/O. Not the headphone amp | Dry stereo plus mono wet, mix and level |
 
+## UI target
+
+The current editor is a development rack: fourteen tiles, Integrator included. The shipping target is a single landscape MS-50-style panel: knobs in an upper band, two jack rows along the bottom, modules as labeled columns. That chassis follows the 1978 layout, rather than a VCV-style module grid. Ext In and Output stay as the end columns because this plugin is a VST3 FX. The layout is Step UI-A in the build guide. Step 6 does not paint that chassis.
+
 ## What it is not
 
 *   Not a Korg product, not affiliated with Korg, and not a copy of the Korg drawings. Those drawings stay outside the repo. Names are used to identify the instrument that was studied.

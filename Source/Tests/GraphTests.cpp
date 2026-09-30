@@ -5,6 +5,7 @@
 #include <atomic>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <string>
 
@@ -145,9 +146,9 @@ int testOneCablePerInput()
     const int ib = graph.addModule (b);
     const int ic = graph.addModule (c);
 
-    check (graph.connect (ia, 1, ib, 0), "first cable");
+    check (graph.attemptConnect (ia, 1, ib, 0) == PatchGraph::ConnectResult::Ok, "first cable");
     const int cables = graph.cableCount();
-    check (! graph.connect (ic, 1, ib, 0), "second cable into B.in");
+    check (graph.attemptConnect (ic, 1, ib, 0) == PatchGraph::ConnectResult::Occupied, "second cable into B.in");
     check (graph.cableCount() == cables, "first cable remains");
 
     graph.prepare (48000.0);
@@ -186,19 +187,89 @@ int testRejectSignalIntoGate()
     const int iCv = graph.addModule (cv);
     const int iGate = graph.addModule (gate);
 
+    // SCHEMATICS.md: Audio and CV into a Gate input are refused. Gate may feed Audio, CV, or Gate.
     check (! graph.connect (iAudio, 1, iGate, 0), "Audio into Gate");
     check (graph.cableCount() == 0, "Audio reject changed nothing");
-    check (graph.connect (iCv, 1, iGate, 0), "CV into Gate");
+    check (! graph.connect (iCv, 1, iGate, 0), "CV into Gate");
+    check (graph.cableCount() == 0, "CV reject changed nothing");
 
     ConstantModule gateSource (1.0f, PortType::Gate);
     SinkModule audioSink (PortType::Audio);
+    SinkModule cvSink (PortType::CV);
     SinkModule gateSink (PortType::Gate);
     const int iGateOut = graph.addModule (gateSource);
     const int iAudioIn = graph.addModule (audioSink);
+    const int iCvIn = graph.addModule (cvSink);
     const int iGateIn = graph.addModule (gateSink);
-    check (! graph.connect (iGateOut, 1, iAudioIn, 0), "Gate into Audio");
+    check (graph.connect (iGateOut, 1, iAudioIn, 0), "Gate into Audio");
+    check (graph.connect (iGateOut, 1, iCvIn, 0), "Gate into CV");
     check (graph.connect (iGateOut, 1, iGateIn, 0), "Gate into Gate");
     return finish ("testRejectSignalIntoGate");
+}
+
+int testConnectStatusStrings()
+{
+    PatchGraph graph;
+    ConstantModule a (1.0f, PortType::Audio);
+    GainModule b;
+    ConstantModule c (2.0f, PortType::Audio);
+    const int ia = graph.addModule (a);
+    const int ib = graph.addModule (b);
+    const int ic = graph.addModule (c);
+
+    const auto first = graph.attemptConnect (ia, 1, ib, 0);
+    check (first == PatchGraph::ConnectResult::Ok, "status path first cable");
+    check (PatchGraph::connectResultText (first)[0] == '\0', "success clears the status");
+    const auto occupied = graph.attemptConnect (ic, 1, ib, 0);
+    check (occupied == PatchGraph::ConnectResult::Occupied, "second cable is occupied");
+    check (std::strcmp (PatchGraph::connectResultText (occupied), "input already has a cable") == 0,
+           "occupied string");
+    check (graph.cableCount() == 1, "occupied connect added nothing");
+
+    check (graph.attemptConnect (ia, 0, ib, 0) == PatchGraph::ConnectResult::BadType, "in to in");
+    check (graph.attemptConnect (ia, 1, ic, 1) == PatchGraph::ConnectResult::BadType, "out to out");
+    check (graph.attemptConnect (ia, 1, ia, 1) == PatchGraph::ConnectResult::BadType, "port to itself");
+
+    PatchGraph cycle;
+    GainModule left;
+    GainModule right;
+    const int iLeft = cycle.addModule (left);
+    const int iRight = cycle.addModule (right);
+    check (cycle.attemptConnect (iLeft, 1, iRight, 0) == PatchGraph::ConnectResult::Ok, "cycle setup");
+    const auto closed = cycle.attemptConnect (iRight, 1, iLeft, 0);
+    check (closed == PatchGraph::ConnectResult::Cycle, "cycle result");
+    check (std::strcmp (PatchGraph::connectResultText (closed), "feedback is not available until step 19") == 0,
+           "cycle string");
+    check (cycle.cableCount() == 1, "cycle connect added nothing");
+    check (cycle.attemptConnect (iLeft, 1, iLeft, 0) == PatchGraph::ConnectResult::Cycle, "module into itself");
+
+    PatchGraph types;
+    ConstantModule audio (1.0f, PortType::Audio);
+    SinkModule gate (PortType::Gate);
+    const int iAudio = types.addModule (audio);
+    const int iGate = types.addModule (gate);
+    const auto badType = types.attemptConnect (iAudio, 1, iGate, 0);
+    check (badType == PatchGraph::ConnectResult::BadType, "audio into gate result");
+    check (std::strcmp (PatchGraph::connectResultText (badType), "that jack does not take this cable") == 0,
+           "type string");
+    check (types.cableCount() == 0, "type reject added nothing");
+
+    PatchGraph both;
+    GainModule src;
+    GainModule mid;
+    ConstantModule other (0.0f, PortType::Audio);
+    const int iSrc = both.addModule (src);
+    const int iMid = both.addModule (mid);
+    const int iOther = both.addModule (other);
+    check (both.attemptConnect (iSrc, 1, iMid, 0) == PatchGraph::ConnectResult::Ok, "path for both");
+    check (both.attemptConnect (iOther, 1, iSrc, 0) == PatchGraph::ConnectResult::Ok, "src input taken");
+    const auto takenAndCycle = both.attemptConnect (iMid, 1, iSrc, 0);
+    check (takenAndCycle == PatchGraph::ConnectResult::Occupied, "taken input wins over a cycle");
+    check (both.cableCount() == 2, "taken-and-cycle added nothing");
+
+    check (graph.attemptConnect (-1, 0, 0, 0) == PatchGraph::ConnectResult::Rejected, "missing module");
+    check (PatchGraph::connectResultText (PatchGraph::ConnectResult::Rejected)[0] == '\0', "rejected has no string");
+    return finish ("testConnectStatusStrings");
 }
 
 int testRejectCycle()
@@ -349,6 +420,7 @@ int main()
     failed += testFanOutAllowed();
     failed += testRejectSignalIntoGate();
     failed += testRejectCycle();
+    failed += testConnectStatusStrings();
     failed += testSnapshotSwapDoesNotAllocate();
     failed += testDisconnectMissingIsNoop();
     failed += testPublishedSnapshotCopy();

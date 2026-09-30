@@ -20,6 +20,18 @@ public:
     bool connect (int sourceModule, int sourcePort, int destModule, int destPort);
     void disconnect (int sourceModule, int sourcePort, int destModule, int destPort);
 
+    // Shared by the editor mouse-up path and by GraphTests. Only Ok calls connect().
+    enum class ConnectResult {
+        Ok,
+        BadType,
+        Occupied,
+        Cycle,
+        Rejected
+    };
+
+    ConnectResult attemptConnect (int sourceModule, int sourcePort, int destModule, int destPort);
+    static const char* connectResultText (ConnectResult result) noexcept;
+
     void prepare (double sampleRate);
     void process();
 

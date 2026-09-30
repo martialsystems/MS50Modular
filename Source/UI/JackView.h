@@ -6,7 +6,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
-// A jack circle. Clicks do not patch. Step 6 owns the drag.
+// A jack circle. Clicks pass through. RackView owns the drag.
 class JackView : public juce::Component
 {
 public:

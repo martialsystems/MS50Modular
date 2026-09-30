@@ -209,10 +209,12 @@ RackView::RackView (MS50ModularAudioProcessor& audioProcessor)
             auto* view = plate->jacks.add (new JackView (slot, port, jack.type, jack.dir, jack.name));
             plate->addAndMakeVisible (view);
         }
+        plate->setInterceptsMouseClicks (false, false);
         addAndMakeVisible (plate);
     }
 
     addAndMakeVisible (cables);
+    setName ("rack");
 }
 
 RackView::~RackView() = default;
@@ -247,6 +249,145 @@ void RackView::resized()
                               cellWidth,
                               cellHeight);
     }
+}
+
+RackView::JackHit RackView::jackAt (juce::Point<float> rackPoint) const
+{
+    JackHit hit;
+    for (int i = 0; i < plates.size(); ++i)
+    {
+        Faceplate* plate = plates[i];
+        if (plate == nullptr || ! plate->isVisible())
+            continue;
+        const auto inPlate = plate->getLocalPoint (this, rackPoint);
+        if (! plate->getLocalBounds().toFloat().contains (inPlate))
+            continue;
+        for (int j = 0; j < plate->jacks.size(); ++j)
+        {
+            JackView* jack = plate->jacks[j];
+            if (jack == nullptr || jack->getWidth() <= 0 || jack->getHeight() <= 0)
+                continue;
+            if (jack->getHitBounds().toFloat().contains (inPlate))
+            {
+                hit.jack = jack;
+                hit.plate = plate;
+                return hit;
+            }
+        }
+    }
+    return hit;
+}
+
+bool RackView::graphEndpoint (const JackView& jack, int& module, int& port) const
+{
+    const int slot = jack.getModuleIndex();
+    int graph = -1;
+    if (slot == kExtInSlot)
+        graph = processor.extInGraphIndex();
+    else if (slot == kOutputSlot)
+        graph = processor.outputGraphIndex();
+    if (graph < 0)
+        return false;
+    module = graph;
+    port = jack.getPortIndex();
+    return true;
+}
+
+juce::Point<float> RackView::jackCentreInRack (const Faceplate& plate, const JackView& jack) const
+{
+    return getLocalPoint (&plate, jack.getHitBounds().toFloat().getCentre());
+}
+
+void RackView::showStatus (const char* text)
+{
+    if (statusTarget != nullptr)
+        statusTarget->showPatchStatus (text != nullptr ? text : "");
+}
+
+void RackView::mouseDown (const juce::MouseEvent& event)
+{
+    if (event.mods.isPopupMenu())
+    {
+        dragging = false;
+        dragMapped = false;
+        cables.clearRubberBand();
+        int sourceModule = -1;
+        int sourcePort = -1;
+        int destModule = -1;
+        int destPort = -1;
+        if (cables.cableAt (event.position, sourceModule, sourcePort, destModule, destPort))
+        {
+            processor.disconnectJacks (sourceModule, sourcePort, destModule, destPort);
+            showStatus ("");
+            cables.repaint();
+        }
+        return;
+    }
+
+    if (! event.mods.isLeftButtonDown())
+        return;
+
+    const JackHit hit = jackAt (event.position);
+    if (hit.jack == nullptr || hit.plate == nullptr || hit.jack->getPortDir() != PortDir::Out)
+        return;
+
+    const auto from = jackCentreInRack (*hit.plate, *hit.jack);
+    dragging = true;
+    dragMapped = graphEndpoint (*hit.jack, dragModule, dragPort);
+    if (! dragMapped)
+    {
+        dragModule = -1;
+        dragPort = -1;
+    }
+    dragX = from.x;
+    dragY = from.y;
+    cables.setRubberBand (from, event.position);
+}
+
+void RackView::mouseDrag (const juce::MouseEvent& event)
+{
+    if (! dragging)
+        return;
+    cables.setRubberBand ({ dragX, dragY }, event.position);
+}
+
+void RackView::mouseUp (const juce::MouseEvent& event)
+{
+    if (! dragging || event.mods.isPopupMenu())
+    {
+        if (dragging)
+        {
+            dragging = false;
+            dragMapped = false;
+            cables.clearRubberBand();
+        }
+        return;
+    }
+
+    const bool mapped = dragMapped;
+    const int sourceModule = dragModule;
+    const int sourcePort = dragPort;
+    dragging = false;
+    dragMapped = false;
+    dragModule = -1;
+    dragPort = -1;
+    cables.clearRubberBand();
+
+    const JackHit hit = jackAt (event.position);
+    int destModule = -1;
+    int destPort = -1;
+    const bool destIsInput = hit.jack != nullptr && hit.jack->getPortDir() == PortDir::In;
+    const bool destMapped = destIsInput && graphEndpoint (*hit.jack, destModule, destPort);
+    if (! mapped || ! destMapped)
+    {
+        showStatus ("");
+        return;
+    }
+
+    const auto result = processor.connectJacks (sourceModule, sourcePort, destModule, destPort);
+    showStatus (PatchGraph::connectResultText (result));
+    if (result == PatchGraph::ConnectResult::Ok)
+        cables.repaint();
 }
 
 CableEnd RackView::jackCentre (int graphModule, int port) const

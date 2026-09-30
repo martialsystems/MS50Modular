@@ -40,8 +40,16 @@ public:
     float dashPhase() const noexcept { return dashPhase_; }
     int drawnCableCount() const noexcept { return cubicCount_; }
     int pathRebuildCount() const noexcept { return rebuilds_; }
+    bool isRubberBandVisible() const noexcept { return rubberVisible_; }
 
     bool drawnCable (int index, float& x0, float& y0, float& x1, float& y1, PortType& type) const noexcept;
+
+    // Message thread. The rubber band is not a published cable.
+    void setRubberBand (juce::Point<float> from, juce::Point<float> to);
+    void clearRubberBand();
+
+    // Fills the graph ids of the nearest drawn cable within the stroke. No allocation.
+    bool cableAt (juce::Point<float> point, int& sourceModule, int& sourcePort, int& destModule, int& destPort);
 
 private:
     struct Cubic {
@@ -54,10 +62,15 @@ private:
         float x1 = 0.0f;
         float y1 = 0.0f;
         PortType type = PortType::Audio;
+        int sourceModule = -1;
+        int sourcePort = -1;
+        int destModule = -1;
+        int destPort = -1;
     };
 
     static bool sameCubic (const Cubic& a, const Cubic& b);
     static juce::Point<float> pointOnCubic (const Cubic& cubic, float t);
+    static float distanceToCubic (const Cubic& cubic, juce::Point<float> point);
 
     void refreshGeometry();
     void rebuildPaths();
@@ -71,4 +84,6 @@ private:
     int rebuilds_ = 0;
     float dashPhase_ = 0.0f;
     juce::Path curves_[3];
+    juce::Path rubber_;
+    bool rubberVisible_ = false;
 };

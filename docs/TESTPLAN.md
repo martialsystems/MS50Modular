@@ -86,6 +86,20 @@ Default patch smoke, after step 10 and again after step 20:
 
 UI and graph must agree. A test calls the same `connect` the mouse-up handler calls.
 
+## UI (2026-09-29)
+
+Step 6 keeps cable edits on the message thread. `testOneCablePerInput` calls `PatchGraph::attemptConnect`, and the mouse-up handler calls that same function.
+
+*   A drag starts on an output jack. Mouse-up on a legal input connects and publishes. Mouse-up on empty space, an output, or an illegal jack does not connect.
+*   A right-click on a drawn cable disconnects and publishes. A right-click on empty space does nothing. Disconnect of a missing cable does nothing.
+*   Status text on the message thread, cleared after a successful change: "that jack does not take this cable", "input already has a cable", "feedback is not available until step 19".
+
+After Step UI-A:
+
+*   Offscreen paint still shows Ext In L and Ext In R running to Output L and Output R.
+*   The colours on those two dry cables differ.
+*   `connect` and `disconnect` still run on the message thread only.
+
 ## Preset recall
 
 After step 18:

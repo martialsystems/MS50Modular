@@ -4,12 +4,13 @@
 
 namespace {
 
-// Step 2 connection table. Rows are the source type. Columns are the destination type.
-// Audio into Gate is refused. CV into Gate is allowed. Gate into Audio is refused.
+// Rows are the source type (Audio, CV, Gate). Columns are the destination type.
+// SCHEMATICS.md: Audio and CV may feed Audio or CV. Gate may feed Audio, CV, or Gate.
+// Audio or CV into a Gate input is refused.
 constexpr bool kAllowed[3][3] = {
     { true, true, false },
+    { true, true, false },
     { true, true, true },
-    { false, true, true },
 };
 
 int typeIndex (PortType type)
@@ -117,6 +118,59 @@ bool PatchGraph::connect (int sourceModule, int sourcePort, int destModule, int 
     ++editCableCount_;
     publish();
     return true;
+}
+
+const char* PatchGraph::connectResultText (ConnectResult result) noexcept
+{
+    switch (result)
+    {
+        case ConnectResult::BadType:
+            return "that jack does not take this cable";
+        case ConnectResult::Occupied:
+            return "input already has a cable";
+        case ConnectResult::Cycle:
+            return "feedback is not available until step 19";
+        case ConnectResult::Ok:
+        case ConnectResult::Rejected:
+            return "";
+    }
+    return "";
+}
+
+PatchGraph::ConnectResult PatchGraph::attemptConnect (int sourceModule, int sourcePort, int destModule, int destPort)
+{
+    if (sourceModule < 0 || destModule < 0 || sourceModule >= moduleCount_ || destModule >= moduleCount_)
+        return ConnectResult::Rejected;
+    if (sourcePort < 0 || destPort < 0 || sourcePort >= kMaxPorts || destPort >= kMaxPorts)
+        return ConnectResult::BadType;
+
+    const Module* source = modules_[sourceModule];
+    const Module* dest = modules_[destModule];
+    if (source == nullptr || dest == nullptr)
+        return ConnectResult::Rejected;
+    if (sourcePort >= source->numPorts() || destPort >= dest->numPorts())
+        return ConnectResult::BadType;
+
+    const PortDesc sourceDesc = source->port (sourcePort);
+    const PortDesc destDesc = dest->port (destPort);
+    if (sourceDesc.dir != PortDir::Out || destDesc.dir != PortDir::In)
+        return ConnectResult::BadType;
+    if (! typesAllowed (sourceDesc.type, destDesc.type))
+        return ConnectResult::BadType;
+
+    for (int i = 0; i < editCableCount_; ++i)
+    {
+        if (editCables_[i].destModule == destModule && editCables_[i].destPort == destPort)
+            return ConnectResult::Occupied;
+    }
+
+    if (closesCycle (sourceModule, destModule))
+        return ConnectResult::Cycle;
+    if (editCableCount_ >= kMaxCables)
+        return ConnectResult::Rejected;
+    if (! connect (sourceModule, sourcePort, destModule, destPort))
+        return ConnectResult::Rejected;
+    return ConnectResult::Ok;
 }
 
 void PatchGraph::disconnect (int sourceModule, int sourcePort, int destModule, int destPort)

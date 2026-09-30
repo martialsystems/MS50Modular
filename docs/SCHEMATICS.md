@@ -537,3 +537,15 @@ Step 18 stores: format version, sample-rate-independent knob values (0 to 1 or t
 ## What the audio thread is forbidden to do
 
 Allocate, lock, read the message-thread cable vector, call into JUCE, resize a buffer, build a path for a cable, or walk the module list in UI order if that differs from the published topological order.
+
+## UI chassis (deferred) (2026-09-29)
+
+The development rack is the current 14 tiles. The target chassis is the original MS-50 column order: knobs above, jacks below. Step UI-A paints that chassis. Step 6 does not.
+
+Cable color policy for Step UI-A. Store the color on the cable when it connects. A frame does not assign a new color.
+
+*   Audio: base amber / orange, per-cable hue within 40 degrees of that base.
+*   CV: base blue, per-cable cyan to indigo.
+*   Gate: base white / grey, warm versus cool.
+
+The default Ext In L and Ext In R dry cables use different hex values. Step 6 still paints a cable from the source jack type and does not store a per-cable color.

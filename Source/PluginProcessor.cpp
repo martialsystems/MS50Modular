@@ -19,6 +19,41 @@ int MS50ModularAudioProcessor::copyPublishedCables (Cable* dest, int capacity) c
     return graph.copyPublishedCables (dest, capacity);
 }
 
+namespace {
+
+bool onMessageThread()
+{
+    auto* messages = juce::MessageManager::getInstanceWithoutCreating();
+    return messages != nullptr && messages->isThisTheMessageThread();
+}
+
+}
+
+PatchGraph::ConnectResult MS50ModularAudioProcessor::connectJacks (int sourceModule, int sourcePort,
+                                                                  int destModule, int destPort)
+{
+    jassert (onMessageThread());
+    if (! onMessageThread())
+        return PatchGraph::ConnectResult::Rejected;
+    return graph.attemptConnect (sourceModule, sourcePort, destModule, destPort);
+}
+
+void MS50ModularAudioProcessor::disconnectJacks (int sourceModule, int sourcePort, int destModule, int destPort)
+{
+    jassert (onMessageThread());
+    if (! onMessageThread())
+        return;
+    graph.disconnect (sourceModule, sourcePort, destModule, destPort);
+}
+
+void MS50ModularAudioProcessor::setOutputMix (float zeroToOne)
+{
+    jassert (onMessageThread());
+    if (! onMessageThread())
+        return;
+    output.setMix (zeroToOne);
+}
+
 MS50ModularAudioProcessor::~MS50ModularAudioProcessor() = default;
 
 void MS50ModularAudioProcessor::prepareToPlay (double sampleRate, int)

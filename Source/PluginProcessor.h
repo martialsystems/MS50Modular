@@ -47,6 +47,11 @@ public:
     // Copies the snapshot process() reads. No allocation. Editor thread only.
     int copyPublishedCables (Cable* dest, int capacity) const;
 
+    // Message thread only. The audio callback does not call these.
+    PatchGraph::ConnectResult connectJacks (int sourceModule, int sourcePort, int destModule, int destPort);
+    void disconnectJacks (int sourceModule, int sourcePort, int destModule, int destPort);
+    void setOutputMix (float zeroToOne);
+
 private:
     PatchGraph graph;
     ExtIn extIn;
