@@ -122,6 +122,8 @@ Requirements: CMake 3.22 or newer, a C++20 compiler, git (JUCE 8 is fetched by C
 
 Tests: `docs/TESTPLAN.md`. Each build-guide step names one acceptance command or one listening check. Do not skip to a later step because a later feature seems small.
 
+Run `MS50ModularTests` and look for `SINE_DRY PASS`.
+
 ## Work rules for coding agents
 
 Read these three files before editing code: `docs/01-research.md`, `docs/METHODOLOGY.md`, `docs/SCHEMATICS.md`. Then implement exactly one step from `docs/BUILD_GUIDE.md`.

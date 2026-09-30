@@ -30,6 +30,18 @@ After step 3, and again after steps 6, 8, and 18:
 *   Mix 1 with Wet unpatched is silence.
 *   `testDryMixPassesStereo` and `testExtInMonoAveragesStereo` pass.
 
+## Sine-through-FX harness (2026-09-29)
+
+Command:
+
+```bash
+cmake --build build --config Debug --target MS50ModularTests && ./build/MS50ModularTests
+```
+
+Agents must treat `SINE_* FAIL` as a step failure. `SINE_HOST SKIP` is allowed. After step 8 and later, keep `testSineDryStereoPasses`. New FX tests must not delete the dry sine tests.
+
+The four lines are `SINE_DRY`, `SINE_LEFT`, `SINE_WET_SILENCE`, and `SINE_RMS`. The optional host check is `python3 scripts/sine_through_fx.py --vst3 <debug-vst3>`.
+
 ## Each module
 
 Run the named tests when the matching build step lands. "Finite" means every sample in a 1 second render at 48 kHz is finite and inside ±40 V in the graph (well above the ±5 V stand-in, tight enough to catch a blow-up).

@@ -50,6 +50,7 @@ target_link_libraries(MS50Modular PRIVATE
 add_executable(MS50ModularTests
   Source/Tests/GraphTests.cpp
   Source/Tests/Step3Tests.cpp
+  Source/Tests/SineThroughFxTests.cpp
   Source/Modular/Module.cpp
   Source/Modular/PatchGraph.cpp
   Source/Modular/ExtIn.cpp

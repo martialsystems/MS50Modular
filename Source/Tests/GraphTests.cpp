@@ -337,6 +337,10 @@ int testExtInMonoAveragesStereo();
 int testWetMixIgnoresDry();
 int testLevelZeroIsSilence();
 int testLeftOnlyStaysLeft();
+int testSineDryStereoPasses();
+int testSineLeftOnlyStaysLeft();
+int testSineWetUnpatchedIsSilence();
+int testSineRmsInRange();
 
 int main()
 {
@@ -353,5 +357,9 @@ int main()
     failed += testWetMixIgnoresDry();
     failed += testLevelZeroIsSilence();
     failed += testLeftOnlyStaysLeft();
+    failed += testSineDryStereoPasses();
+    failed += testSineLeftOnlyStaysLeft();
+    failed += testSineWetUnpatchedIsSilence();
+    failed += testSineRmsInRange();
     return failed == 0 ? 0 : 1;
 }

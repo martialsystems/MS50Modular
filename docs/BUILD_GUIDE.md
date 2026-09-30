@@ -119,6 +119,16 @@ Do not touch: cable drawing, VCF, any other module.
 
 Rollback: processor returns to the step 1 copy. Keep the graph types.
 
+## Agent verify (2026-09-29)
+
+Every DSP step reruns the sine harness:
+
+```bash
+cmake --build build --config Debug --target MS50ModularTests && ./build/MS50ModularTests
+```
+
+Dry mix 0 must still pass unless that step documents a default-mix change. `SINE_* FAIL` fails the step. `SINE_HOST SKIP` is allowed when pedalboard or the VST3 bundle is absent. The host command is `python3 scripts/sine_through_fx.py --vst3 <debug-vst3>`.
+
 ## Step 4: GUI rack and jacks, no DSP change
 
 Files: `Source/UI/RackView.h/.cpp`, `JackView.h/.cpp`. Editor shows the 14 faceplates, all of them, including Integrator, even though only Ext In and Output process audio. Other faceplates are inert and their jacks do not connect yet. Each jack is a circle with a type color: audio amber, CV blue, gate white.

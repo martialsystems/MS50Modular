@@ -445,7 +445,7 @@ def draw_page(canvas, _doc):
     )
     canvas.setFont("Times-Roman", 9)
     canvas.drawString(LEFT, FOOTER_BASE, "MS-50 Modular design pack")
-    canvas.drawCentredString(PAGE_W / 2.0, FOOTER_BASE, "2026-09-21")
+    canvas.drawCentredString(PAGE_W / 2.0, FOOTER_BASE, "2026-09-29")
     canvas.drawRightString(PAGE_W - RIGHT, FOOTER_BASE, str(canvas.getPageNumber()))
     canvas.setStrokeColor(INK)
     canvas.setLineWidth(0.6)
@@ -468,13 +468,14 @@ def build():
         "The instrument's name is used only to identify the subject of the study.",
         st["body"],
     ))
-    story.append(Paragraph("Document date: 2026-09-21.", st["body"]))
+    story.append(Paragraph("Document date: 2026-09-29.", st["body"]))
     story.append(heading("Revisions", st["h1"]))
     for line in (
         "2026-09-21: First compiled pack. Methodology, research summary, software schematic, build guide, test plan, and reference list.",
         "2026-09-21: Copyright and the Korg notice placed on every page. The repository is public.",
         "2026-09-21: Rights statement set out in full. Korg Inc. is named as owner of the MS-50, its name, and its circuit designs. Martial Systems LLC claims copyright only in the original text and code of this repository.",
         "2026-09-21: Research page form. Headings use the wording of the notes. Body text is 10 point. The footer is one block: the copyright notice, the Korg notice, the pack title, the date, and the page number. A heading stays with the line under it. A table or a code listing moves when it does not fit. A heading after a chart has a break before it, and starts on the next page when less than two inches remain. The reference list stays in APA and closes the pack.",
+        "2026-09-29: Sine-through-FX harness added to the build guide and the test plan. Dry mix 0 stays the agent check. The host script may skip when pedalboard or the VST3 bundle is absent.",
     ):
         story.append(Paragraph(line, st["body"]))
     story.append(Paragraph(
