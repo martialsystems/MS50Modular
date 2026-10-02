@@ -17,8 +17,8 @@ public:
 };
 
 // Fourteen faceplates. Slot index is the rack order, not a PatchGraph index.
-// Ext In is slot 0. Output is slot 5. The graph stores those two modules at the
-// indices returned by addModule, which the processor keeps.
+// Ext In is slot 0. Output is slot 5. Noise is slot 9. The graph stores those
+// modules at the indices returned by addModule, which the processor keeps.
 class RackView : public juce::Component,
                  private CableJackLookup
 {

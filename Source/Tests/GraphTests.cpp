@@ -445,6 +445,10 @@ int testSineDryStereoPasses();
 int testSineLeftOnlyStaysLeft();
 int testSineWetUnpatchedIsSilence();
 int testSineRmsInRange();
+int testNoiseBothJacksMove();
+int testNoiseSeedRepeats();
+int testNoisePinkIsDarkerThanWhite();
+int testNoiseHasNoKnobs();
 
 int main()
 {
@@ -467,5 +471,9 @@ int main()
     failed += testSineLeftOnlyStaysLeft();
     failed += testSineWetUnpatchedIsSilence();
     failed += testSineRmsInRange();
+    failed += testNoiseBothJacksMove();
+    failed += testNoiseSeedRepeats();
+    failed += testNoisePinkIsDarkerThanWhite();
+    failed += testNoiseHasNoKnobs();
     return failed == 0 ? 0 : 1;
 }

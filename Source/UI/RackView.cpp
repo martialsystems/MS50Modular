@@ -116,6 +116,7 @@ constexpr JackSpec kIntegrator[] = {
 // Faceplate order. These slots are not PatchGraph indices.
 constexpr int kExtInSlot = 0;
 constexpr int kOutputSlot = 5;
+constexpr int kNoiseSlot = 9;
 
 constexpr PlateSpec kPlates[] = {
     { "Ext In", kExtIn, 4 },
@@ -197,6 +198,7 @@ RackView::RackView (MS50ModularAudioProcessor& audioProcessor)
 {
     jassert (std::strcmp (kPlates[kExtInSlot].name, "Ext In") == 0);
     jassert (std::strcmp (kPlates[kOutputSlot].name, "Output") == 0);
+    jassert (std::strcmp (kPlates[kNoiseSlot].name, "Noise") == 0);
 
     for (int slot = 0; slot < static_cast<int> (std::size (kPlates)); ++slot)
     {
@@ -286,6 +288,8 @@ bool RackView::graphEndpoint (const JackView& jack, int& module, int& port) cons
         graph = processor.extInGraphIndex();
     else if (slot == kOutputSlot)
         graph = processor.outputGraphIndex();
+    else if (slot == kNoiseSlot)
+        graph = processor.noiseGraphIndex();
     if (graph < 0)
         return false;
     module = graph;
@@ -468,6 +472,8 @@ CableEnd RackView::jackCentre (int graphModule, int port) const
         slot = kExtInSlot;
     else if (graphModule == processor.outputGraphIndex())
         slot = kOutputSlot;
+    else if (graphModule == processor.noiseGraphIndex())
+        slot = kNoiseSlot;
     if (slot < 0 || slot >= plates.size())
         return end;
 

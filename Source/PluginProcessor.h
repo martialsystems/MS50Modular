@@ -3,6 +3,7 @@
 #pragma once
 
 #include "Modular/ExtIn.h"
+#include "Modular/Noise.h"
 #include "Modular/OutputModule.h"
 #include "Modular/PatchGraph.h"
 
@@ -43,6 +44,7 @@ public:
     // Graph indices from addModule. Rack slots live in RackView.
     int extInGraphIndex() const noexcept { return extModuleIndex_; }
     int outputGraphIndex() const noexcept { return outputModuleIndex_; }
+    int noiseGraphIndex() const noexcept { return noiseModuleIndex_; }
 
     // Copies the snapshot process() reads. No allocation. Editor thread only.
     int copyPublishedCables (Cable* dest, int capacity) const;
@@ -56,8 +58,10 @@ private:
     PatchGraph graph;
     ExtIn extIn;
     OutputModule output;
+    NoiseModule noise;
     int extModuleIndex_ = -1;
     int outputModuleIndex_ = -1;
+    int noiseModuleIndex_ = -1;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MS50ModularAudioProcessor)
 };

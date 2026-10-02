@@ -31,6 +31,7 @@ target_sources(MS50Modular PRIVATE
   Source/Modular/PatchGraph.cpp
   Source/Modular/ExtIn.cpp
   Source/Modular/OutputModule.cpp
+  Source/Modular/Noise.cpp
   Source/UI/JackView.cpp
   Source/UI/CableView.cpp
   Source/UI/RackView.cpp)
@@ -51,10 +52,12 @@ add_executable(MS50ModularTests
   Source/Tests/GraphTests.cpp
   Source/Tests/Step3Tests.cpp
   Source/Tests/SineThroughFxTests.cpp
+  Source/Tests/NoiseTests.cpp
   Source/Modular/Module.cpp
   Source/Modular/PatchGraph.cpp
   Source/Modular/ExtIn.cpp
-  Source/Modular/OutputModule.cpp)
+  Source/Modular/OutputModule.cpp
+  Source/Modular/Noise.cpp)
 
 target_include_directories(MS50ModularTests PRIVATE Source)
 

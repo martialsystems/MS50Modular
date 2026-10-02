@@ -10,6 +10,7 @@ MS50ModularAudioProcessor::MS50ModularAudioProcessor()
 {
     extModuleIndex_ = graph.addModule (extIn);
     outputModuleIndex_ = graph.addModule (output);
+    noiseModuleIndex_ = graph.addModule (noise);
     graph.connect (extModuleIndex_, 0, outputModuleIndex_, 0);
     graph.connect (extModuleIndex_, 1, outputModuleIndex_, 1);
 }
@@ -61,6 +62,7 @@ void MS50ModularAudioProcessor::prepareToPlay (double sampleRate, int)
     graph.prepare (sampleRate);
     extIn.prepare (sampleRate);
     output.prepare (sampleRate);
+    noise.prepare (sampleRate);
     setLatencySamples (0);
 }
 
