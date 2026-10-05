@@ -54,13 +54,13 @@ Rack order, top to bottom, left to right:
 2. MG, EG 1, EG 2, Noise, Ring
 3. Divider, Inverter, Integrator
 
-Phase 2 faces are not drawn and have no ports in the graph.
+Phase 2 columns are drawn on the panel and have no ports in the graph. The divider /16 jack is one of those drawings. The research divider is /2 and /4.
 
 ## PatchGraph rules
 
 *   Fixed module list. No add-module command in phase 1.
 *   Each module owns a fixed `float portValue[]`. Unpatched Audio and CV inputs are set to 0 V before the sample, except EG `Trig` jacks. An unpatched `Trig` is set to +5 V so it rests released. 0 V on a trigger means "shorted," and a missing cable must not hold the envelope forever (S-15). A Gate input that received a promoted Gate uses the promotion rule below.
-*   An input sums every cable that lands on it. A second `connect` appends another cable and publishes. See Input summing.
+*   An input sums every cable that lands on it. A second `connect` appends another cable and publishes. Stack order, cable color, and cable shape do not change that sum. See Input summing.
 *   An output may feed several inputs (S-27). That fan-out is a software convenience so EG 1 can reach both the VCA and the filter before the multiples module exists.
 *   Cable creation and deletion happen on the message thread. The audio thread reads a published snapshot.
 *   Snapshot storage is two preallocated graphs plus an atomic index. Swapping snapshots does not allocate. `processBlock` does not allocate, lock, take a mutex, or log.
@@ -74,11 +74,19 @@ Phase 2 faces are not drawn and have no ports in the graph.
 *   Gate-only inputs in phase 1: none on the modules. Ext In's gate output is the Gate source. EG 2 `DelayTrig` is type Gate. Output has no gate jack.
 *   Sample rate lives on the graph. `prepare(sampleRate)` runs on the message thread before audio starts, and again if the host changes rate. It may allocate. `processSample` may not.
 
-## Input summing (2026-09-29)
+## Input summing (2026-10-05)
 
-An input starts at 0 V on each sample. Every cable into that input adds the source port. A second connect appends a cable and publishes the snapshot. Stacking is a VST convenience: a 1978 MS-50 jack took one plug. Fan-out from one output remains allowed.
+An input starts at 0 V on each sample. Every cable into that input adds the source port. A second connect appends a cable and publishes the snapshot. Fan-out from one output remains allowed.
 
-Unpatch by dragging the cable onto empty space, or by right-clicking it. A drag that lands on a legal input moves the cable. The default dry cables are created once, in the processor constructor. A later publish does not put a removed dry cable back.
+Stack order, cable color, and cable shape do not change the sum. Reordering the plugs drawn on a jack does not publish. `Cable` stores four integers: source module, source port, destination module, destination port.
+
+A 1978 MS-50 jack took one plug. This plugin stacks.
+
+The panel cable is undirected. The graph orients it from output to input. A drag may start on either jack. Dropping on empty space, or a right-click away from a jack, removes that cable. Shift-drag adds another cable on an occupied jack. Clicking an occupied jack opens the stack chooser. Escape cancels a drag that has not been published.
+
+An illegal pair is removed. The status strings are "that jack does not take this cable" and "feedback is not available until step 19". A jack with no graph module uses the first string and does not stay patched.
+
+The default dry cables are created once, in the processor constructor. A later publish does not put a removed dry cable back.
 
 Sketch, not a finished class:
 
@@ -538,20 +546,16 @@ Do not instantiate these in `ModuleRack`.
 
 ## State
 
-Step 18 stores: format version, sample-rate-independent knob values (0 to 1 or the scale index), and the cable list as module-id plus port-index pairs. It does not store module state (EG phase, filter memory, noise seed). Loading a preset calls `prepare` memory clear. Unknown version: reject the load, keep the current patch, report an error on the message thread.
+Step 18 stores: format version, sample-rate-independent knob values (0 to 1 or the scale index), and the cable list as module-id plus port-index pairs. It does not store cable color, stack order, or module state (EG phase, filter memory, noise seed). Loading a preset calls `prepare` memory clear. Unknown version: reject the load, keep the current patch, report an error on the message thread.
 
 ## What the audio thread is forbidden to do
 
 Allocate, lock, read the message-thread cable vector, call into JUCE, resize a buffer, build a path for a cable, or walk the module list in UI order if that differs from the published topological order.
 
-## UI chassis (deferred) (2026-09-29)
+## Panel (2026-10-05)
 
-The development rack is the current 14 tiles. The target chassis is the original MS-50 column order: knobs above, jacks below. Step UI-A paints that chassis. Step 6 does not.
+The editor is the landscape panel: knobs above, jacks in columns, cables hanging over the face. The tile rack was the development UI through step 7.
 
-Cable color policy for Step UI-A. Store the color on the cable when it connects. A frame does not assign a new color.
+Cable color is chosen on the panel and is not stored on `Cable`. A frame does not write color into the graph. The two default dry cables use different colors. Red, white, yellow, and green are the four choices. Color does not change the sound.
 
-*   Audio: base amber / orange, per-cable hue within 40 degrees of that base.
-*   CV: base blue, per-cable cyan to indigo.
-*   Gate: base white / grey, warm versus cool.
-
-The default Ext In L and Ext In R dry cables use different hex values. Step 6 still paints a cable from the source jack type and does not store a per-cable color.
+Column knobs stay pictures until their modules exist. The top MIX control is Output mix.

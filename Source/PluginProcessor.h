@@ -41,7 +41,7 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
-    // Graph indices from addModule. Rack slots live in RackView.
+    // Graph indices from addModule. Panel jack ids live in PanelGeometry.inc.
     int extInGraphIndex() const noexcept { return extModuleIndex_; }
     int outputGraphIndex() const noexcept { return outputModuleIndex_; }
     int noiseGraphIndex() const noexcept { return noiseModuleIndex_; }

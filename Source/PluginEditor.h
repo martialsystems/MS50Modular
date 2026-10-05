@@ -3,12 +3,11 @@
 #pragma once
 
 #include "PluginProcessor.h"
-#include "UI/RackView.h"
+#include "UI/PatchBayView.h"
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
-class MS50ModularAudioProcessorEditor : public juce::AudioProcessorEditor,
-                                       private PatchStatusTarget
+class MS50ModularAudioProcessorEditor : public juce::AudioProcessorEditor
 {
 public:
     explicit MS50ModularAudioProcessorEditor (MS50ModularAudioProcessor&);
@@ -18,13 +17,8 @@ public:
     void resized() override;
 
 private:
-    void showPatchStatus (const char* text) override;
-
-    juce::Label titleLabel;
-    juce::Label statusLabel;
-    juce::Label mixLabel;
-    juce::Slider mixSlider;
-    RackView rack;
+    juce::ComponentBoundsConstrainer constrainer;
+    PatchBayView bay;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MS50ModularAudioProcessorEditor)
 };

@@ -106,7 +106,7 @@ Rules:
 | S-24 | Feedback edge | In a cycle, the newest cable is the back-edge and delays one sample | A different deterministic rule, if documented in the same change as the tests |
 | S-25 | Control rate | Knobs and CV are read every audio sample. There is no slower CV block | A profiled need for a coarser rate. Do not add one for style |
 | S-26 | EG2 timeline | See SCHEMATICS, EG2. No sustain plateau | An owner's sentence or a scope shot of hold versus delay |
-| S-27 | Output fan-out | One output may feed many inputs. An input sums every cable that lands on it. Stacking on an input is a VST convenience: a 1978 MS-50 jack took one plug | If a later pass removes fan-out, the multiples module (phase 2) becomes required first |
+| S-27 | Output fan-out | One output may feed many inputs. An input sums every cable that lands on it. Stack order, cable color, and cable shape do not change that sum. A 1978 MS-50 jack took one plug. This plugin stacks | If a later pass removes fan-out, the multiples module (phase 2) becomes required first |
 
 Footage frequencies used with S-03 and S-04, equal-tempered C, A440. These pitches are a stand-in for what "32'" meant at the jack with no cable inserted. The switch positions 32', 16', 8', 4' are confirmed. The hertz numbers are not.
 
@@ -116,6 +116,32 @@ Footage frequencies used with S-03 and S-04, equal-tempered C, A440. These pitch
 | 16' | 65.406 |
 | 8' | 130.813 |
 | 4' | 261.626 |
+
+## Cable rule (2026-10-05)
+
+The panel draws an undirected cable. The graph stores a directed link from an output to an input. A drag may start on either jack.
+
+Several cables on one output carry the same signal. Several cables on one input add. The graph appends each new link. `process` zeros a patched input, then adds the source ports in published order.
+
+Stack order is the order of the plugs drawn on that jack. Changing it moves the visual cables only. It does not call `connect` or `publish`. Step 19 still treats the newest published link as the back-edge.
+
+Cable color is one of red, white, yellow, or green. Cable shape is the rope drawn on the message thread. Neither is a field on `Cable`. `Cable` stays four integers: source module, source port, destination module, destination port.
+
+A 1978 MS-50 jack took one plug. This plugin stacks, on the panel and in the graph.
+
+Gestures on the panel:
+
+*   Drag an empty jack to start a cable. Drag a plug to move that cable. Drop on empty space to unplug.
+*   Click an occupied jack to open the stack chooser. Drag a chooser row to reorder that jack.
+*   Shift-drag adds another cable on an occupied jack.
+*   Escape cancels a drag that has not been published.
+*   Right-click a cable away from a jack to unplug it.
+
+An illegal pair is refused and does not stay on the panel. The status strings stay "that jack does not take this cable" and "feedback is not available until step 19". A jack whose module is not in the graph yet uses the first of those strings.
+
+A move disconnects the old link before connecting the new one. If the new link is refused, the old link is connected again and becomes the newest published cable.
+
+The panel draws every column, including modules that are not in the graph yet. Sample and hold, the mixer, and the meter have no graph module. Divider /2 and /4 stay unmapped until that module exists. The /16 jack stays unmapped: the research divider is /2 and /4 only.
 
 ## How to A/B against public recordings
 
@@ -141,7 +167,7 @@ A module is done when all of the following are true:
 4. Unpatched inputs read 0 V, except Gate promotion tests.
 5. `processSample()` does not allocate. A test or a code search shows no `new`, `vector::push_back`, `string`, lock, or `printf` on that path.
 6. The module is on the rack as its own faceplate. The integrator is not hidden inside another module.
-7. A wrong cable (second cable into an input, or a signal into a Gate-only jack) is rejected by the graph, not only hidden by the UI.
+7. A wrong cable (two inputs, two outputs, a signal into a Gate-only jack, or a jack with no graph module) is rejected by the graph. A second cable into an input is summed. Reordering the plugs on a jack does not publish.
 
 A module is not done because it "sounds analog."
 

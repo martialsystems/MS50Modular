@@ -50,6 +50,9 @@ credentials.*
 *.flac
 *.ogg
 
+# Panel rasters. The editor uses panel/assets/panel.svg.
+panel/assets/*.png
+
 # Do not commit Korg scans, even if someone drops them in while studying.
 /reference-scans/
 *.djvu

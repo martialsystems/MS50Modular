@@ -1,0 +1,297 @@
+// Copyright (c) 2026 Martial Systems LLC. All rights reserved.
+
+#include "PluginEditor.h"
+#include "PluginProcessor.h"
+#include "UI/PatchBayLogic.h"
+#include "UI/PatchBayView.h"
+
+#include <cmath>
+#include <cstdio>
+#include <cstring>
+
+namespace {
+
+int gFails = 0;
+
+void expect (bool ok, const char* message)
+{
+    if (! ok)
+    {
+        std::printf ("FAIL %s\n", message);
+        ++gFails;
+    }
+}
+
+void gesture (PatchBayView& bay, float x0, float y0, float x1, float y1, bool shift, bool right)
+{
+    auto source = juce::Desktop::getInstance().getMainMouseSource();
+    int flags = right ? juce::ModifierKeys::rightButtonModifier : juce::ModifierKeys::leftButtonModifier;
+    if (shift)
+        flags |= juce::ModifierKeys::shiftModifier;
+    const juce::ModifierKeys mods (flags);
+    const auto time = juce::Time::getCurrentTime();
+    const auto start = bay.designToLocal (x0, y0);
+    const auto end = bay.designToLocal (x1, y1);
+    juce::MouseEvent down (source, start, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                           &bay, &bay, time, start, time, 1, false);
+    bay.mouseDown (down);
+    if (right)
+        return;
+
+    const auto mid = bay.designToLocal (x0 + 24.0f, y0 + 24.0f);
+    juce::MouseEvent drag (source, mid, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                           &bay, &bay, time, start, time, 1, true);
+    bay.mouseDrag (drag);
+    juce::MouseEvent dragEnd (source, end, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                              &bay, &bay, time, start, time, 1, true);
+    bay.mouseDrag (dragEnd);
+    juce::MouseEvent up (source, end, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                         &bay, &bay, time, start, time, 1, true);
+    bay.mouseUp (up);
+}
+
+void clickAt (PatchBayView& bay, float x, float y)
+{
+    auto source = juce::Desktop::getInstance().getMainMouseSource();
+    const juce::ModifierKeys mods (juce::ModifierKeys::leftButtonModifier);
+    const auto time = juce::Time::getCurrentTime();
+    const auto start = bay.designToLocal (x, y);
+    juce::MouseEvent down (source, start, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                           &bay, &bay, time, start, time, 1, false);
+    bay.mouseDown (down);
+    juce::MouseEvent up (source, start, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                         &bay, &bay, time, start, time, 1, false);
+    bay.mouseUp (up);
+}
+
+bool near (float actual, float expected)
+{
+    return std::fabs (actual - expected) < 1.0e-3f;
+}
+
+int publishedCount (MS50ModularAudioProcessor& processor)
+{
+    Cable cables[kPatchBayMaxCables] {};
+    return processor.copyPublishedCables (cables, kPatchBayMaxCables);
+}
+
+float hostLeftAfter (MS50ModularAudioProcessor& processor, float left, float right)
+{
+    processor.prepareToPlay (48000.0, 64);
+    juce::AudioBuffer<float> buffer (2, 64);
+    juce::MidiBuffer midi;
+    for (int i = 0; i < 64; ++i)
+    {
+        buffer.setSample (0, i, left);
+        buffer.setSample (1, i, right);
+    }
+    processor.processBlock (buffer, midi);
+    return buffer.getSample (0, 63);
+}
+
+bool cablePixelBright (juce::Component& component, juce::Point<float> local)
+{
+    const auto image = component.createComponentSnapshot (component.getLocalBounds(), true, 1.0f);
+    if (! image.isValid() || image.getWidth() < 1 || image.getHeight() < 1)
+        return false;
+
+    const int px = juce::jlimit (0, image.getWidth() - 1, static_cast<int> (local.x));
+    const int py = juce::jlimit (0, image.getHeight() - 1, static_cast<int> (local.y));
+    for (int dy = -3; dy <= 3; ++dy)
+    {
+        for (int dx = -3; dx <= 3; ++dx)
+        {
+            const int x = juce::jlimit (0, image.getWidth() - 1, px + dx);
+            const int y = juce::jlimit (0, image.getHeight() - 1, py + dy);
+            const auto pixel = image.getPixelAt (x, y);
+            if (pixel.getRed() + pixel.getGreen() + pixel.getBlue() > 180)
+                return true;
+        }
+    }
+    return false;
+}
+
+}
+
+class ProbeApp : public juce::JUCEApplication
+{
+public:
+    const juce::String getApplicationName() override { return "MS50PanelProbe"; }
+    const juce::String getApplicationVersion() override { return "1"; }
+    bool moreThanOneInstanceAllowed() override { return true; }
+
+    void initialise (const juce::String&) override
+    {
+        processor = std::make_unique<MS50ModularAudioProcessor>();
+        auto* created = processor->createEditor();
+        window = std::make_unique<juce::DocumentWindow> ("MS-50 panel probe",
+                                                          juce::Colours::black,
+                                                          juce::DocumentWindow::allButtons);
+        window->setUsingNativeTitleBar (true);
+        window->setContentOwned (created, true);
+        window->centreWithSize (1280, 512);
+        window->setVisible (true);
+        window->toFront (true);
+        juce::Timer::callAfterDelay (150, [this] { run(); });
+    }
+
+    void shutdown() override
+    {
+        window = nullptr;
+        processor = nullptr;
+    }
+
+    void systemRequestedQuit() override { quit(); }
+
+private:
+    void run()
+    {
+        auto* editor = dynamic_cast<MS50ModularAudioProcessorEditor*> (window->getContentComponent());
+        auto* bay = editor != nullptr ? dynamic_cast<PatchBayView*> (editor->getChildComponent (0)) : nullptr;
+        expect (editor != nullptr && bay != nullptr, "editor hosts the patch bay");
+        if (bay == nullptr || processor == nullptr)
+        {
+            finish();
+            return;
+        }
+
+        expect (bay->panelLoaded(), "panel SVG parsed");
+        expect (publishedCount (*processor) == 2, "default dry cables");
+        expect (bay->visualCount() == 2, "default cables are drawn");
+
+        const auto there = bay->designToLocal (100.0f, 80.0f);
+        const auto back = bay->localToDesign (there);
+        expect (std::fabs (back.x - 100.0f) < 0.6f && std::fabs (back.y - 80.0f) < 0.6f, "design mapping at 1280x512");
+
+        const int extMono = panelJackIndex ("EXT IN", "MONO");
+        const int outL = panelJackIndex ("OUTPUT", "L");
+        const int outWet = panelJackIndex ("OUTPUT", "WET");
+        const int vco = panelJackIndex ("VCO", "HZ/V");
+        const int white = panelJackIndex ("NOISE", "WHITE");
+        gesture (*bay, kPanelJacks[extMono].x, kPanelJacks[extMono].y, kPanelJacks[outL].x, kPanelJacks[outL].y, false, false);
+        expect (publishedCount (*processor) == 3, "second cable stacks on Output L");
+        expect (near (hostLeftAfter (*processor, 1.0f, 0.0f), 1.5f), "stacked Output L sums to 1.5");
+
+        gesture (*bay, kPanelJacks[outL].x, kPanelJacks[outL].y, 800.0f, 600.0f, false, false);
+        expect (publishedCount (*processor) == 2, "drop on empty unplugs the top plug");
+        expect (near (hostLeftAfter (*processor, 1.0f, 0.0f), 1.0f), "dry left returns after unplug");
+
+        gesture (*bay, kPanelJacks[vco].x, kPanelJacks[vco].y, kPanelJacks[outWet].x, kPanelJacks[outWet].y, false, false);
+        expect (publishedCount (*processor) == 2, "unmapped jack does not connect");
+        expect (bay->statusText() == "that jack does not take this cable", "refusal uses the type status");
+
+        gesture (*bay, kPanelJacks[white].x, kPanelJacks[white].y, kPanelJacks[outWet].x, kPanelJacks[outWet].y, true, false);
+        gesture (*bay, kPanelJacks[extMono].x, kPanelJacks[extMono].y, kPanelJacks[outWet].x, kPanelJacks[outWet].y, true, false);
+        expect (publishedCount (*processor) == 4, "two cables stack on Output Wet");
+
+        clickAt (*bay, kPanelJacks[outWet].x, kPanelJacks[outWet].y);
+        expect (bay->menuOpen(), "occupied jack opens the stack chooser");
+        expect (bay->keyPressed (juce::KeyPress (juce::KeyPress::escapeKey)), "escape handles the chooser");
+        expect (! bay->menuOpen(), "escape closes the stack chooser");
+
+        Cable before[8] {};
+        const int beforeCount = processor->copyPublishedCables (before, 8);
+        int plugs[8] {};
+        const int onWet = bay->plugsOnJack (outWet, plugs, 8);
+        expect (onWet == 2, "wet jack shows two plugs");
+        if (onWet == 2)
+        {
+            const int reversed[2] = { plugs[1], plugs[0] };
+            expect (bay->reorderStack (outWet, reversed, 2), "chooser reorder");
+        }
+        Cable after[8] {};
+        const int afterCount = processor->copyPublishedCables (after, 8);
+        expect (afterCount == beforeCount, "reorder count");
+        bool same = beforeCount == afterCount;
+        for (int i = 0; i < beforeCount && same; ++i)
+        {
+            same = before[i].sourceModule == after[i].sourceModule
+                   && before[i].sourcePort == after[i].sourcePort
+                   && before[i].destModule == after[i].destModule
+                   && before[i].destPort == after[i].destPort;
+        }
+        expect (same, "reordering the stack does not change the graph");
+
+        editor->setSize (1600, 640);
+        const auto wide = bay->designToLocal (kPanelJacks[outL].x, kPanelJacks[outL].y);
+        const auto wideBack = bay->localToDesign (wide);
+        expect (std::fabs (wideBack.x - kPanelJacks[outL].x) < 0.6f, "mapping at 1600 wide");
+        editor->setSize (1100, 440);
+        const auto narrow = bay->designToLocal (kPanelJacks[white].x, kPanelJacks[white].y);
+        const auto narrowBack = bay->localToDesign (narrow);
+        expect (std::fabs (narrowBack.x - kPanelJacks[white].x) < 0.6f
+                && std::fabs (narrowBack.y - kPanelJacks[white].y) < 0.6f,
+                "mapping at 1100 wide");
+
+        editor->setSize (1280, 512);
+        const float mixX = kMixTrackX + kMixTrackW - 6.0f;
+        gesture (*bay, mixX, kMixTrackY, mixX, kMixTrackY, false, false);
+        expect (bay->outputMix() > 0.9f, "top mix slider reaches the right");
+        gesture (*bay, kMixTrackX + 2.0f, kMixTrackY, kMixTrackX + 2.0f, kMixTrackY, false, false);
+        expect (bay->outputMix() < 0.05f, "top mix slider returns to dry");
+
+        for (int i = 0; i < 20; ++i)
+            bay->advanceCableFrame();
+
+        juce::Image snapshot (juce::Image::ARGB, bay->getWidth(), bay->getHeight(), true);
+        juce::Graphics graphics (snapshot);
+        bay->paintEntireComponent (graphics, true);
+        juce::File png ("/tmp/ms50_panel_probe.png");
+        juce::FileOutputStream stream (png);
+        if (stream.openedOk())
+        {
+            juce::PNGImageFormat format;
+            format.writeImageToStream (snapshot, stream);
+        }
+
+        bool foundRope = false;
+        float ropeX = 0.0f;
+        float ropeY = 0.0f;
+        for (float y = 360.0f; y < 620.0f && ! foundRope; y += 6.0f)
+        {
+            for (float x = 80.0f; x < 1520.0f && ! foundRope; x += 6.0f)
+            {
+                bool nearJack = false;
+                for (int jack = 0; jack < kPanelJackCount; ++jack)
+                {
+                    const float dx = kPanelJacks[jack].x - x;
+                    const float dy = kPanelJacks[jack].y - y;
+                    if (dx * dx + dy * dy < 22.0f * 22.0f)
+                        nearJack = true;
+                }
+                if (nearJack)
+                    continue;
+                if (bay->cableNearDesign (x, y) >= 0)
+                {
+                    foundRope = true;
+                    ropeX = x;
+                    ropeY = y;
+                }
+            }
+        }
+        expect (foundRope, "a settled cable can be hit");
+        if (foundRope)
+            expect (cablePixelBright (*bay, bay->designToLocal (ropeX, ropeY)), "the hit cable paints");
+        const int beforeUnplug = publishedCount (*processor);
+        if (foundRope)
+            gesture (*bay, ropeX, ropeY, ropeX, ropeY, false, true);
+        expect (publishedCount (*processor) == beforeUnplug - 1, "right-click unplugs that cable");
+
+        finish();
+    }
+
+    void finish()
+    {
+        if (gFails == 0)
+            std::printf ("PROBE PASS\n");
+        else
+            std::printf ("PROBE FAIL %d\n", gFails);
+        setApplicationReturnValue (gFails == 0 ? 0 : 1);
+        quit();
+    }
+
+    std::unique_ptr<MS50ModularAudioProcessor> processor;
+    std::unique_ptr<juce::DocumentWindow> window;
+};
+
+START_JUCE_APPLICATION (ProbeApp)

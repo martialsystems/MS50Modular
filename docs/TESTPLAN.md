@@ -88,7 +88,7 @@ UI and graph must agree. A test calls the same `connect` the mouse-up handler ca
 
 ## UI (2026-09-29)
 
-Step 6 keeps cable edits on the message thread. The mouse-up handler calls `PatchGraph::attemptConnect`. `testInputSumsTwoCables` and `testSecondCableDoesNotReplaceFirst` call that same function.
+Step 6 on the tile rack. The panel in Panel patch bay (2026-10-05) lets either jack start the drag. Step 6 keeps cable edits on the message thread. The mouse-up handler calls `PatchGraph::attemptConnect`. `testInputSumsTwoCables` and `testSecondCableDoesNotReplaceFirst` call that same function.
 
 *   A drag starts on an output jack. Mouse-up on a legal input connects and publishes. Mouse-up on empty space, an output, or an illegal jack does not connect.
 *   A drag that starts on a drawn cable unpatches that cable when it ends on empty space. A right-click on a drawn cable disconnects and publishes. A right-click on empty space does nothing. Disconnect of a missing cable does nothing.
@@ -104,7 +104,18 @@ Step 6 keeps cable edits on the message thread. The mouse-up handler calls `Patc
 
 `testRejectCycle` still passes. `testFanOutAllowed` and `testRejectSignalIntoGate` stay.
 
-Unpatch: drag a drawn cable onto empty space, or right-click it. Stacking on one jack is a VST convenience: a 1978 MS-50 jack took one plug.
+Unpatch: drag a drawn cable onto empty space, or right-click it. A 1978 MS-50 jack took one plug. This plugin stacks. See Panel patch bay (2026-10-05).
+
+## Panel patch bay (2026-10-05)
+
+`testPanelStackRule`: 58 jacks, `Cable` is four integers, either drag direction orients Ext In L to Output L, input-to-input and output-to-output and a jack to itself are refused, VCO Hz/V is unmapped, a stack of Ext In L and Ext In Mono on Output L sums to 7.5 V, and reordering that stack does not change the published snapshot.
+
+The standalone window check is `MS50PanelProbe`. It stacks, unplugs, refuses an unmapped jack, opens the chooser, reorders without publishing, and right-clicks a cable.
+
+*   A drag may start on either jack. The engine orients the link.
+*   Mouse-up on an illegal pair does not connect.
+*   Reordering the stack does not change the published snapshot.
+*   The two default dry cables use different colors.
 
 After Step UI-A:
 

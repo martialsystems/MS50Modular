@@ -49,10 +49,11 @@ The current editor is a development rack: fourteen tiles, Integrator included. T
 ## Features in the finished phase 1 plugin
 
 *   Stereo in and stereo out. Processing modules are mono.
-*   Click-drag patch cables. An input sums every cable on it. An output may feed several inputs (stand-in S-27).
-*   Stacking on one jack is a VST convenience: a 1978 MS-50 jack took one plug. Drag a cable onto empty space to unpatch it, or right-click the cable.
-*   Animated cables drawn on the message thread.
-*   Port colors: audio, CV, gate. Illegal cables are refused.
+*   Click-drag patch cables on the landscape panel. An input sums every cable on it. An output may feed several inputs (stand-in S-27).
+*   Stack order, cable color, and cable shape do not change the sound. A 1978 MS-50 jack took one plug. This plugin stacks. Drag a plug onto empty space to unpatch it, or right-click the cable. Shift-drag adds a cable. Click an occupied jack to choose or reorder the stack.
+*   The editor is that panel. Column knobs are pictures until their modules exist. The top MIX control is Output mix. Sample and hold, the mixer, and the meter are drawn and are not graph modules. The divider /16 jack stays unmapped.
+*   Rope cables are drawn on the message thread.
+*   Port types: audio, CV, gate. Illegal cables are refused.
 *   No heap allocation on the audio thread.
 *   Feedback is legal only with a one-sample delay on a chosen back-edge (step 19).
 *   State save and load of knobs and cables (step 18).
@@ -99,7 +100,9 @@ MS50Modular/
     PluginProcessor.h/.cpp
     PluginEditor.h/.cpp
     Modular/                graph and modules, no JUCE types in process()
-    UI/                     rack, jacks, cables
+    UI/                     panel patch bay
+  panel/                    layout, SVG, geometry emitter
+  tools/PanelProbe.cpp      standalone window check
 ```
 
 The design-pack commit is documents, license, gitignore, and scripts. `CMakeLists.txt` and `Source/` arrive in step 1 so this commit does not contain a plugin that does not build.
@@ -139,7 +142,7 @@ Read these three files before editing code: `docs/01-research.md`, `docs/METHODO
 *   Keep the integrator on the rack. Do not fold lag into the VCO.
 *   DSP modules do not include JUCE headers. The processor copies buffers in and out.
 *   `process()` and `processSample()` do not allocate, lock, or log.
-*   Inputs sum. A second cable into an input stays in the graph.
+*   Inputs sum. A second cable into an input stays in the graph. Stack order, cable color, and cable shape do not change the sound. The cable rule is in `METHODOLOGY.md`.
 *   Branch `feat/step-XX` off `main`. One step per branch. Do not start step N+1 on a branch whose acceptance test fails.
 *   When that step's acceptance checks pass, merge the branch into `main` and push `main` before the next step. Leave it unmerged only when the user says to keep it on the branch.
 *   Do not commit DAW projects, samples, `.env` files, or scans of the Korg schematics.

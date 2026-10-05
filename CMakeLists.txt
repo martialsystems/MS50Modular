@@ -24,6 +24,11 @@ juce_add_plugin(MS50Modular
   FORMATS VST3
   PRODUCT_NAME "MS-50 Modular")
 
+juce_add_binary_data(MS50PanelAssets
+  HEADER_NAME PanelAssets.h
+  NAMESPACE PanelAssets
+  SOURCES panel/assets/panel.svg)
+
 target_sources(MS50Modular PRIVATE
   Source/PluginProcessor.cpp
   Source/PluginEditor.cpp
@@ -32,9 +37,8 @@ target_sources(MS50Modular PRIVATE
   Source/Modular/ExtIn.cpp
   Source/Modular/OutputModule.cpp
   Source/Modular/Noise.cpp
-  Source/UI/JackView.cpp
-  Source/UI/CableView.cpp
-  Source/UI/RackView.cpp)
+  Source/UI/PatchBayLogic.cpp
+  Source/UI/PatchBayView.cpp)
 
 target_include_directories(MS50Modular PRIVATE Source)
 
@@ -44,6 +48,7 @@ target_compile_definitions(MS50Modular PUBLIC
   JUCE_VST3_CAN_REPLACE_VST2=0)
 
 target_link_libraries(MS50Modular PRIVATE
+  MS50PanelAssets
   juce::juce_audio_utils
   juce::juce_recommended_config_flags
   juce::juce_recommended_warning_flags)
@@ -53,11 +58,39 @@ add_executable(MS50ModularTests
   Source/Tests/Step3Tests.cpp
   Source/Tests/SineThroughFxTests.cpp
   Source/Tests/NoiseTests.cpp
+  Source/Tests/PatchBayTests.cpp
   Source/Modular/Module.cpp
   Source/Modular/PatchGraph.cpp
   Source/Modular/ExtIn.cpp
   Source/Modular/OutputModule.cpp
-  Source/Modular/Noise.cpp)
+  Source/Modular/Noise.cpp
+  Source/UI/PatchBayLogic.cpp)
+
+juce_add_gui_app(MS50PanelProbe PRODUCT_NAME "MS50PanelProbe")
+
+target_sources(MS50PanelProbe PRIVATE
+  tools/PanelProbe.cpp
+  Source/PluginProcessor.cpp
+  Source/PluginEditor.cpp
+  Source/Modular/Module.cpp
+  Source/Modular/PatchGraph.cpp
+  Source/Modular/ExtIn.cpp
+  Source/Modular/OutputModule.cpp
+  Source/Modular/Noise.cpp
+  Source/UI/PatchBayLogic.cpp
+  Source/UI/PatchBayView.cpp)
+
+target_include_directories(MS50PanelProbe PRIVATE Source)
+
+target_compile_definitions(MS50PanelProbe PRIVATE
+  JUCE_WEB_BROWSER=0
+  JUCE_USE_CURL=0)
+
+target_link_libraries(MS50PanelProbe PRIVATE
+  MS50PanelAssets
+  juce::juce_audio_utils
+  juce::juce_recommended_config_flags
+  juce::juce_recommended_warning_flags)
 
 target_include_directories(MS50ModularTests PRIVATE Source)
 

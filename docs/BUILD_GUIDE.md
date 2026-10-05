@@ -163,7 +163,7 @@ Rollback: ignore mouse-up. Keyboard of cables is not required.
 
 ## Stackable inputs (2026-09-29)
 
-An input sums every cable. A second `connect` to the same input succeeds, appends a cable, and publishes. This is a VST convenience: a 1978 MS-50 jack took one plug. Fan-out from one output stays allowed. Cycles, a cable from a port to itself, in-to-in, out-to-out, and the type matrix stay rejected.
+An input sums every cable. A second `connect` to the same input succeeds, appends a cable, and publishes. A 1978 MS-50 jack took one plug. This plugin stacks. The panel gestures are in Panel patch bay (2026-10-05). Fan-out from one output stays allowed. Cycles, a cable from a port to itself, in-to-in, out-to-out, and the type matrix stay rejected.
 
 Status strings stay "that jack does not take this cable" and "feedback is not available until step 19". A legal second cable does not use "input already has a cable".
 
@@ -174,6 +174,31 @@ Agent verify: `SINE_DRY` must still pass. The default graph is still those two d
 Tests: `testInputSumsTwoCables`, `testSecondCableDoesNotReplaceFirst`. `testFanOutAllowed`, `testRejectSignalIntoGate`, `testRejectCycle`, and the `SINE_*` lines stay.
 
 Do not touch: Noise, VCF DSP, Step UI-A.
+
+## Panel patch bay (2026-10-05)
+
+The editor is the landscape panel. `panel/assets/layout.json` is the geometry. `panel/emit_panel_svg.py` writes `panel/assets/panel.svg` and `Source/UI/PanelGeometry.inc`. Do not re-run `panel/build_panel.py` unless the module list should change. The SVG is the panel the editor scales. Panel PNGs are not committed.
+
+Files: `Source/UI/PatchBayView.cpp/.h`, `Source/UI/PatchBayLogic.cpp/.h`, `Source/PluginEditor.cpp/.h`. The tile views `RackView`, `JackView`, and `CableView` are not in the plugin target. Steps 4 to 6 above record that those files were the development UI.
+
+Cable rule: `METHODOLOGY.md`, Cable rule (2026-10-05).
+
+*   A drag may start on either jack. The graph orients output to input.
+*   An empty jack starts a cable. An occupied jack, without Shift, grabs the top plug.
+*   Shift-drag adds a cable.
+*   Drop on empty space unplugs. Right-click away from a jack unplugs.
+*   Click an occupied jack to open the stack chooser. Dragging a chooser row reorders that jack and does not publish.
+*   Escape cancels.
+*   Two inputs, two outputs, a jack with no graph module, or a cycle before step 19: the cable does not stay. Status strings stay "that jack does not take this cable" and "feedback is not available until step 19".
+*   Sample and hold, the mixer, and the meter are drawn and are not graph modules. Divider /2 and /4 stay unmapped until that module exists. Do not add /16 DSP. The research divider is /2 and /4.
+
+Top MIX is Output mix, default 0. Column knobs stay pictures until their modules exist. Level stays 1.
+
+A move disconnects the old link first, then connects the new one, so the old link is not read as a cycle. If the new link is refused, the old link is connected again and is then the newest published cable.
+
+Acceptance: `testPanelStackRule`. `SINE_DRY` still passes. `tools/PanelProbe.cpp` opens a window, stacks Ext In Mono on Output L, unplugs it, refuses VCO Hz/V into Output Wet, stacks two cables on Wet, opens the chooser, reorders them without changing the published bytes, moves the top mix, and right-clicks a cable.
+
+Do not touch: module DSP that does not exist yet.
 
 ## Step 7: Noise
 
@@ -333,6 +358,8 @@ Stop. Phase 2 is a new packet. Do not start the adding amplifier because fan-out
 
 ## Step UI-A: original panel pass (2026-09-29)
 
+The landscape chassis landed in Panel patch bay (2026-10-05). Column knobs are still pictures. Cable color stays off `Cable`. The notes below are the 2026-09-29 plan for that pass.
+
 Goal: replace the tile rack with one landscape chassis copied from the 1978 MS-50. Knobs sit in an upper band. Two continuous jack rows run along the bottom. Modules are labeled columns.
 
 When: after Step 6 works, and after at least the VCO, VCF, and VCA make sound, so the knobs have a signal to control. Do not block steps 7 to 20 on this pass.
@@ -345,7 +372,7 @@ Phase 2 gaps (mixer, sample and hold, meter) may be empty labeled slots so the s
 
 Jacks: one size, silver body. Type is a small ring on that body: amber for audio, blue for CV, white for gate.
 
-Cables: a type family plus a stored per-cable hue, so two audio cables can carry different hues. The hue is assigned at connect and saved with the cable. A frame does not assign a new hue. Cables paint in a top layer over the panel.
+Cables paint in a top layer over the panel. The 2026-09-29 plan stored a hue on the cable. Cable rule (2026-10-05) keeps color off `Cable`.
 
 Do not touch: DSP, port order, the type matrix, snapshot rules.
 

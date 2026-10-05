@@ -445,7 +445,7 @@ def draw_page(canvas, _doc):
     )
     canvas.setFont("Times-Roman", 9)
     canvas.drawString(LEFT, FOOTER_BASE, "MS-50 Modular design pack")
-    canvas.drawCentredString(PAGE_W / 2.0, FOOTER_BASE, "2026-09-29")
+    canvas.drawCentredString(PAGE_W / 2.0, FOOTER_BASE, "2026-10-05")
     canvas.drawRightString(PAGE_W - RIGHT, FOOTER_BASE, str(canvas.getPageNumber()))
     canvas.setStrokeColor(INK)
     canvas.setLineWidth(0.6)
@@ -468,7 +468,7 @@ def build():
         "The instrument's name is used only to identify the subject of the study.",
         st["body"],
     ))
-    story.append(Paragraph("Document date: 2026-09-29.", st["body"]))
+    story.append(Paragraph("Document date: 2026-10-05.", st["body"]))
     story.append(heading("Revisions", st["h1"]))
     for line in (
         "2026-09-21: First compiled pack. Methodology, research summary, software schematic, build guide, test plan, and reference list.",
@@ -478,6 +478,7 @@ def build():
         "2026-09-29: Sine-through-FX harness added to the build guide and the test plan. Dry mix 0 stays the agent check. The host script may skip when pedalboard or the VST3 bundle is absent.",
         "2026-09-29: Step UI-A recorded in the build guide, the schematic, and the test plan. The landscape chassis is deferred. Step 6 click-drag patching is code, not a new DSP chapter.",
         "2026-09-29: Inputs sum. A second cable into one jack stays, and the volts add. Drag a cable onto empty space to unpatch it. SINE_DRY stays the dry check.",
+        "2026-10-05: The cable rule is stacking. Stack order, color, and shape do not change the sound. The editor is the landscape panel. A 1978 jack took one plug.",
     ):
         story.append(Paragraph(line, st["body"]))
     story.append(Paragraph(
