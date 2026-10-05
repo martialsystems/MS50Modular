@@ -558,4 +558,4 @@ The editor is the landscape panel: knobs above, jacks in columns, cables hanging
 
 Cable color is chosen on the panel and is not stored on `Cable`. A frame does not write color into the graph. The two default dry cables use different colors. Red, white, yellow, and green are the four choices. Color does not change the sound.
 
-Column knobs stay pictures until their modules exist. The top MIX control is Output mix.
+Column knobs turn. A turn does not drive a module that is not in the graph. The top MIX control is Output mix. Output level stays 1. EXT IN is the column immediately left of OUTPUT.

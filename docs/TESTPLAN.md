@@ -110,7 +110,9 @@ Unpatch: drag a drawn cable onto empty space, or right-click it. A 1978 MS-50 ja
 
 `testPanelStackRule`: 58 jacks, `Cable` is four integers, either drag direction orients Ext In L to Output L, input-to-input and output-to-output and a jack to itself are refused, VCO Hz/V is unmapped, a stack of Ext In L and Ext In Mono on Output L sums to 7.5 V, and reordering that stack does not change the published snapshot.
 
-The standalone window check is `MS50PanelProbe`. It stacks, unplugs, refuses an unmapped jack, opens the chooser, reorders without publishing, and right-clicks a cable.
+`testPanelKnobs`: 31 knobs, EXT IN is the column beside OUTPUT, a 40px upward drag adds 0.2, Shift is five times finer, the wheel matches that scale, and the divider switch steps 2, 4, 16.
+
+The standalone window check is `MS50PanelProbe`. It turns a column knob without publishing, steps the divider switch, stacks, unplugs, refuses an unmapped jack, opens the chooser, reorders without publishing, and right-clicks a cable.
 
 *   A drag may start on either jack. The engine orients the link.
 *   Mouse-up on an illegal pair does not connect.

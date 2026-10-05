@@ -479,6 +479,7 @@ def build():
         "2026-09-29: Step UI-A recorded in the build guide, the schematic, and the test plan. The landscape chassis is deferred. Step 6 click-drag patching is code, not a new DSP chapter.",
         "2026-09-29: Inputs sum. A second cable into one jack stays, and the volts add. Drag a cable onto empty space to unpatch it. SINE_DRY stays the dry check.",
         "2026-10-05: The cable rule is stacking. Stack order, color, and shape do not change the sound. The editor is the landscape panel. A 1978 jack took one plug.",
+        "2026-10-05: Column knobs turn. Ext In sits immediately left of Output. A column knob does not drive a module that is not in the graph.",
     ):
         story.append(Paragraph(line, st["body"]))
     story.append(Paragraph(

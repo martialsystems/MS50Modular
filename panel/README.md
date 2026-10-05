@@ -4,7 +4,7 @@ The Korg MS-50, the MS-50 name, and the circuit designs of that instrument are t
 
 # Panel
 
-`assets/layout.json` is the jack and knob geometry: 58 jacks on a 1600 by 640 canvas.
+`assets/layout.json` is the jack and knob geometry: 58 jacks and 31 knobs on a 1600 by 640 canvas. EXT IN is the column immediately left of OUTPUT. The editor paints knob bodies on top of the tick marks. Turning a knob does not write the graph.
 
 `emit_panel_svg.py` reads that file and writes `assets/panel.svg` and `Source/UI/PanelGeometry.inc`. It does not move a jack. Run it from the repo root:
 

@@ -2,6 +2,7 @@
 
 #include "UI/PatchBayLogic.h"
 
+#include <cmath>
 #include <cstring>
 
 int panelJackIndex (const char* section, const char* label)
@@ -169,4 +170,72 @@ int loadPublishedCables (VisualCable* dest, int capacity,
         ++count;
     }
     return count;
+}
+
+int panelKnobIndex (const char* section, const char* label)
+{
+    if (section == nullptr || label == nullptr)
+        return -1;
+
+    for (int i = 0; i < kPanelKnobCount; ++i)
+    {
+        if (std::strcmp (kPanelKnobs[i].section, section) == 0
+            && std::strcmp (kPanelKnobs[i].label, label) == 0)
+            return i;
+    }
+    return -1;
+}
+
+float panelKnobClamp (float value, bool isSwitch)
+{
+    if (value < 0.0f)
+        value = 0.0f;
+    if (value > 1.0f)
+        value = 1.0f;
+    if (isSwitch)
+        value = std::round (value * 2.0f) / 2.0f;
+    return value;
+}
+
+float panelKnobDrag (float start, float deltaUpPx, bool shift, bool isSwitch)
+{
+    const float divisor = isSwitch ? 60.0f : (shift ? 1000.0f : 200.0f);
+    return panelKnobClamp (start + deltaUpPx / divisor, isSwitch);
+}
+
+float panelKnobWheel (float current, float htmlDeltaY, bool shift, bool isSwitch)
+{
+    if (isSwitch)
+    {
+        float sign = 0.0f;
+        if (htmlDeltaY > 0.0f)
+            sign = 1.0f;
+        else if (htmlDeltaY < 0.0f)
+            sign = -1.0f;
+        return panelKnobClamp (current - sign * 0.5f, true);
+    }
+
+    const float rate = shift ? 0.0002f : 0.001f;
+    return panelKnobClamp (current - htmlDeltaY * rate, false);
+}
+
+float panelKnobFromWheel (float current, float wheelDeltaY, bool reversed, bool shift, bool isSwitch)
+{
+    // One notch matches the prototype's 100px wheel line.
+    // Positive wheelDeltaY is a physical upward push when reversed is false.
+    const float htmlDeltaY = (reversed ? wheelDeltaY : -wheelDeltaY) * 100.0f;
+    return panelKnobWheel (current, htmlDeltaY, shift, isSwitch);
+}
+
+float panelKnobSwitchClick (float current)
+{
+    float stepped = std::fmod (current + 0.5f, 1.5f);
+    if (stepped < 0.0f)
+        stepped += 1.5f;
+    return panelKnobClamp (stepped, true);
+}
+
+float panelKnobAngleDegrees (bool isSwitch, float value)
+{
+    return isSwitch ? (-48.0f + 96.0f * value) : (-135.0f + 270.0f * value);
 }

@@ -287,6 +287,8 @@ PatchBayView::PatchBayView (MS50ModularAudioProcessor& processor)
     panel_ = juce::Drawable::createFromImageData (PanelAssets::panel_svg, PanelAssets::panel_svgSize);
     menu_ = std::make_unique<StackMenu> (*this);
     addChildComponent (*menu_);
+    for (int i = 0; i < kPanelKnobCount; ++i)
+        knobValue_[i] = kPanelKnobs[i].valueDefault;
 
     Cable published[kPatchBayMaxCables] {};
     const int publishedCount = audioProcessor.copyPublishedCables (published, kPatchBayMaxCables);
@@ -903,6 +905,30 @@ void PatchBayView::paint (juce::Graphics& g)
         return juce::Point<float> (origin.x + x * scale, origin.y + y * scale);
     };
 
+    for (int i = 0; i < kPanelKnobCount; ++i)
+    {
+        const PanelKnobRec& knob = kPanelKnobs[i];
+        const auto centre = screenPoint (knob.cx, knob.cy);
+        const float radius = knob.radius * scale;
+        const float shadow = (knob.radius + 4.0f) * scale;
+        g.setColour (juce::Colours::black.withAlpha (0.45f));
+        g.fillEllipse (centre.x + scale - shadow, centre.y + 2.0f * scale - shadow, shadow * 2.0f, shadow * 2.0f);
+        g.setColour (juce::Colour (0xff08080a));
+        g.fillEllipse (centre.x - (radius + 3.0f * scale), centre.y - (radius + 3.0f * scale),
+                       (radius + 3.0f * scale) * 2.0f, (radius + 3.0f * scale) * 2.0f);
+        g.setColour (juce::Colour (0xff1a1a1b));
+        g.fillEllipse (centre.x - radius, centre.y - radius, radius * 2.0f, radius * 2.0f);
+        g.setColour (juce::Colour (0xff2a2a2c));
+        const float cap = radius * 0.8f;
+        g.fillEllipse (centre.x - cap, centre.y - cap, cap * 2.0f, cap * 2.0f);
+        g.setColour (juce::Colour (0xfff1ede0));
+        const float angle = juce::degreesToRadians (panelKnobAngleDegrees (knob.kind == 1, knobValue_[i]));
+        juce::Line<float> pointer (centre.x, centre.y - radius * 0.1f,
+                                   centre.x, centre.y - (radius - 1.5f * scale));
+        pointer.applyTransform (juce::AffineTransform::rotation (angle, centre.x, centre.y));
+        g.drawLine (pointer, 2.4f * scale);
+    }
+
     for (int cable = 0; cable < count_; ++cable)
     {
         if (! ropes_[cable].ready)
@@ -1003,6 +1029,8 @@ void PatchBayView::paint (juce::Graphics& g)
             line = "Drop on a jack to plug in. Empty space unplugs. Esc cancels.";
         else if (hoverJack_ >= 0)
             line = juce::String (kPanelJacks[hoverJack_].section) + ": " + kPanelJacks[hoverJack_].label;
+        else
+            line = knobReadout_;
     }
     if (line.isNotEmpty())
     {
@@ -1024,6 +1052,8 @@ void PatchBayView::mouseMove (const juce::MouseEvent& event)
     pointerX_ = design.x;
     pointerY_ = design.y;
     pointerIn_ = true;
+    if (! knobDrag_)
+        knobReadout_.clear();
     hoverJack_ = jackAt (design.x, design.y);
     hoverLabel_ = labelAt (design.x, design.y);
     repaint();
@@ -1060,7 +1090,7 @@ void PatchBayView::mouseDown (const juce::MouseEvent& event)
 
     if (event.mods.isRightButtonDown())
     {
-        if (jackAt (design.x, design.y) < 0)
+        if (knobAt (design.x, design.y) < 0 && jackAt (design.x, design.y) < 0)
             unplugIndex (cableNear (design.x, design.y));
         return;
     }
@@ -1077,6 +1107,18 @@ void PatchBayView::mouseDown (const juce::MouseEvent& event)
     {
         mixDrag_ = true;
         setMixFromDesignX (design.x);
+        return;
+    }
+
+    const int knob = knobAt (design.x, design.y);
+    if (knob >= 0)
+    {
+        knobDrag_ = true;
+        knobDragMoved_ = false;
+        knobSuppressSwitchStep_ = false;
+        knobDragIndex_ = knob;
+        knobDragStartY_ = event.position.y;
+        knobDragStartValue_ = knobValue_[knob];
         return;
     }
 
@@ -1098,6 +1140,18 @@ void PatchBayView::mouseDrag (const juce::MouseEvent& event)
     pointerX_ = design.x;
     pointerY_ = design.y;
     pointerIn_ = true;
+
+    if (knobDrag_ && knobDragIndex_ >= 0)
+    {
+        const float deltaUp = knobDragStartY_ - event.position.y;
+        if (std::fabs (deltaUp) > 3.0f)
+            knobDragMoved_ = true;
+        const bool isSwitch = kPanelKnobs[knobDragIndex_].kind == 1;
+        setKnobValue (knobDragIndex_,
+                      panelKnobDrag (knobDragStartValue_, deltaUp, event.mods.isShiftDown(), isSwitch));
+        return;
+    }
+
     hoverJack_ = jackAt (design.x, design.y);
     hoverLabel_ = labelAt (design.x, design.y);
 
@@ -1135,6 +1189,19 @@ void PatchBayView::mouseUp (const juce::MouseEvent& event)
     pointerX_ = design.x;
     pointerY_ = design.y;
 
+    if (knobDrag_)
+    {
+        const int index = knobDragIndex_;
+        const bool moved = knobDragMoved_;
+        const bool suppress = knobSuppressSwitchStep_;
+        knobDrag_ = false;
+        knobDragIndex_ = -1;
+        knobSuppressSwitchStep_ = false;
+        if (! suppress && ! moved && index >= 0 && index < kPanelKnobCount && kPanelKnobs[index].kind == 1)
+            setKnobValue (index, panelKnobSwitchClick (knobValue_[index]));
+        return;
+    }
+
     if (mixDrag_)
     {
         mixDrag_ = false;
@@ -1157,6 +1224,76 @@ void PatchBayView::mouseUp (const juce::MouseEvent& event)
             menu_->showFor (downJack_);
     }
     downActive_ = false;
+}
+
+void PatchBayView::mouseDoubleClick (const juce::MouseEvent& event)
+{
+    const auto design = localToDesign (event.position);
+    const int index = knobAt (design.x, design.y);
+    if (index < 0)
+        return;
+
+    knobSuppressSwitchStep_ = true;
+    setKnobValue (index, kPanelKnobs[index].valueDefault);
+}
+
+void PatchBayView::mouseWheelMove (const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel)
+{
+    if (knobDrag_)
+        return;
+
+    const auto design = localToDesign (event.position);
+    const int index = knobAt (design.x, design.y);
+    if (index < 0)
+        return;
+
+    setKnobValue (index, panelKnobFromWheel (knobValue_[index], wheel.deltaY, wheel.isReversed,
+                                              event.mods.isShiftDown(), kPanelKnobs[index].kind == 1));
+}
+
+int PatchBayView::knobAt (float x, float y) const
+{
+    for (int i = 0; i < kPanelKnobCount; ++i)
+    {
+        const PanelKnobRec& knob = kPanelKnobs[i];
+        if (x >= knob.hitX && x <= knob.hitX + knob.hitW
+            && y >= knob.hitY && y <= knob.hitY + knob.hitH)
+            return i;
+    }
+    return -1;
+}
+
+void PatchBayView::setKnobValue (int index, float value)
+{
+    if (index < 0 || index >= kPanelKnobCount)
+        return;
+
+    const PanelKnobRec& knob = kPanelKnobs[index];
+    const bool isSwitch = knob.kind == 1;
+    knobValue_[index] = panelKnobClamp (value, isSwitch);
+    const float shown = knobValue_[index];
+    if (isSwitch)
+    {
+        const char* ratio = "4";
+        if (shown < 0.25f)
+            ratio = "2";
+        else if (shown > 0.75f)
+            ratio = "16";
+        knobReadout_ = juce::String (knob.section) + juce::String::fromUTF8 (" · ÷ ") + ratio;
+    }
+    else
+    {
+        knobReadout_ = juce::String (knob.section) + juce::String::fromUTF8 (" · ")
+                       + knob.label + " " + juce::String (shown, 2);
+    }
+    repaint();
+}
+
+float PatchBayView::knobValue (int index) const
+{
+    if (index < 0 || index >= kPanelKnobCount)
+        return 0.0f;
+    return knobValue_[index];
 }
 
 bool PatchBayView::keyPressed (const juce::KeyPress& key)

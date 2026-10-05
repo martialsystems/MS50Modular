@@ -58,3 +58,14 @@ bool reorderJackStack (VisualCable* cables, int count, int jack, const int* bott
 int loadPublishedCables (VisualCable* dest, int capacity,
                          const Cable* published, int publishedCount,
                          int extIndex, int outputIndex, int noiseIndex);
+
+int panelKnobIndex (const char* section, const char* label);
+
+// Column knobs are 0..1. The divider switch snaps to 0, 0.5, and 1.
+// deltaUpPx is the pointer travel in component pixels, positive when the drag moves up.
+float panelKnobClamp (float value, bool isSwitch);
+float panelKnobDrag (float start, float deltaUpPx, bool shift, bool isSwitch);
+float panelKnobWheel (float current, float htmlDeltaY, bool shift, bool isSwitch);
+float panelKnobFromWheel (float current, float wheelDeltaY, bool reversed, bool shift, bool isSwitch);
+float panelKnobSwitchClick (float current);
+float panelKnobAngleDegrees (bool isSwitch, float value);

@@ -50,6 +50,61 @@ void gesture (PatchBayView& bay, float x0, float y0, float x1, float y1, bool sh
     bay.mouseUp (up);
 }
 
+void dragKnobLocal (PatchBayView& bay, float designX, float designY, float localDy, bool shift)
+{
+    auto source = juce::Desktop::getInstance().getMainMouseSource();
+    int flags = juce::ModifierKeys::leftButtonModifier;
+    if (shift)
+        flags |= juce::ModifierKeys::shiftModifier;
+    const juce::ModifierKeys mods (flags);
+    const auto time = juce::Time::getCurrentTime();
+    const auto start = bay.designToLocal (designX, designY);
+    const auto end = start + juce::Point<float> (0.0f, localDy);
+    juce::MouseEvent down (source, start, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                           &bay, &bay, time, start, time, 1, false);
+    bay.mouseDown (down);
+    juce::MouseEvent drag (source, end, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                           &bay, &bay, time, start, time, 1, true);
+    bay.mouseDrag (drag);
+    juce::MouseEvent up (source, end, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                         &bay, &bay, time, start, time, 1, true);
+    bay.mouseUp (up);
+}
+
+void wheelOnKnob (PatchBayView& bay, float designX, float designY, float deltaY)
+{
+    auto source = juce::Desktop::getInstance().getMainMouseSource();
+    const juce::ModifierKeys mods (juce::ModifierKeys::noModifiers);
+    const auto time = juce::Time::getCurrentTime();
+    const auto start = bay.designToLocal (designX, designY);
+    juce::MouseEvent move (source, start, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                           &bay, &bay, time, start, time, 0, false);
+    juce::MouseWheelDetails wheel {};
+    wheel.deltaY = deltaY;
+    bay.mouseWheelMove (move, wheel);
+}
+
+juce::Image paintBay (PatchBayView& bay)
+{
+    juce::Image image (juce::Image::ARGB, bay.getWidth(), bay.getHeight(), true);
+    juce::Graphics graphics (image);
+    bay.paintEntireComponent (graphics, true);
+    return image;
+}
+
+bool knobPixelsDiffer (const juce::Image& before, const juce::Image& after, juce::Rectangle<int> box)
+{
+    const int x0 = juce::jlimit (0, before.getWidth() - 1, box.getX());
+    const int y0 = juce::jlimit (0, before.getHeight() - 1, box.getY());
+    const int x1 = juce::jlimit (0, before.getWidth(), box.getRight());
+    const int y1 = juce::jlimit (0, before.getHeight(), box.getBottom());
+    for (int y = y0; y < y1; ++y)
+        for (int x = x0; x < x1; ++x)
+            if (before.getPixelAt (x, y) != after.getPixelAt (x, y))
+                return true;
+    return false;
+}
+
 void clickAt (PatchBayView& bay, float x, float y)
 {
     auto source = juce::Desktop::getInstance().getMainMouseSource();
@@ -162,6 +217,50 @@ private:
         const auto there = bay->designToLocal (100.0f, 80.0f);
         const auto back = bay->localToDesign (there);
         expect (std::fabs (back.x - 100.0f) < 0.6f && std::fabs (back.y - 80.0f) < 0.6f, "design mapping at 1280x512");
+
+        const int cutoff = panelKnobIndex ("VCF", "CUTOFF");
+        const int ratio = panelKnobIndex ("DIV", "RATIO SWITCH");
+        expect (bay->knobCount() == 31 && cutoff >= 0 && ratio >= 0, "live knob table");
+        const float cutoffDefault = bay->knobValue (cutoff);
+        const float mixBefore = bay->outputMix();
+        const int cablesBefore = publishedCount (*processor);
+        const auto beforePaint = paintBay (*bay);
+        dragKnobLocal (*bay, kPanelKnobs[cutoff].cx, kPanelKnobs[cutoff].cy, -40.0f, false);
+        expect (near (bay->knobValue (cutoff), cutoffDefault + 0.2f), "drag up 40px turns cutoff");
+        expect (bay->knobReadout().contains ("CUTOFF"), "knob readout names cutoff");
+        dragKnobLocal (*bay, kPanelKnobs[cutoff].cx, kPanelKnobs[cutoff].cy, -200.0f, true);
+        expect (near (bay->knobValue (cutoff), cutoffDefault + 0.4f), "shift drag is finer");
+        wheelOnKnob (*bay, kPanelKnobs[cutoff].cx, kPanelKnobs[cutoff].cy, 1.0f);
+        expect (near (bay->knobValue (cutoff), cutoffDefault + 0.5f), "wheel up turns cutoff");
+        dragKnobLocal (*bay, kPanelKnobs[cutoff].cx, kPanelKnobs[cutoff].cy, -5000.0f, false);
+        expect (bay->knobValue (cutoff) == 1.0f, "cutoff clamps at 1");
+        const auto turnedPaint = paintBay (*bay);
+        const auto capCentre = bay->designToLocal (kPanelKnobs[cutoff].cx, kPanelKnobs[cutoff].cy);
+        const auto capEdge = bay->designToLocal (kPanelKnobs[cutoff].cx + kPanelKnobs[cutoff].radius + 8.0f,
+                                                  kPanelKnobs[cutoff].cy + kPanelKnobs[cutoff].radius + 8.0f);
+        const juce::Rectangle<int> capBox (static_cast<int> (capCentre.x - (capEdge.x - capCentre.x)),
+                                            static_cast<int> (capCentre.y - (capEdge.y - capCentre.y)),
+                                            static_cast<int> ((capEdge.x - capCentre.x) * 2.0f),
+                                            static_cast<int> ((capEdge.y - capCentre.y) * 2.0f));
+        expect (knobPixelsDiffer (beforePaint, turnedPaint, capBox), "turning a knob repaints its cap");
+        {
+            auto source = juce::Desktop::getInstance().getMainMouseSource();
+            const juce::ModifierKeys mods (juce::ModifierKeys::leftButtonModifier);
+            const auto time = juce::Time::getCurrentTime();
+            const auto at = bay->designToLocal (kPanelKnobs[cutoff].cx, kPanelKnobs[cutoff].cy);
+            juce::MouseEvent click (source, at, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                    bay, bay, time, at, time, 2, false);
+            bay->mouseDoubleClick (click);
+        }
+        expect (near (bay->knobValue (cutoff), cutoffDefault), "double-click resets cutoff");
+        clickAt (*bay, kPanelKnobs[ratio].cx, kPanelKnobs[ratio].cy);
+        expect (bay->knobValue (ratio) == 1.0f, "divider click steps to 16");
+        expect (bay->knobReadout().contains ("16"), "switch readout shows 16");
+        dragKnobLocal (*bay, kPanelKnobs[ratio].cx, kPanelKnobs[ratio].cy, 40.0f, false);
+        expect (bay->knobValue (ratio) == 0.5f, "divider drag snaps");
+        expect (publishedCount (*processor) == cablesBefore, "turning knobs does not publish");
+        expect (std::fabs (bay->outputMix() - mixBefore) < 1.0e-6f, "column knobs leave Output mix alone");
+        expect (! bay->menuOpen(), "turning knobs does not open the chooser");
 
         const int extMono = panelJackIndex ("EXT IN", "MONO");
         const int outL = panelJackIndex ("OUTPUT", "L");

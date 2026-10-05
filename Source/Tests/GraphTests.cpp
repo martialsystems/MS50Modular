@@ -450,6 +450,7 @@ int testNoiseSeedRepeats();
 int testNoisePinkIsDarkerThanWhite();
 int testNoiseHasNoKnobs();
 int testPanelStackRule();
+int testPanelKnobs();
 
 int main()
 {
@@ -477,5 +478,6 @@ int main()
     failed += testNoisePinkIsDarkerThanWhite();
     failed += testNoiseHasNoKnobs();
     failed += testPanelStackRule();
+    failed += testPanelKnobs();
     return failed == 0 ? 0 : 1;
 }

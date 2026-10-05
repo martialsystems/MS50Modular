@@ -1,6 +1,6 @@
 # Geometry lives in panel/assets/layout.json. Refresh the editor SVG with
 # panel/emit_panel_svg.py. Re-run this file only when the module list should change.
-import math,json,io,random,os
+import math,json,io,random,os,re
 import numpy as np,cairosvg
 from PIL import Image,ImageFont,ImageDraw
 from scipy.ndimage import gaussian_filter
@@ -13,7 +13,6 @@ W,H,SC,M=1600,640,2,14; AVAIL=W-2*M
 CH_Y=12; TI_Y=50; KT=78; KB=200; MINP=37; MAXP=74   # jack pitch: min fits hole+name+gap, max = 2x min
 KR=13; RING=21; JR=9; PL=10; PITCH=50; KSP=56; INK="#dcd6c2"; GOLD="#c29f4c"
 mods=[
- dict(t="EXT IN",J=["L","R","MONO","GATE"]),
  dict(t="VCO",kn=["RANGE","FINE","PW","FM 1","FM 2"],kc=2,J=["HZ/V","V/OCT","FM 1","FM 2","PWM","TRI","SAW","PULSE"]),
  dict(t="VCF",kn=["CUTOFF","PEAK","MOD"],J=["IN","CUTOFF","OUT"]),
  dict(t="VCA 1",kn=["INITIAL","MOD","LOW CUT"],J=["IN","ENV","OUT"]),
@@ -29,6 +28,7 @@ mods=[
  dict(t="INT",kn=["TIME"],J=["IN","OUT"]),
  dict(t="MIX",kn=["LEVEL 1","LEVEL 2","LEVEL 3"],J=["IN 1","IN 2","IN 3","OUT"]),
  dict(t="MTR",meter=1),
+ dict(t="EXT IN",J=["L","R","MONO","GATE"]),
  dict(t="OUTPUT",kn=["MIX","LEVEL"],J=["L","R","WET"]),
 ]
 def jstart(m):                                  # jacks start under the column's own controls, or right under the title if it has none
@@ -60,11 +60,11 @@ def knob(sec,lab,cx,cy,v,r=KR,label=True):
             a=math.radians(-135+27*i-90); l=4 if i%5==0 else 2.5
             P.append(f'<line x1="{cx+(r+4)*math.cos(a):.1f}" y1="{cy+(r+4)*math.sin(a):.1f}" x2="{cx+(r+4+l)*math.cos(a):.1f}" y2="{cy+(r+4+l)*math.sin(a):.1f}" stroke="{INK}" stroke-width="1.1"/>')
     a=math.radians(-135+270*v-90); ex,ey=math.cos(a),math.sin(a)
-    P.append(f'<circle cx="{cx+1}" cy="{cy+2}" r="{r+4}" fill="#000" opacity=".45"/><circle cx="{cx}" cy="{cy}" r="{r+3}" fill="#08080a" stroke="#000" stroke-width=".8"/>'
+    P.append('<g class="kbody">'+f'<circle cx="{cx+1}" cy="{cy+2}" r="{r+4}" fill="#000" opacity=".45"/><circle cx="{cx}" cy="{cy}" r="{r+3}" fill="#08080a" stroke="#000" stroke-width=".8"/>'
       f'<circle cx="{cx}" cy="{cy}" r="{r+1.2}" fill="none" stroke="#3c3c3f" stroke-width="2.4" stroke-dasharray=".8 1.6" opacity=".75"/>'
       f'<circle cx="{cx}" cy="{cy}" r="{r-.3}" fill="url(#kb)" stroke="#000" stroke-width=".8"/><circle cx="{cx}" cy="{cy}" r="{r*.8:.1f}" fill="url(#kt)" stroke="#050505" stroke-width=".8"/>'
       f'<ellipse cx="{cx-r*.28:.1f}" cy="{cy-r*.32:.1f}" rx="{r*.45:.1f}" ry="{r*.28:.1f}" fill="url(#ks)" transform="rotate(-35 {cx} {cy})"/>'
-      f'<line x1="{cx+ex*r*.1:.1f}" y1="{cy+ey*r*.1:.1f}" x2="{cx+ex*(r-1.5):.1f}" y2="{cy+ey*(r-1.5):.1f}" stroke="#f1ede0" stroke-width="2.4"/>')
+      f'<line x1="{cx+ex*r*.1:.1f}" y1="{cy+ey*r*.1:.1f}" x2="{cx+ex*(r-1.5):.1f}" y2="{cy+ey*(r-1.5):.1f}" stroke="#f1ede0" stroke-width="2.4"/></g>')
 def jack(sec,lab,hx,cy):                       # hole centered in column, name centered below it
     J.append(dict(section=sec,label=lab,x=round(hx,1),y=cy,radius=JR,hit=[round(hx-11,1),round(cy-11,1),22,22])); circ.append((hx,cy,JR+1.5,"jack "+lab))
     P.append(f'<circle cx="{hx:.1f}" cy="{cy}" r="{JR+1.5}" fill="#000" opacity=".55"/><circle cx="{hx:.1f}" cy="{cy}" r="{JR}" fill="url(#js)" stroke="#2a2a2c" stroke-width=".9"/>'
@@ -135,18 +135,23 @@ def fbm(h,w,oc=6,base=4,seed=0):
     for o in range(oc):
         n=base*2**o; a=np.ascontiguousarray(r.random((max(2,n*h//w),n)).astype(np.float32)); acc+=amp*np.asarray(Image.fromarray(a).resize((w,h),Image.BICUBIC)); tot+=amp; amp*=.5
     acc/=tot; return (acc-acc.min())/(acc.max()-acc.min())
-a=np.asarray(Image.open(io.BytesIO(cairosvg.svg2png(bytestring=svg.encode(),output_width=W*SC,output_height=H*SC))).convert("RGB")).astype(np.float32)/255; h,w=a.shape[:2]
-paint=ss(.38,.5,a.mean(-1)); a=a*(1-paint[...,None])+a*np.array([1,.96,.88],np.float32)*(.96+.04*fbm(h,w,5,6,1))[...,None]*paint[...,None]
-a+=(1-paint)[...,None]*((rng.random((h,w,1))-.5).astype(np.float32)*.05+(blur(rng.random((h,w)),.9)[...,None]-.5)*.1)
-a*=(.9+.2*fbm(h,w,6,3,2))[...,None]
-yy,xx=np.mgrid[0:h,0:w].astype(np.float32); d=np.minimum(np.minimum(xx,w-xx),np.minimum(yy,h-yy))
-wm=np.exp(-d/(14*SC))*np.clip((fbm(h,w,5,20,4)-.5)*3.5,0,1)*.4; a=a*(1-.5*wm[...,None])+np.array([.36,.36,.34],np.float32)*.5*wm[...,None]
-sl=Image.new("L",(w,h),0); dr=ImageDraw.Draw(sl)
-for _ in range(40):
-    x0,y0=random.uniform(0,w),random.uniform(0,h); L=random.uniform(10,120)*SC; t=random.uniform(0,6.28); dr.line([(x0,y0),(x0+L*math.cos(t),y0+L*math.sin(t))],fill=random.randint(40,110),width=1)
-a+=blur(np.asarray(sl).astype(np.float32)/255,.6)[...,None]*.14
-a+=blur((rng.random((h,w))>.9996).astype(np.float32),1.0)[...,None]*1.5
-r=np.sqrt(((xx/w-.5)/.5)**2+((yy/h-.5)/.5)**2)/1.414; a*=(1-.28*r**2.5)[...,None]; a*=np.array([1.03,1,.95],np.float32); a+=.012
-im=Image.fromarray((np.clip(a,0,1)**.97*255).astype(np.uint8)); o=os.path.join(os.path.dirname(os.path.abspath(__file__)),"..","assets")+"/"; os.makedirs(o,exist_ok=True)
-im.save(o+"panel@2x.png"); im.resize((W,H),Image.LANCZOS).save(o+"panel.png")
+def finish(svg):
+    global rng
+    random.seed(5); rng=np.random.default_rng(5)   # same wear on both renders
+    a=np.asarray(Image.open(io.BytesIO(cairosvg.svg2png(bytestring=svg.encode(),output_width=W*SC,output_height=H*SC))).convert("RGB")).astype(np.float32)/255; h,w=a.shape[:2]
+    paint=ss(.38,.5,a.mean(-1)); a=a*(1-paint[...,None])+a*np.array([1,.96,.88],np.float32)*(.96+.04*fbm(h,w,5,6,1))[...,None]*paint[...,None]
+    a+=(1-paint)[...,None]*((rng.random((h,w,1))-.5).astype(np.float32)*.05+(blur(rng.random((h,w)),.9)[...,None]-.5)*.1)
+    a*=(.9+.2*fbm(h,w,6,3,2))[...,None]
+    yy,xx=np.mgrid[0:h,0:w].astype(np.float32); d=np.minimum(np.minimum(xx,w-xx),np.minimum(yy,h-yy))
+    wm=np.exp(-d/(14*SC))*np.clip((fbm(h,w,5,20,4)-.5)*3.5,0,1)*.4; a=a*(1-.5*wm[...,None])+np.array([.36,.36,.34],np.float32)*.5*wm[...,None]
+    sl=Image.new("L",(w,h),0); dr=ImageDraw.Draw(sl)
+    for _ in range(40):
+        x0,y0=random.uniform(0,w),random.uniform(0,h); L=random.uniform(10,120)*SC; t=random.uniform(0,6.28); dr.line([(x0,y0),(x0+L*math.cos(t),y0+L*math.sin(t))],fill=random.randint(40,110),width=1)
+    a+=blur(np.asarray(sl).astype(np.float32)/255,.6)[...,None]*.14
+    a+=blur((rng.random((h,w))>.9996).astype(np.float32),1.0)[...,None]*1.5
+    r=np.sqrt(((xx/w-.5)/.5)**2+((yy/h-.5)/.5)**2)/1.414; a*=(1-.28*r**2.5)[...,None]; a*=np.array([1.03,1,.95],np.float32); a+=.012
+    return Image.fromarray((np.clip(a,0,1)**.97*255).astype(np.uint8))
+o=os.path.join(os.path.dirname(os.path.abspath(__file__)),"..","assets")+"/"; os.makedirs(o,exist_ok=True)
+im=finish(svg); im.save(o+"panel@2x.png"); im.resize((W,H),Image.LANCZOS).save(o+"panel.png")
+bg=finish(re.sub(r'<g class="kbody">.*?</g>',"",svg)); bg.save(o+"panel_bg@2x.png"); bg.resize((W,H),Image.LANCZOS).save(o+"panel_bg.png")   # no knob bodies: for live knobs
 json.dump(dict(canvas=[W,H],bands=dict(chrome=[CH_Y,30],titles=[TI_Y,20],knobs=[KT,KB],lane=[FR_B,H-M-FR_B]),columns=cols,knobs=K,jacks=J,labels=[dict(text=t[4],rect=[round(t[0],1),round(t[1],1),round(t[2]-t[0],1),round(t[3]-t[1],1)]) for t in texts]),open(o+"layout.json","w"),indent=1)

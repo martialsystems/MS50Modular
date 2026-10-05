@@ -144,3 +144,56 @@ int testPanelStackRule()
 
     return finish ("testPanelStackRule");
 }
+
+int testPanelKnobs()
+{
+    check (kPanelKnobCount == 31, "panel knob count");
+
+    const int vco = panelJackIndex ("VCO", "HZ/V");
+    const int extL = panelJackIndex ("EXT IN", "L");
+    const int outL = panelJackIndex ("OUTPUT", "L");
+    check (vco >= 0 && extL >= 0 && outL >= 0, "VCO, Ext In, and Output jacks exist");
+    check (kPanelJacks[vco].x < kPanelJacks[extL].x, "VCO stays left of Ext In");
+    check (kPanelJacks[extL].x < kPanelJacks[outL].x, "Ext In sits left of Output");
+
+    float leftOfOutput = -1.0f;
+    const char* beside = "";
+    for (int i = 0; i < kPanelJackCount; ++i)
+    {
+        if (kPanelJacks[i].x < kPanelJacks[outL].x && kPanelJacks[i].x > leftOfOutput)
+        {
+            leftOfOutput = kPanelJacks[i].x;
+            beside = kPanelJacks[i].section;
+        }
+    }
+    check (std::strcmp (beside, "EXT IN") == 0, "the column beside Output is Ext In");
+
+    const int cutoff = panelKnobIndex ("VCF", "CUTOFF");
+    const int ratio = panelKnobIndex ("DIV", "RATIO SWITCH");
+    check (cutoff >= 0 && ratio >= 0, "cutoff and divider switch exist");
+    const float start = kPanelKnobs[cutoff].valueDefault;
+    check (std::fabs (panelKnobDrag (start, 40.0f, false, false) - (start + 0.2f)) < 1.0e-4f,
+           "drag up 40px adds 0.2");
+    check (std::fabs (panelKnobDrag (start, 200.0f, true, false) - (start + 0.2f)) < 1.0e-4f,
+           "shift drag is five times finer");
+    check (panelKnobDrag (start, 5000.0f, false, false) == 1.0f, "drag clamps at 1");
+    check (std::fabs (panelKnobWheel (start + 0.4f, 100.0f, false, false) - (start + 0.3f)) < 1.0e-4f,
+           "wheel down removes 0.1");
+    check (std::fabs (panelKnobFromWheel (0.5f, 1.0f, false, false, false) - 0.6f) < 1.0e-4f,
+           "wheel up adds 0.1");
+    check (std::fabs (panelKnobFromWheel (0.5f, 1.0f, true, false, false) - 0.4f) < 1.0e-4f,
+           "reversed wheel up is a downward push");
+
+    check (kPanelKnobs[ratio].kind == 1, "divider control is the switch");
+    check (kPanelKnobs[ratio].valueDefault == 0.5f, "switch default is 4");
+    check (panelKnobSwitchClick (0.5f) == 1.0f, "click steps 4 to 16");
+    check (panelKnobSwitchClick (1.0f) == 0.0f, "click steps 16 to 2");
+    check (panelKnobSwitchClick (0.0f) == 0.5f, "click steps 2 to 4");
+    check (panelKnobDrag (1.0f, -40.0f, false, true) == 0.5f, "switch drag snaps");
+    check (panelKnobFromWheel (0.5f, 1.0f, false, false, true) == 1.0f, "wheel up steps the switch");
+    check (panelKnobAngleDegrees (false, 0.0f) == -135.0f, "rotary start angle");
+    check (panelKnobAngleDegrees (false, 1.0f) == 135.0f, "rotary end angle");
+    check (panelKnobAngleDegrees (true, 0.5f) == 0.0f, "switch centre angle");
+
+    return finish ("testPanelKnobs");
+}

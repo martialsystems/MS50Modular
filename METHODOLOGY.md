@@ -143,6 +143,14 @@ A move disconnects the old link before connecting the new one. If the new link i
 
 The panel draws every column, including modules that are not in the graph yet. Sample and hold, the mixer, and the meter have no graph module. Divider /2 and /4 stay unmapped until that module exists. The /16 jack stays unmapped: the research divider is /2 and /4 only.
 
+## Knob rule (2026-10-05)
+
+Column knobs turn on the panel. Drag up or down. Hold Shift and the same drag is five times finer. The mouse wheel turns a knob. Double-click returns that knob's layout default. The divider switch steps through 2, 4, and 16, stored as 0, 0.5, and 1.
+
+A column knob does not write the graph and does not drive a module that is not in the process list. Output level stays 1. The top MIX control remains Output mix. The divider switch does not select a DSP ratio.
+
+EXT IN is the column immediately left of OUTPUT. VCO is the left column. Tick marks and labels stay on the panel drawing. Knob bodies are painted from the current value.
+
 ## How to A/B against public recordings
 
 Do this after step 8 (filter stand-in) and again after step 20 (diode-bridge pass). Do not treat adjectives as data. One listener called the MS-50 harsher than his MS-20. Another called it softer.

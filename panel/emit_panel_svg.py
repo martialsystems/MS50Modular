@@ -50,10 +50,11 @@ def baseline(rect):
     return rect[1] + z * 0.74
 
 
-def knob_svg(cx, cy, radius, value):
-    r = radius
-    a = math.radians(-135 + 270 * value - 90)
-    ex, ey = math.cos(a), math.sin(a)
+def knob_ticks(knob):
+    # Bodies are drawn live. The divider switch has 2 / 4 / 16 labels and no tick ring.
+    if knob["label"] == "RATIO SWITCH":
+        return ""
+    cx, cy, r = knob["cx"], knob["cy"], knob["radius"]
     ticks = []
     for i in range(11):
         ang = math.radians(-135 + 27 * i - 90)
@@ -63,16 +64,7 @@ def knob_svg(cx, cy, radius, value):
             f'x2="{cx + (r + 4 + length) * math.cos(ang):.1f}" y2="{cy + (r + 4 + length) * math.sin(ang):.1f}" '
             f'stroke="{INK}" stroke-width="1.1"/>'
         )
-    body = (
-        f'<circle cx="{cx + 1:.1f}" cy="{cy + 2:.1f}" r="{r + 4}" fill="#000" opacity="0.45"/>'
-        f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{r + 3}" fill="#08080a" stroke="#000" stroke-width="0.8"/>'
-        f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{r + 1.2}" fill="none" stroke="#3c3c3f" stroke-width="2.4" opacity="0.75"/>'
-        f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{r - 0.3:.1f}" fill="url(#kb)" stroke="#000" stroke-width="0.8"/>'
-        f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{r * 0.8:.1f}" fill="url(#kt)" stroke="#050505" stroke-width="0.8"/>'
-        f'<line x1="{cx + ex * r * 0.1:.1f}" y1="{cy + ey * r * 0.1:.1f}" '
-        f'x2="{cx + ex * (r - 1.5):.1f}" y2="{cy + ey * (r - 1.5):.1f}" stroke="#f1ede0" stroke-width="2.4"/>'
-    )
-    return "".join(ticks) + body
+    return "".join(ticks)
 
 
 def jack_svg(hx, cy, radius):
@@ -128,7 +120,7 @@ def build_svg(lay):
         f'<circle cx="{cx:.1f}" cy="109" r="2" fill="#111"/>'
     )
     for knob in lay["knobs"]:
-        parts.append(knob_svg(knob["cx"], knob["cy"], knob["radius"], knob["default"]))
+        parts.append(knob_ticks(knob))
     for jack in lay["jacks"]:
         parts.append(jack_svg(jack["x"], jack["y"], jack["radius"]))
     for lab in lay["labels"]:
@@ -192,6 +184,20 @@ def build_inc(lay):
         "    int dir; // 0 in, 1 out, -1 when the jack is not on the graph",
         "};",
         "",
+        "struct PanelKnobRec {",
+        "    const char* section;",
+        "    const char* label;",
+        "    float cx;",
+        "    float cy;",
+        "    float radius;",
+        "    float valueDefault;",
+        "    float hitX;",
+        "    float hitY;",
+        "    float hitW;",
+        "    float hitH;",
+        "    int kind; // 0 rotary, 1 divider switch",
+        "};",
+        "",
         "inline constexpr float kPanelW = 1600.0f;",
         "inline constexpr float kPanelH = 640.0f;",
         "inline constexpr float kMixTrackX = 1396.0f;",
@@ -221,6 +227,19 @@ def build_inc(lay):
         )
     lines.append("};")
     lines.append("")
+    knobs = lay["knobs"]
+    lines.append(f"inline constexpr int kPanelKnobCount = {len(knobs)};")
+    lines.append("inline constexpr PanelKnobRec kPanelKnobs[] = {")
+    for knob in knobs:
+        kind = 1 if knob["label"] == "RATIO SWITCH" else 0
+        hit = knob["hit"]
+        lines.append(
+            f'    {{ "{c_escape(knob["section"])}", "{c_escape(knob["label"])}", '
+            f'{knob["cx"]:.1f}f, {knob["cy"]:.1f}f, {knob["radius"]:.1f}f, {knob["default"]:.2f}f, '
+            f'{hit[0]:.1f}f, {hit[1]:.1f}f, {hit[2]:.1f}f, {hit[3]:.1f}f, {kind} }},'
+        )
+    lines.append("};")
+    lines.append("")
     return "\n".join(lines) + "\n"
 
 
@@ -228,7 +247,11 @@ def main():
     lay = json.load(open(LAY))
     assert lay["canvas"] == [W, H]
     assert len(lay["jacks"]) == 58, len(lay["jacks"])
+    assert len(lay["knobs"]) == 31, len(lay["knobs"])
+    titles = [column["title"] for column in lay["columns"]]
+    assert titles[-2:] == ["EXT IN", "OUTPUT"], titles
     svg = build_svg(lay)
+    assert "kbody" not in svg
     os.makedirs(os.path.dirname(SVG), exist_ok=True)
     os.makedirs(os.path.dirname(INC), exist_ok=True)
     with open(SVG, "w") as handle:

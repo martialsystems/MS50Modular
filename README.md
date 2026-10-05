@@ -35,7 +35,7 @@ Phase 1 rack, fixed, not a spawner:
 
 ## UI target
 
-The current editor is a development rack: fourteen tiles, Integrator included. The shipping target is a single landscape MS-50-style panel: knobs in an upper band, two jack rows along the bottom, modules as labeled columns. That chassis follows the 1978 layout, rather than a VCV-style module grid. Ext In and Output stay as the end columns because this plugin is a VST3 FX. The layout is Step UI-A in the build guide. Step 6 does not paint that chassis.
+The editor is the landscape panel: knobs in an upper band, jacks in labeled columns, cables hanging below. Ext In sits immediately left of Output. VCO is the left column. The layout is Step UI-A in the build guide.
 
 ## What it is not
 
@@ -51,7 +51,7 @@ The current editor is a development rack: fourteen tiles, Integrator included. T
 *   Stereo in and stereo out. Processing modules are mono.
 *   Click-drag patch cables on the landscape panel. An input sums every cable on it. An output may feed several inputs (stand-in S-27).
 *   Stack order, cable color, and cable shape do not change the sound. A 1978 MS-50 jack took one plug. This plugin stacks. Drag a plug onto empty space to unpatch it, or right-click the cable. Shift-drag adds a cable. Click an occupied jack to choose or reorder the stack.
-*   The editor is that panel. Column knobs are pictures until their modules exist. The top MIX control is Output mix. Sample and hold, the mixer, and the meter are drawn and are not graph modules. The divider /16 jack stays unmapped.
+*   The editor is that panel. Column knobs turn. A turn does not drive a module that is not in the graph. The top MIX control is Output mix, and Output level stays 1. Sample and hold, the mixer, and the meter are drawn and are not graph modules. The divider /16 jack stays unmapped.
 *   Rope cables are drawn on the message thread.
 *   Port types: audio, CV, gate. Illegal cables are refused.
 *   No heap allocation on the audio thread.

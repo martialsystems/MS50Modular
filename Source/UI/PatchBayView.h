@@ -25,6 +25,8 @@ public:
     void mouseDown (const juce::MouseEvent&) override;
     void mouseDrag (const juce::MouseEvent&) override;
     void mouseUp (const juce::MouseEvent&) override;
+    void mouseDoubleClick (const juce::MouseEvent&) override;
+    void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
     bool keyPressed (const juce::KeyPress&) override;
 
     juce::Point<float> designToLocal (float x, float y) const;
@@ -34,6 +36,9 @@ public:
     bool menuOpen() const;
     const juce::String& statusText() const noexcept { return status_; }
     float outputMix() const noexcept { return mix_; }
+    int knobCount() const noexcept { return kPanelKnobCount; }
+    float knobValue (int index) const;
+    const juce::String& knobReadout() const noexcept { return knobReadout_; }
     bool panelLoaded() const noexcept { return panel_ != nullptr; }
     int cableNearDesign (float x, float y) const { return cableNear (x, y); }
     int plugsOnJack (int jack, int* out, int capacity) const;
@@ -62,6 +67,8 @@ private:
     void stackLevels (int* levelA, int* levelB) const;
     void endPin (int jack, int level, float& x, float& y) const;
     int jackAt (float x, float y) const;
+    int knobAt (float x, float y) const;
+    void setKnobValue (int index, float value);
     int labelAt (float x, float y) const;
     int cableNear (float x, float y) const;
     bool mixAt (float x, float y) const;
@@ -87,7 +94,9 @@ private:
     int count_ = 0;
     int currentColor_ = 0;
     float mix_ = 0.0f;
+    float knobValue_[kPanelKnobCount] {};
     juce::String status_;
+    juce::String knobReadout_;
 
     bool grabActive_ = false;
     bool grabEndA_ = false;
@@ -100,6 +109,12 @@ private:
     bool downMoved_ = false;
     bool downShift_ = false;
     bool mixDrag_ = false;
+    bool knobDrag_ = false;
+    bool knobDragMoved_ = false;
+    bool knobSuppressSwitchStep_ = false;
+    int knobDragIndex_ = -1;
+    float knobDragStartY_ = 0.0f;
+    float knobDragStartValue_ = 0.0f;
     int downJack_ = -1;
     float downX_ = 0.0f;
     float downY_ = 0.0f;

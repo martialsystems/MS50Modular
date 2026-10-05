@@ -192,11 +192,11 @@ Cable rule: `METHODOLOGY.md`, Cable rule (2026-10-05).
 *   Two inputs, two outputs, a jack with no graph module, or a cycle before step 19: the cable does not stay. Status strings stay "that jack does not take this cable" and "feedback is not available until step 19".
 *   Sample and hold, the mixer, and the meter are drawn and are not graph modules. Divider /2 and /4 stay unmapped until that module exists. Do not add /16 DSP. The research divider is /2 and /4.
 
-Top MIX is Output mix, default 0. Column knobs stay pictures until their modules exist. Level stays 1.
+Top MIX is Output mix, default 0. Level stays 1. Column knobs turn, as in Knob rule (2026-10-05), and do not drive a module that is not in the graph. EXT IN is the column immediately left of OUTPUT.
 
 A move disconnects the old link first, then connects the new one, so the old link is not read as a cycle. If the new link is refused, the old link is connected again and is then the newest published cable.
 
-Acceptance: `testPanelStackRule`. `SINE_DRY` still passes. `tools/PanelProbe.cpp` opens a window, stacks Ext In Mono on Output L, unplugs it, refuses VCO Hz/V into Output Wet, stacks two cables on Wet, opens the chooser, reorders them without changing the published bytes, moves the top mix, and right-clicks a cable.
+Acceptance: `testPanelStackRule` and `testPanelKnobs`. `SINE_DRY` still passes. `tools/PanelProbe.cpp` opens a window, turns a column knob without publishing, steps the divider switch, stacks Ext In Mono on Output L, unplugs it, refuses VCO Hz/V into Output Wet, stacks two cables on Wet, opens the chooser, reorders them without changing the published bytes, moves the top mix, and right-clicks a cable.
 
 Do not touch: module DSP that does not exist yet.
 
@@ -358,7 +358,7 @@ Stop. Phase 2 is a new packet. Do not start the adding amplifier because fan-out
 
 ## Step UI-A: original panel pass (2026-09-29)
 
-The landscape chassis landed in Panel patch bay (2026-10-05). Column knobs are still pictures. Cable color stays off `Cable`. The notes below are the 2026-09-29 plan for that pass.
+The landscape chassis landed in Panel patch bay (2026-10-05). Column knobs turn as of Knob rule (2026-10-05). Cable color stays off `Cable`. The notes below are the 2026-09-29 plan for that pass.
 
 Goal: replace the tile rack with one landscape chassis copied from the 1978 MS-50. Knobs sit in an upper band. Two continuous jack rows run along the bottom. Modules are labeled columns.
 
@@ -366,7 +366,7 @@ When: after Step 6 works, and after at least the VCO, VCF, and VCA make sound, s
 
 Files: `RackView`, `JackView`, `CableView`, `PluginEditor`. No `PatchGraph` API change. Jack ids stay the schematic ids. Only x/y and paint change.
 
-Layout, left to right: VCO, VCF, VCA 1, VCA 2, MG, EG 1, EG 2, Ring, Noise, Divider, Inverter, Integrator. Ext In is the far left column. Output is the far right column.
+The 2026-09-29 plan ran VCO, VCF, VCA 1, VCA 2, MG, EG 1, EG 2, Ring, Noise, Divider, Inverter, Integrator, with Ext In on the far left and Output on the far right. The panel shipped on 2026-10-05 follows `layout.json`: VCO is the left column, and EXT IN is immediately left of OUTPUT.
 
 Phase 2 gaps (mixer, sample and hold, meter) may be empty labeled slots so the spacing stays honest.
 
