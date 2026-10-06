@@ -200,6 +200,20 @@ Acceptance: `testPanelStackRule` and `testPanelKnobs`. `SINE_DRY` still passes. 
 
 Do not touch: module DSP that does not exist yet.
 
+## FL Studio install (2026-10-05)
+
+FL Studio 2024 ships `ilbridge`, and that bridge is x86_64 only. The Debug bundle in `build/` is arm64 only, so that bridge cannot open it. Plugin Manager still files the plugin under Effects, with status error. The failed record has no plugin type, so the Effect control cannot clear the row.
+
+After a change that should be heard in FL Studio, quit FL Studio and Plugin Manager, then run:
+
+```bash
+scripts/install_fl_plugin.sh
+```
+
+The script builds target `MS50Modular_VST3` as a Release bundle for arm64 and x86_64 under `build/fl-release/`. It loads each slice, requires subcategory Fx, processes one dry stereo block, and runs `scripts/sine_through_fx.py` on that bundle. It then points `~/Library/Audio/Plug-Ins/VST3/MS-50 Modular.vst3` at that bundle and deletes `MS-50 Modular.nfo` and `MS-50 Modular.fst` from the Effects and Generators plugin-database folders. In FL Studio, use Find plugins so the new record is written from this bundle.
+
+Keep one copy. A second bundle in `/Library/Audio/Plug-Ins/VST3` is a second row. Building the static library target `MS50Modular` does not refresh the VST3. The Debug tree stays arm64 for `MS50ModularTests` and `MS50PanelProbe`.
+
 ## Step 7: Noise
 
 Files: `Source/Modular/Noise.h/.cpp`. Add it to the rack's process list. Faceplate already exists; wire the two jacks.

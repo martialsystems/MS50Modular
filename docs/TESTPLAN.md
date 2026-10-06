@@ -42,6 +42,10 @@ Agents must treat `SINE_* FAIL` as a step failure. `SINE_HOST SKIP` is allowed. 
 
 The four lines are `SINE_DRY`, `SINE_LEFT`, `SINE_WET_SILENCE`, and `SINE_RMS`. The optional host check is `python3 scripts/sine_through_fx.py --vst3 <debug-vst3>`.
 
+## FL Studio rescan (2026-10-05)
+
+Quit FL Studio and Plugin Manager, run `scripts/install_fl_plugin.sh`, then Find plugins. The script's slice check must print `LOAD_OK` for arm64 and for x86_64, with subcategory Fx and a dry-block error below 1e-5. The user-folder symlink is the only installed copy. A failed earlier scan leaves an Effects row with no plugin type: Find plugins replaces that row. The Debug bundle is not the one FL Studio opens.
+
 ## Each module
 
 Run the named tests when the matching build step lands. "Finite" means every sample in a 1 second render at 48 kHz is finite and inside ±40 V in the graph (well above the ±5 V stand-in, tight enough to catch a blow-up).
