@@ -45,14 +45,14 @@ inline constexpr float kPowerH = 20.00f;
 // Momentary HOLD key under the EXT IN jacks. Mouse down holds the gate. Mouse up releases it.
 // The view paints the cap before the cables.
 inline constexpr float kHoldCx = 1341.80f;
-inline constexpr float kHoldCy = 266.50f;
+inline constexpr float kHoldCy = 265.50f;
 inline constexpr float kHoldHitX = 1324.80f;
-inline constexpr float kHoldHitY = 249.50f;
+inline constexpr float kHoldHitY = 248.50f;
 inline constexpr float kHoldHitW = 34.00f;
 inline constexpr float kHoldHitH = 34.00f;
 // Red lamp above the HOLD key, lit while the key is held (like the SQ-10 START lamp). The dark bezel is in the SVG.
 inline constexpr float kHoldLampCx = 1341.80f;
-inline constexpr float kHoldLampCy = 240.00f;
+inline constexpr float kHoldLampCy = 239.50f;
 inline constexpr float kHoldLampR = 3.50f;
 
 // Preset LCD in the top bar. The glass is in the SVG. The view draws the dots.
@@ -179,19 +179,19 @@ inline constexpr PanelLabelRec kPanelLabels[] = {
     { "IN 3", 1197.4f, 408.4f, 21.4f, 10.3f },
     { "OUT", 1196.1f, 482.4f, 24.0f, 10.3f },
     { "EXT IN", 1320.4f, 56.1f, 42.7f, 11.3f },
-    { "L", 1293.3f, 102.4f, 6.7f, 10.3f },
-    { "R", 1382.9f, 102.4f, 7.9f, 10.3f },
-    { "MONO", 1278.9f, 176.4f, 35.4f, 10.3f },
-    { "GATE", 1371.4f, 176.4f, 30.9f, 10.3f },
+    { "L", 1293.3f, 103.9f, 6.7f, 10.3f },
+    { "R", 1382.9f, 103.9f, 7.9f, 10.3f },
+    { "MONO", 1278.9f, 150.9f, 35.4f, 10.3f },
+    { "GATE", 1371.4f, 150.9f, 30.9f, 10.3f },
     { "OUTPUT", 1482.3f, 56.1f, 53.3f, 11.3f },
     { "MIX", 1498.8f, 117.9f, 20.4f, 10.3f },
     { "LEVEL", 1490.5f, 167.9f, 37.1f, 10.3f },
     { "L", 1467.1f, 210.4f, 6.7f, 10.3f },
     { "R", 1543.5f, 210.4f, 7.9f, 10.3f },
     { "WET", 1496.4f, 284.4f, 25.2f, 10.3f },
-    { "THRESHOLD", 1260.9f, 229.9f, 71.6f, 10.3f },
-    { "RELEASE", 1359.7f, 229.9f, 54.4f, 10.3f },
-    { "HOLD", 1325.6f, 288.4f, 32.4f, 10.3f },
+    { "THRESHOLD", 1260.9f, 211.4f, 71.6f, 10.3f },
+    { "RELEASE", 1359.7f, 211.4f, 54.4f, 10.3f },
+    { "HOLD", 1325.6f, 287.4f, 32.4f, 10.3f },
     { "VU METER", 1385.0f, 322.8f, 67.6f, 11.3f },
     { "METER FACE", 1265.6f, 365.2f, 306.4f, 139.3f },
 };
@@ -248,10 +248,10 @@ inline constexpr PanelJackRec kPanelJacks[] = {
     { "MIX", "IN 2", 1208.1f, 320.5f, 15, 1, 0 },
     { "MIX", "IN 3", 1208.1f, 394.5f, 15, 2, 0 },
     { "MIX", "OUT", 1208.1f, 468.5f, 15, 3, 1 },
-    { "EXT IN", "L", 1296.7f, 88.5f, 1, 0, 1 },
-    { "EXT IN", "R", 1386.9f, 88.5f, 1, 1, 1 },
-    { "EXT IN", "MONO", 1296.7f, 162.5f, 1, 2, 1 },
-    { "EXT IN", "GATE", 1386.9f, 162.5f, 1, 3, 1 },
+    { "EXT IN", "L", 1296.7f, 90.0f, 1, 0, 1 },
+    { "EXT IN", "R", 1386.9f, 90.0f, 1, 1, 1 },
+    { "EXT IN", "MONO", 1296.7f, 137.0f, 1, 2, 1 },
+    { "EXT IN", "GATE", 1386.9f, 137.0f, 1, 3, 1 },
     { "OUTPUT", "L", 1470.5f, 196.5f, 2, 0, 0 },
     { "OUTPUT", "R", 1547.5f, 196.5f, 2, 1, 0 },
     { "OUTPUT", "WET", 1509.0f, 270.5f, 2, 2, 0 },
@@ -288,8 +288,8 @@ inline constexpr PanelKnobRec kPanelKnobs[] = {
     { "MIX", "LEVEL 1", 1208.1f, 101.0f, 13.0f, 0.80f, 1187.1f, 80.0f, 42.0f, 42.0f, 0 },
     { "MIX", "LEVEL 2", 1208.1f, 151.0f, 13.0f, 0.80f, 1187.1f, 130.0f, 42.0f, 42.0f, 0 },
     { "MIX", "LEVEL 3", 1208.1f, 201.0f, 13.0f, 0.80f, 1187.1f, 180.0f, 42.0f, 42.0f, 0 },
-    { "EXT IN", "THRESHOLD", 1296.7f, 213.0f, 13.0f, 0.3758f, 1275.7f, 192.0f, 42.0f, 42.0f, 0 },
-    { "EXT IN", "RELEASE", 1386.9f, 213.0f, 13.0f, 0.5316f, 1365.9f, 192.0f, 42.0f, 42.0f, 0 },
+    { "EXT IN", "THRESHOLD", 1296.7f, 194.5f, 13.0f, 0.3758f, 1275.7f, 173.5f, 42.0f, 42.0f, 0 },
+    { "EXT IN", "RELEASE", 1386.9f, 194.5f, 13.0f, 0.5316f, 1365.9f, 173.5f, 42.0f, 42.0f, 0 },
     { "OUTPUT", "MIX", 1509.0f, 101.0f, 13.0f, 1.00f, 1488.0f, 80.0f, 42.0f, 42.0f, 0 },
     { "OUTPUT", "LEVEL", 1509.0f, 151.0f, 13.0f, 0.70f, 1488.0f, 130.0f, 42.0f, 42.0f, 0 },
 };

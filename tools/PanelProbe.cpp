@@ -709,7 +709,7 @@ private:
             clickAt (*bay, onX, powerY);
             expect (bay->outputMix() == 1.0f, "hold check turns the effect back on");
 
-            const auto legend = bay->designToLocal (1325.6f + 10.0f, 288.4f + 4.0f);
+            const auto legend = bay->designToLocal (1325.6f + 10.0f, 287.4f + 4.0f);
             juce::MouseEvent legendDown (source, legend, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
                                          bay, bay, time, legend, time, 1, false);
             bay->mouseDown (legendDown);
