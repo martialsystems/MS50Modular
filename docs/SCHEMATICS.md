@@ -54,7 +54,7 @@ Rack order, top to bottom, left to right:
 2. MG, EG 1, EG 2, Noise, Ring
 3. Divider, Inverter, Integrator
 
-Phase 2 columns are drawn on the panel and have no ports in the graph. The divider /16 jack is one of those drawings. The research divider is /2 and /4.
+Phase 2 columns are drawn on the panel and have no ports in the graph. The divider is /2 and /4; the panel no longer has a /16 jack or switch position.
 
 ## PatchGraph rules
 
@@ -313,7 +313,8 @@ Knobs:
 | Knob | Range | Default | Status |
 |---|---|---|---|
 | Low cut | 10 Hz to 2 kHz, exponential | 10 Hz | S-11. The control exists: CONFIRMED |
-| Intensity | 0 to 1 | 0.85 | CONFIRMED as an output attenuator. The taper is linear stand-in |
+| Intensity | 0 to 1 | 0.85 | CONFIRMED as an output attenuator. The taper is linear stand-in. Panel VCA 1 MOD |
+| Initial | 0 to 1 | 0 | Panel VCA 1 INITIAL, added to Env / 5 before the clamp. 0 leaves Env in charge |
 
 Jacks: `SigIn` Audio in, `Env` CV in, `Out` Audio out.
 
@@ -335,23 +336,23 @@ CONFIRMED: manual low-cut, intensity after the gain cell, env jack, AC-coupled r
 
 Purpose: modulation VCA, sheet name MVCA. DC-coupled. Opto lag is a smoother (S-12).
 
-Knobs: none.
+Knobs: Initial and Mod (2026-10-06), the panel's VCA 2 INITIAL and MOD. The sheet has no knob here. They are host parameters at Initial 0 and Mod 1, where the law is the CV-only one below. They are not in the graph blob.
 
 Jacks: `In` CV in (also accepts Audio), `Control` CV in, `Out` CV out.
 
 ```text
-target = clamp(Control volts / 5, 0, 1)
+target = clamp(Control volts / 5 + Initial, 0, 1) * Mod
 gain = onePole(target, tau = 0.020)      # S-12
 Out = In * gain
 ```
 
 A DC input of +3 V with control +5 V settles near +3 V. A pulse on Control does not pass instantly. 20 ms is the stand-in, not a measurement.
 
-Failure modes: AC coupling. A panel knob that the sheet does not have. Reusing VCA 1's low-cut.
+Failure modes: AC coupling. Defaults other than Initial 0 and Mod 1. Reusing VCA 1's low-cut.
 
-Test: `testVca2PassesDc`. `testVca2ControlDoesNotClick` (a step on Control produces a ramp longer than one sample). `testVca2NoKnobs`.
+Test: `testVca2PassesDc`. `testVca2ControlDoesNotClick` (a step on Control produces a ramp longer than one sample). `testVca2NoKnobs` (name kept: at the defaults it is the CV-only law, Initial 1 opens it, Mod 0 closes it).
 
-CONFIRMED: opto topology, DC path, no panel knob. STAND-IN: S-12.
+CONFIRMED: opto topology, DC path. STAND-IN: S-12, and the Initial and Mod panel knobs.
 
 ## MG
 
@@ -538,7 +539,7 @@ CONFIRMED: four-quadrant IC, two inputs, one output, no panel knob, DC path. STA
 The adding amplifier and sample and hold are graph modules. The meter is a display on the panel. ESP, TRIG SW, the volt source, the headphone amp, and multiples remain notes in this section.
 
 *   Adding amp: `Mixer`. Jacks In 1, In 2, In 3, Out. Knobs Level 1, Level 2, Level 3, each defaulting to 0.8. `Out = -(In1*level1 + In2*level2 + In3*level3)`. DC passes. No offset jack.
-*   Sample and hold: its own module. Jacks In, Out, Ext Clock, Clock Out, and a Rate knob. The panel hole labelled CLOCK is Ext Clock. Clock Out has no panel hole. The internal clock runs while Ext Clock is unpatched. A rising edge at 1 V holds In onto Out. Clock Out follows the clock that won, high at +5 V. Rate stand-in: 0.1 Hz at knob 0 through 100 Hz at knob 1, exponential. Divider /16 stays unmapped.
+*   Sample and hold: its own module. Jacks In, Out, Ext Clock, Clock Out, and a Rate knob. The panel hole labelled CLOCK is Ext Clock. Clock Out has no panel hole. The internal clock runs while Ext Clock is unpatched. A rising edge at 1 V holds In onto Out. Clock Out follows the clock that won, high at +5 V. Rate stand-in: 0.1 Hz at knob 0 through 100 Hz at knob 1, exponential.
 *   Meter: a display. A click on a mapped jack selects that jack. The needle is about ±5 V full scale. With no selection it reads Output Wet. `process()` does not read it.
 *   ESP: preamp, follower, trigger. The Ext In gate (S-22) remains the gate until ESP is built.
 *   TRIG SW: active-low button module. Replaces the Ext In manual button's role as the obvious trigger.

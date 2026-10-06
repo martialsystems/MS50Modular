@@ -282,8 +282,9 @@ float panelKnobClamp (float value, bool isSwitch)
         value = 0.0f;
     if (value > 1.0f)
         value = 1.0f;
+    // The divider switch has two positions: 0 is /2, 1 is /4.
     if (isSwitch)
-        value = std::round (value * 2.0f) / 2.0f;
+        value = std::round (value);
     return value;
 }
 
@@ -302,7 +303,7 @@ float panelKnobWheel (float current, float htmlDeltaY, bool shift, bool isSwitch
             sign = 1.0f;
         else if (htmlDeltaY < 0.0f)
             sign = -1.0f;
-        return panelKnobClamp (current - sign * 0.5f, true);
+        return panelKnobClamp (current - sign, true);
     }
 
     const float rate = shift ? 0.0002f : 0.001f;
@@ -319,10 +320,7 @@ float panelKnobFromWheel (float current, float wheelDeltaY, bool reversed, bool 
 
 float panelKnobSwitchClick (float current)
 {
-    float stepped = std::fmod (current + 0.5f, 1.5f);
-    if (stepped < 0.0f)
-        stepped += 1.5f;
-    return panelKnobClamp (stepped, true);
+    return panelKnobClamp (current, true) < 0.5f ? 1.0f : 0.0f;
 }
 
 float panelKnobAngleDegrees (bool isSwitch, float value)

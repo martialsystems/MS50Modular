@@ -4,7 +4,7 @@
 
 #include "Module.h"
 
-// S-18. Clock divider, /2 and /4 only. The panel /16 hole is not a port.
+// S-18. Clock divider, /2 and /4 only. The panel has no /16 jack.
 class Divider : public Module {
 public:
     static constexpr int kIn = 0;

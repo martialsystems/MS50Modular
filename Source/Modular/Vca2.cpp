@@ -39,11 +39,15 @@ PortDesc Vca2::port (int index) const
 
 int Vca2::numKnobs() const
 {
-    return 0;
+    return 2;
 }
 
-void Vca2::setKnob (int, float)
+void Vca2::setKnob (int knob, float zeroToOne)
 {
+    if (knob == kKnobInitial)
+        initial01_ = clamp01 (zeroToOne);
+    else if (knob == kKnobMod)
+        mod_ = clamp01 (zeroToOne);
 }
 
 void Vca2::prepare (double rate)
@@ -54,7 +58,7 @@ void Vca2::prepare (double rate)
 
 void Vca2::processSample()
 {
-    const float target = clamp01 (portValue[kControl] / 5.0f);
+    const float target = clamp01 (portValue[kControl] / 5.0f + initial01_) * mod_;
     const float rate = static_cast<float> (sampleRate > 1.0 ? sampleRate : 48000.0);
     const float coeff = 1.0f - std::exp (-1.0f / (0.020f * rate));
     gain_ += (target - gain_) * coeff;

@@ -174,18 +174,30 @@ int testVca2ControlDoesNotClick()
 
 int testVca2NoKnobs()
 {
+    // Name kept for the runner. VCA 2 now has Initial and Mod. At their defaults the law is the old CV-only one.
     Vca2 vca;
-    check (vca.numKnobs() == 0, "vca 2 has no knobs");
+    check (vca.numKnobs() == 2, "vca 2 has Initial and Mod");
     check (vca.numPorts() == 3, "vca 2 has three ports");
     check (vca.port (Vca2::kIn).type == PortType::CV && vca.port (Vca2::kIn).dir == PortDir::In, "in is cv");
     check (vca.port (Vca2::kControl).type == PortType::CV, "control is cv");
     check (vca.port (Vca2::kOut).dir == PortDir::Out, "out is an output");
     vca.prepare (kRate);
-    vca.setKnob (0, 1.0f);
     vca.portValue[Vca2::kIn] = 3.0f;
     vca.portValue[Vca2::kControl] = 0.0f;
-    vca.processSample();
-    check (std::fabs (vca.portValue[Vca2::kOut]) < 1.0e-6f, "setKnob does not open vca 2");
+    for (int i = 0; i < 20000; ++i)
+        vca.processSample();
+    check (std::fabs (vca.portValue[Vca2::kOut]) < 1.0e-6f, "Initial 0 with no CV is closed");
+
+    vca.setKnob (Vca2::kKnobInitial, 1.0f);
+    for (int i = 0; i < 20000; ++i)
+        vca.processSample();
+    check (std::fabs (vca.portValue[Vca2::kOut] - 3.0f) < 0.02f, "Initial 1 passes audio with no CV");
+
+    vca.setKnob (Vca2::kKnobMod, 0.0f);
+    vca.portValue[Vca2::kControl] = 5.0f;
+    for (int i = 0; i < 20000; ++i)
+        vca.processSample();
+    check (std::fabs (vca.portValue[Vca2::kOut]) < 1.0e-3f, "Mod 0 closes VCA 2");
     return finish ("testVca2NoKnobs");
 }
 
@@ -224,10 +236,38 @@ int testVcaPanelJacks()
     const FaceKnobBinding lowCut = faceKnobBinding ("VCA 1", "LOW CUT");
     check (lowCut.knob == FaceKnob::Vca1LowCut && std::strcmp (lowCut.parameterName, "VCA 1 Low Cut") == 0, "low cut name");
     check (lowCut.minimum == 0.0f && lowCut.maximum == 1.0f && lowCut.fallback == 0.68f, "low cut range");
-    check (faceKnobBinding ("VCA 1", "INITIAL").knob == FaceKnob::None, "initial stays a picture");
-    check (faceKnobBinding ("VCA 1", "MOD").knob == FaceKnob::None, "vca 1 mod stays a picture");
-    check (faceKnobBinding ("VCA 2", "INITIAL").knob == FaceKnob::None, "vca 2 initial stays a picture");
-    check (faceKnobBinding ("VCA 2", "MOD").knob == FaceKnob::None, "vca 2 mod stays a picture");
+    const FaceKnobBinding initial = faceKnobBinding ("VCA 1", "INITIAL");
+    const FaceKnobBinding mod = faceKnobBinding ("VCA 1", "MOD");
+    const FaceKnobBinding initial2 = faceKnobBinding ("VCA 2", "INITIAL");
+    const FaceKnobBinding mod2 = faceKnobBinding ("VCA 2", "MOD");
+    check (initial.knob == FaceKnob::Vca1Initial && initial.index == Vca1::kKnobInitial && initial.fallback == 0.0f
+               && std::strcmp (initial.parameterId, "vca1Initial") == 0,
+           "VCA 1 Initial is a host knob on the module Initial, default 0");
+    check (mod.knob == FaceKnob::Vca1Mod && mod.index == Vca1::kKnobIntensity && mod.fallback == 0.85f,
+           "VCA 1 Mod is the module Intensity, default 0.85");
+    check (initial2.knob == FaceKnob::Vca2Initial && initial2.index == Vca2::kKnobInitial && initial2.fallback == 0.0f,
+           "VCA 2 Initial is a host knob, default 0");
+    check (mod2.knob == FaceKnob::Vca2Mod && mod2.index == Vca2::kKnobMod && mod2.fallback == 1.0f,
+           "VCA 2 Mod is a host knob, default 1");
+
+    // Initial 0 leaves Env in charge. Initial above 0 passes audio with no gate.
+    Vca1 vca;
+    vca.prepare (kRate);
+    vca.setKnob (Vca1::kKnobIntensity, mod.fallback);
+    vca.setKnob (Vca1::kKnobInitial, 0.0f);
+    vca.portValue[Vca1::kSigIn] = 3.0f;
+    vca.portValue[Vca1::kEnv] = 0.0f;
+    vca.processSample();
+    check (std::fabs (vca.portValue[Vca1::kOut]) < 1.0e-6f, "Initial 0 with no Env is silent");
+    double sum = 0.0;
+    vca.setKnob (Vca1::kKnobInitial, 0.7f);
+    for (int i = 0; i < 4800; ++i)
+    {
+        vca.portValue[Vca1::kSigIn] = (i / 24) % 2 == 0 ? 3.0f : -3.0f;
+        vca.processSample();
+        sum += std::fabs (vca.portValue[Vca1::kOut]);
+    }
+    check (sum / 4800.0 > 0.5, "Initial 0.7 passes audio with no gate");
     return finish ("testVcaPanelJacks");
 }
 

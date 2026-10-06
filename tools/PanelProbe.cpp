@@ -71,6 +71,17 @@ void dragKnobLocal (PatchBayView& bay, float designX, float designY, float local
     bay.mouseUp (up);
 }
 
+void doubleClickKnob (PatchBayView& bay, int knob)
+{
+    auto source = juce::Desktop::getInstance().getMainMouseSource();
+    const juce::ModifierKeys mods (juce::ModifierKeys::leftButtonModifier);
+    const auto time = juce::Time::getCurrentTime();
+    const auto at = bay.designToLocal (kPanelKnobs[knob].cx, kPanelKnobs[knob].cy);
+    juce::MouseEvent click (source, at, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                            &bay, &bay, time, at, time, 2, false);
+    bay.mouseDoubleClick (click);
+}
+
 void wheelOnKnob (PatchBayView& bay, float designX, float designY, float deltaY)
 {
     auto source = juce::Desktop::getInstance().getMainMouseSource();
@@ -465,10 +476,14 @@ private:
             writeCrop (paintBay (*bay), "/tmp/ms50_knob_mid.png");
         }
         clickAt (*bay, kPanelKnobs[ratio].cx, kPanelKnobs[ratio].cy);
-        expect (bay->knobValue (ratio) == 1.0f, "divider click steps to 16");
-        expect (bay->knobReadout().contains ("16"), "switch readout shows 16");
-        dragKnobLocal (*bay, kPanelKnobs[ratio].cx, kPanelKnobs[ratio].cy, 40.0f, false);
-        expect (bay->knobValue (ratio) == 0.5f, "divider drag snaps");
+        expect (bay->knobValue (ratio) == 1.0f, "divider click steps from /2 to /4");
+        expect (bay->knobReadout().contains ("4") && ! bay->knobReadout().contains ("16"), "switch readout shows 4");
+        clickAt (*bay, kPanelKnobs[ratio].cx, kPanelKnobs[ratio].cy);
+        expect (bay->knobValue (ratio) == 0.0f, "divider click steps from /4 back to /2");
+        dragKnobLocal (*bay, kPanelKnobs[ratio].cx, kPanelKnobs[ratio].cy, -120.0f, false);
+        expect (bay->knobValue (ratio) == 1.0f, "divider drag up snaps to /4");
+        dragKnobLocal (*bay, kPanelKnobs[ratio].cx, kPanelKnobs[ratio].cy, 120.0f, false);
+        expect (bay->knobValue (ratio) == 0.0f, "divider drag down snaps to /2");
         expect (publishedCount (*processor) == cablesBefore, "turning knobs does not publish");
         expect (std::fabs (bay->outputMix() - mixBefore) < 1.0e-6f, "column knobs leave Output mix alone");
         expect (! bay->menuOpen(), "turning knobs does not open the chooser");
@@ -730,6 +745,10 @@ private:
         clickAt (*bay, kPresetBezelX + 20.0f, row0Y);
         expect (! bay->presetMenuOpen(), "choosing a preset closes the list");
         expect (processor->getCurrentProgram() == 0, "the first preset is Dry");
+        checkVcaKnobs (*bay, row0Y);
+        clickAt (*bay, kPresetBezelX + 12.0f, kPresetBezelY + kPresetBezelH * 0.5f);
+        clickAt (*bay, kPresetBezelX + 20.0f, row0Y);
+        expect (processor->getCurrentProgram() == 0, "the first preset is Dry again");
         expect (bay->outputMix() == 0.0f, "dry preset turns the effect off");
         expect (publishedCount (*processor) == 2, "dry replaces the cables");
         if (auto* restoredLevel = processor->parameterForPanelKnob ("OUTPUT", "LEVEL"))
@@ -738,6 +757,48 @@ private:
             expect (near (restoredMix->getValue(), 1.0f), "preset restore puts output mix back at 1");
 
         finish();
+    }
+
+    // VCA 1 and VCA 2 Initial and Mod: bound to the module, double-click returns the module default,
+    // and a preset that opens VCA 1 shows that value on the knob.
+    void checkVcaKnobs (PatchBayView& bay, float row0Y)
+    {
+        struct VcaKnob { const char* section; const char* label; float moduleDefault; };
+        const VcaKnob vcaKnobs[] = { { "VCA 1", "INITIAL", 0.0f }, { "VCA 1", "MOD", 0.85f },
+                                     { "VCA 2", "INITIAL", 0.0f }, { "VCA 2", "MOD", 1.0f } };
+        for (const auto& v : vcaKnobs)
+        {
+            const int knob = panelKnobIndex (v.section, v.label);
+            auto* parameter = processor->parameterForPanelKnob (v.section, v.label);
+            if (knob < 0 || parameter == nullptr)
+            {
+                std::printf ("FAIL %s %s is not a host knob\n", v.section, v.label);
+                ++gFails;
+                continue;
+            }
+            expect (near (kPanelKnobs[knob].valueDefault, v.moduleDefault), "panel default is the module default");
+            expect (near (bay.knobValue (knob), v.moduleDefault), "Dry shows the module default");
+            dragKnobLocal (bay, kPanelKnobs[knob].cx, kPanelKnobs[knob].cy, v.moduleDefault > 0.5f ? 60.0f : -60.0f, false);
+            expect (! near (parameter->getValue(), v.moduleDefault), "dragging the knob moves its parameter");
+            doubleClickKnob (bay, knob);
+            expect (near (bay.knobValue (knob), v.moduleDefault), "double-click returns the module default");
+            expect (near (parameter->getValue(), v.moduleDefault), "double-click resets the parameter");
+        }
+
+        const int initial = panelKnobIndex ("VCA 1", "INITIAL");
+        auto* initialParam = processor->parameterForPanelKnob ("VCA 1", "INITIAL");
+        clickAt (bay, kPresetBezelX + 12.0f, kPresetBezelY + kPresetBezelH * 0.5f);
+        clickAt (bay, kPresetBezelX + 20.0f, row0Y + 21.0f * static_cast<float> (kFilterLoopPreset));
+        expect (processor->getCurrentProgram() == kFilterLoopPreset, "Filter loop preset loads");
+        expect (near (factoryVca1Initial (kFilterLoopPreset), 0.7f), "Filter loop sets VCA 1 Initial to 0.7");
+        if (initial >= 0 && initialParam != nullptr)
+        {
+            expect (near (initialParam->getValue(), 0.7f), "preset puts 0.7 on the VCA 1 Initial parameter");
+            expect (near (bay.knobValue (initial), 0.7f), "preset shows 0.7 on the VCA 1 Initial knob");
+            doubleClickKnob (bay, initial);
+            expect (near (bay.knobValue (initial), 0.0f), "double-click returns VCA 1 Initial to 0");
+            expect (near (initialParam->getValue(), 0.0f), "double-click resets the VCA 1 Initial parameter");
+        }
     }
 
     void finish()

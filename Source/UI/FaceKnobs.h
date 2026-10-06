@@ -10,7 +10,11 @@ enum class FaceKnob {
     VcfCutoff,
     VcfPeak,
     VcfAmount,
+    Vca1Initial,
+    Vca1Mod,
     Vca1LowCut,
+    Vca2Initial,
+    Vca2Mod,
     Eg1Attack,
     Eg1Decay,
     Eg1Sustain,
@@ -65,8 +69,17 @@ inline FaceKnobBinding faceKnobBinding (const char* section, const char* label)
         return { FaceKnob::VcfPeak, 1, 0.0f, 1.0f, 0.30f, "vcfPeak", "VCF Peak" };
     if (faceKnobText (section, "VCF") && faceKnobText (label, "MOD"))
         return { FaceKnob::VcfAmount, 2, 0.0f, 1.0f, 0.68f, "vcfAmount", "VCF Cutoff Amount" };
+    // Fallbacks are the module defaults. Initial 0 leaves Env in charge. Above 0 the VCA passes audio with no gate.
+    if (faceKnobText (section, "VCA 1") && faceKnobText (label, "INITIAL"))
+        return { FaceKnob::Vca1Initial, 2, 0.0f, 1.0f, 0.0f, "vca1Initial", "VCA 1 Initial" };
+    if (faceKnobText (section, "VCA 1") && faceKnobText (label, "MOD"))
+        return { FaceKnob::Vca1Mod, 1, 0.0f, 1.0f, 0.85f, "vca1Mod", "VCA 1 Mod" };
     if (faceKnobText (section, "VCA 1") && faceKnobText (label, "LOW CUT"))
         return { FaceKnob::Vca1LowCut, 0, 0.0f, 1.0f, 0.68f, "vca1LowCut", "VCA 1 Low Cut" };
+    if (faceKnobText (section, "VCA 2") && faceKnobText (label, "INITIAL"))
+        return { FaceKnob::Vca2Initial, 0, 0.0f, 1.0f, 0.0f, "vca2Initial", "VCA 2 Initial" };
+    if (faceKnobText (section, "VCA 2") && faceKnobText (label, "MOD"))
+        return { FaceKnob::Vca2Mod, 1, 0.0f, 1.0f, 1.0f, "vca2Mod", "VCA 2 Mod" };
     if (faceKnobText (section, "EG 1") && faceKnobText (label, "ATTACK"))
         return { FaceKnob::Eg1Attack, 0, 0.0f, 1.0f, 0.50f, "eg1Attack", "EG 1 Attack" };
     if (faceKnobText (section, "EG 1") && faceKnobText (label, "DECAY"))

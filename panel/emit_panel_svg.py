@@ -112,7 +112,7 @@ def baseline(rect):
 
 
 def knob_ticks(knob):
-    # Bodies are drawn live. The divider switch has 2 / 4 / 16 labels and no tick ring.
+    # Bodies are drawn live. The divider switch has 2 / 4 labels and no tick ring.
     if knob["label"] == "RATIO SWITCH":
         return ""
     cx, cy, r = knob["cx"], knob["cy"], knob["radius"]
@@ -362,7 +362,7 @@ def build_inc(lay):
 def main():
     lay = json.load(open(LAY))
     assert lay["canvas"] == [W, H]
-    assert len(lay["jacks"]) == 58, len(lay["jacks"])
+    assert len(lay["jacks"]) == 57, len(lay["jacks"])
     assert len(lay["knobs"]) == 31, len(lay["knobs"])
     titles = [column["title"] for column in lay["columns"]]
     assert titles[-2:] == ["EXT IN", "OUTPUT"], titles

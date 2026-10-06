@@ -1063,15 +1063,6 @@ void PatchBayView::showProgramKnobs()
     for (int i = 0; i < kPanelKnobCount; ++i)
         knobValue_[i] = kPanelKnobs[i].valueDefault;
     syncHostKnobs();
-    const float initial = factoryVca1Initial (audioProcessor.getCurrentProgram());
-    if (initial <= 0.0f)
-        return;
-    for (int i = 0; i < kPanelKnobCount; ++i)
-    {
-        const PanelKnobRec& knob = kPanelKnobs[i];
-        if (std::strcmp (knob.section, "VCA 1") == 0 && std::strcmp (knob.label, "INITIAL") == 0)
-            knobValue_[i] = initial;
-    }
 }
 
 int PatchBayView::swatchAt (float x, float y) const
@@ -1886,11 +1877,7 @@ void PatchBayView::setKnobValue (int index, float value)
     const float shown = knobValue_[index];
     if (isSwitch)
     {
-        const char* ratio = "4";
-        if (shown < 0.25f)
-            ratio = "2";
-        else if (shown > 0.75f)
-            ratio = "16";
+        const char* ratio = shown < 0.5f ? "2" : "4";
         knobReadout_ = juce::String (knob.section) + juce::String::fromUTF8 (" · ÷ ") + ratio;
     }
     else

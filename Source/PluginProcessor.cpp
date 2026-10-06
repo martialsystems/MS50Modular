@@ -34,7 +34,11 @@ MS50ModularAudioProcessor::MS50ModularAudioProcessor()
     addKnobParameter (faceKnobBinding ("VCF", "CUTOFF"));
     addKnobParameter (faceKnobBinding ("VCF", "PEAK"));
     addKnobParameter (faceKnobBinding ("VCF", "MOD"));
+    addKnobParameter (faceKnobBinding ("VCA 1", "INITIAL"));
+    addKnobParameter (faceKnobBinding ("VCA 1", "MOD"));
     addKnobParameter (faceKnobBinding ("VCA 1", "LOW CUT"));
+    addKnobParameter (faceKnobBinding ("VCA 2", "INITIAL"));
+    addKnobParameter (faceKnobBinding ("VCA 2", "MOD"));
     addKnobParameter (faceKnobBinding ("EG 1", "ATTACK"));
     addKnobParameter (faceKnobBinding ("EG 1", "DECAY"));
     addKnobParameter (faceKnobBinding ("EG 1", "SUSTAIN"));
@@ -101,8 +105,16 @@ void MS50ModularAudioProcessor::addKnobParameter (const FaceKnobBinding& binding
         vcfPeak_ = parameter;
     else if (binding.knob == FaceKnob::VcfAmount)
         vcfAmount_ = parameter;
+    else if (binding.knob == FaceKnob::Vca1Initial)
+        vca1Initial_ = parameter;
+    else if (binding.knob == FaceKnob::Vca1Mod)
+        vca1Mod_ = parameter;
     else if (binding.knob == FaceKnob::Vca1LowCut)
         vca1LowCut_ = parameter;
+    else if (binding.knob == FaceKnob::Vca2Initial)
+        vca2Initial_ = parameter;
+    else if (binding.knob == FaceKnob::Vca2Mod)
+        vca2Mod_ = parameter;
     else if (binding.knob == FaceKnob::Eg1Attack)
         eg1Attack_ = parameter;
     else if (binding.knob == FaceKnob::Eg1Decay)
@@ -157,8 +169,16 @@ juce::AudioParameterFloat* MS50ModularAudioProcessor::floatParameter (FaceKnob k
         return vcfPeak_;
     if (knob == FaceKnob::VcfAmount)
         return vcfAmount_;
+    if (knob == FaceKnob::Vca1Initial)
+        return vca1Initial_;
+    if (knob == FaceKnob::Vca1Mod)
+        return vca1Mod_;
     if (knob == FaceKnob::Vca1LowCut)
         return vca1LowCut_;
+    if (knob == FaceKnob::Vca2Initial)
+        return vca2Initial_;
+    if (knob == FaceKnob::Vca2Mod)
+        return vca2Mod_;
     if (knob == FaceKnob::Eg1Attack)
         return eg1Attack_;
     if (knob == FaceKnob::Eg1Decay)
@@ -228,7 +248,11 @@ void MS50ModularAudioProcessor::applyHostControls()
     apply (vcfCutoff_, vcf, Vcf::kKnobCutoff);
     apply (vcfPeak_, vcf, Vcf::kKnobPeak);
     apply (vcfAmount_, vcf, Vcf::kKnobAmount);
+    apply (vca1Initial_, vca1, Vca1::kKnobInitial);
+    apply (vca1Mod_, vca1, Vca1::kKnobIntensity);
     apply (vca1LowCut_, vca1, Vca1::kKnobLowCut);
+    apply (vca2Initial_, vca2, Vca2::kKnobInitial);
+    apply (vca2Mod_, vca2, Vca2::kKnobMod);
     apply (eg1Attack_, eg1, Eg1::kKnobAttack);
     apply (eg1Decay_, eg1, Eg1::kKnobDecay);
     apply (eg1Sustain_, eg1, Eg1::kKnobSustain);
@@ -448,7 +472,12 @@ void MS50ModularAudioProcessor::applyProgramParameters (int index)
     restore (vcfCutoff_, knobs.vcfCutoff);
     restore (vcfPeak_, knobs.vcfPeak);
     restore (vcfAmount_, 0.68f);
+    // Feedback and the self-mod presets open VCA 1 Initial to 0.7. The knob shows it.
+    restore (vca1Initial_, factoryVca1Initial (index));
+    restore (vca1Mod_, 0.85f);
     restore (vca1LowCut_, 0.68f);
+    restore (vca2Initial_, 0.0f);
+    restore (vca2Mod_, 1.0f);
     restore (eg1Attack_, knobs.eg1Attack);
     restore (eg1Decay_, knobs.eg1Decay);
     restore (eg1Sustain_, knobs.eg1Sustain);
@@ -480,7 +509,6 @@ void MS50ModularAudioProcessor::setCurrentProgram (int index)
 
     currentProgram_ = index;
     applyProgramParameters (index);
-    vca1.setKnob (Vca1::kKnobIntensity, 0.85f);
     output.setLevel (1.0f);
     applyHostControls();
     const double rate = getSampleRate();
@@ -509,7 +537,6 @@ void MS50ModularAudioProcessor::getStateInformation (juce::MemoryBlock& destData
     const int bytes = graph.getState (blob, static_cast<int> (sizeof blob));
     if (bytes > 0)
         xml.setAttribute ("graph", juce::String::toHexString (blob, bytes));
-    xml.setAttribute ("vca1Initial", static_cast<double> (vca1.initial()));
     copyXmlToBinary (xml, destData);
 }
 
@@ -531,11 +558,14 @@ void MS50ModularAudioProcessor::setStateInformation (const void* data, int sizeI
         presetError_.clear();
     }
 
-    // Absent on saves from before this attribute. Those sessions keep Initial at 0.
-    if (xml->hasAttribute ("vca1Initial"))
-        vca1.setKnob (Vca1::kKnobInitial, static_cast<float> (xml->getDoubleAttribute ("vca1Initial")));
-    else
+    // vca1Initial is a host parameter now, under the attribute older saves already wrote.
+    // Absent on saves from before that attribute. Those sessions keep Initial at 0.
+    if (! xml->hasAttribute ("vca1Initial"))
+    {
         vca1.setKnob (Vca1::kKnobInitial, 0.0f);
+        if (vca1Initial_ != nullptr)
+            *vca1Initial_ = 0.0f;
+    }
 
     for (auto* parameter : getParameters())
     {
