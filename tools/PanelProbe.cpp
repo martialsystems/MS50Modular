@@ -329,12 +329,19 @@ private:
                 "mapping at 1100 wide");
 
         editor->setSize (1280, 512);
-        const float switchX = kEffectSwitchX + kEffectSwitchW * 0.5f;
-        const float switchY = kEffectSwitchY + kEffectSwitchH * 0.5f;
-        clickAt (*bay, switchX, switchY);
-        expect (bay->outputMix() == 1.0f, "effect switch turns on");
-        clickAt (*bay, switchX, switchY);
-        expect (bay->outputMix() == 0.0f, "effect switch turns off");
+        const float powerY = kPowerY + kPowerH * 0.5f;
+        const float onX = kPowerX + kPowerW * 0.75f;
+        const float offX = kPowerX + kPowerW * 0.25f;
+        clickAt (*bay, onX, powerY);
+        expect (bay->outputMix() == 1.0f, "power rocker turns on");
+        clickAt (*bay, onX, powerY);
+        expect (bay->outputMix() == 1.0f, "power rocker on stays on");
+        clickAt (*bay, offX, powerY);
+        expect (bay->outputMix() == 0.0f, "power rocker turns off");
+        clickAt (*bay, kPresetBezelX + 12.0f, kPresetBezelY + kPresetBezelH * 0.5f);
+        expect (! bay->presetMenuOpen(), "preset screen stays closed while power is off");
+        clickAt (*bay, onX, powerY);
+        expect (bay->outputMix() == 1.0f, "power rocker turns back on");
 
         for (int i = 0; i < 20; ++i)
             bay->advanceCableFrame();
@@ -343,6 +350,7 @@ private:
         juce::Graphics graphics (snapshot);
         bay->paintEntireComponent (graphics, true);
         juce::File png ("/tmp/ms50_panel_probe.png");
+        png.deleteFile();
         juce::FileOutputStream stream (png);
         if (stream.openedOk())
         {
@@ -351,9 +359,9 @@ private:
         }
 
         {
-            const auto centre = bay->designToLocal (kExtInButtonCx, kExtInButtonCy);
-            const auto topLeft = bay->designToLocal (kExtInButtonCx - 80.0f, kExtInButtonCy - 90.0f);
-            const auto bottomRight = bay->designToLocal (kExtInButtonCx + 80.0f, kExtInButtonCy + 70.0f);
+            const auto centre = bay->designToLocal (kHoldCx, kHoldCy);
+            const auto topLeft = bay->designToLocal (kHoldCx - 80.0f, kHoldCy - 90.0f);
+            const auto bottomRight = bay->designToLocal (kHoldCx + 80.0f, kHoldCy + 70.0f);
             const juce::Rectangle<int> crop (static_cast<int> (topLeft.x),
                                               static_cast<int> (topLeft.y),
                                               static_cast<int> (bottomRight.x - topLeft.x),
@@ -362,8 +370,8 @@ private:
             const int capX = juce::jlimit (0, snapshot.getWidth() - 1, static_cast<int> (centre.x));
             const int capY = juce::jlimit (0, snapshot.getHeight() - 1, static_cast<int> (centre.y));
             const auto capPixel = snapshot.getPixelAt (capX, capY);
-            expect (capPixel.getRed() < 80 && capPixel.getGreen() < 80 && capPixel.getBlue() < 80,
-                    "hold cap is the dark knob face");
+            expect (capPixel.getRed() > 180 && capPixel.getGreen() > 170 && capPixel.getBlue() > 140,
+                    "hold key is the cream cap");
             juce::File upFile ("/tmp/ms50_hold_up.png");
             upFile.deleteFile();
             juce::FileOutputStream upStream (upFile);
@@ -392,12 +400,22 @@ private:
                 format.writeImageToStream (downClip, downStream);
             }
             expect (knobPixelsDiffer (snapshot, heldShot, crop), "holding the button repaints the cap");
-            const auto heldPixel = heldShot.getPixelAt (capX, capY);
-            expect (heldPixel.getRed() > capPixel.getRed() + 40 && heldPixel.getGreen() > capPixel.getGreen() + 20,
-                    "holding the button shows the gold pip");
+            const auto litPoint = bay->designToLocal (kHoldCx + 8.0f, kHoldCy + 8.0f);
+            const int litX = juce::jlimit (0, heldShot.getWidth() - 1, static_cast<int> (litPoint.x));
+            const int litY = juce::jlimit (0, heldShot.getHeight() - 1, static_cast<int> (litPoint.y));
+            const auto unlitCorner = snapshot.getPixelAt (litX, litY);
+            const auto heldPixel = heldShot.getPixelAt (litX, litY);
+            expect (heldPixel.getRed() > unlitCorner.getRed() + 20
+                        && heldPixel.getBlue() + 20 < unlitCorner.getBlue(),
+                    "latched hold key is amber");
+            expect (processor->extInButtonHeld(), "hold latches");
 
             juce::MouseEvent up (source, centre, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
                                  bay, bay, time, centre, time, 1, false);
+            bay->mouseUp (up);
+            expect (processor->extInButtonHeld(), "mouse up leaves the hold latched");
+            bay->mouseDown (down);
+            expect (! processor->extInButtonHeld(), "a second press releases the hold");
             bay->mouseUp (up);
         }
 
@@ -433,6 +451,18 @@ private:
         if (foundRope)
             gesture (*bay, ropeX, ropeY, ropeX, ropeY, false, true);
         expect (publishedCount (*processor) == beforeUnplug - 1, "right-click unplugs that cable");
+
+        clickAt (*bay, kPresetBezelX + 12.0f, kPresetBezelY + kPresetBezelH * 0.5f);
+        expect (bay->presetMenuOpen(), "preset screen opens the list");
+        expect (bay->keyPressed (juce::KeyPress (juce::KeyPress::escapeKey)), "escape closes the preset list");
+        expect (! bay->presetMenuOpen(), "preset list is closed");
+        clickAt (*bay, kPresetBezelX + 12.0f, kPresetBezelY + kPresetBezelH * 0.5f);
+        const float row0Y = kPresetBezelY + kPresetBezelH + 3.0f + 5.0f + 10.5f;
+        clickAt (*bay, kPresetBezelX + 20.0f, row0Y);
+        expect (! bay->presetMenuOpen(), "choosing a preset closes the list");
+        expect (processor->getCurrentProgram() == 0, "the first preset is Dry");
+        expect (bay->outputMix() == 0.0f, "dry preset turns the effect off");
+        expect (publishedCount (*processor) == 2, "dry replaces the cables");
 
         finish();
     }

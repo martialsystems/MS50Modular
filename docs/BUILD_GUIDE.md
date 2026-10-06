@@ -177,7 +177,7 @@ Do not touch: Noise, VCF DSP, Step UI-A.
 
 ## Panel patch bay (2026-10-05)
 
-The editor is the landscape panel. `panel/assets/layout.json` is the geometry. `panel/emit_panel_svg.py` writes `panel/assets/panel.svg` and `Source/UI/PanelGeometry.inc`. Do not re-run `panel/build_panel.py` unless the module list should change. The SVG is the panel the editor scales. Panel PNGs are not committed.
+The editor is the landscape panel. `panel/assets/layout.json` is the geometry. `panel/emit_panel_svg.py` writes `Source/UI/PanelGeometry.inc` and leaves the faceplate SVGs alone. The editor scales `panel/assets/panel_bg.svg` and paints the knobs, needle, power rocker, and preset screen on top. Do not re-run `panel/build_panel.py` unless the module list should change. Panel PNGs are not committed.
 
 Files: `Source/UI/PatchBayView.cpp/.h`, `Source/UI/PatchBayLogic.cpp/.h`, `Source/PluginEditor.cpp/.h`. The tile views `RackView`, `JackView`, and `CableView` are not in the plugin target. Steps 4 to 6 above record that those files were the development UI.
 

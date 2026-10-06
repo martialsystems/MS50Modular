@@ -287,6 +287,11 @@ void MS50ModularAudioProcessor::setExtInButtonHeld (bool held)
     extIn.setButtonHeld (held);
 }
 
+bool MS50ModularAudioProcessor::extInButtonHeld() const noexcept
+{
+    return extIn.buttonHeld();
+}
+
 float MS50ModularAudioProcessor::meterVolts() const noexcept
 {
     const int module = meter_.readingModule (outputModuleIndex_);

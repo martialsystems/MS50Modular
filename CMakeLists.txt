@@ -27,7 +27,7 @@ juce_add_plugin(MS50Modular
 juce_add_binary_data(MS50PanelAssets
   HEADER_NAME PanelAssets.h
   NAMESPACE PanelAssets
-  SOURCES panel/assets/panel.svg)
+  SOURCES panel/assets/panel_bg.svg)
 
 target_sources(MS50Modular PRIVATE
   Source/PluginProcessor.cpp

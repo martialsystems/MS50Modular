@@ -155,6 +155,9 @@ int testPanelKnobs()
     check (vco >= 0 && extL >= 0 && outL >= 0, "VCO, Ext In, and Output jacks exist");
     check (kPanelJacks[vco].x < kPanelJacks[extL].x, "VCO stays left of Ext In");
     check (kPanelJacks[extL].x < kPanelJacks[outL].x, "Ext In sits left of Output");
+    check (kPowerW == 40.0f && kPowerH == 20.0f, "power rocker is the on off control");
+    check (kHoldHitW == 34.0f && kHoldHitH == 34.0f, "hold key is the square cap");
+    check (kPresetChars == 16, "preset screen is 16 characters");
 
     float leftOfOutput = -1.0f;
     const char* beside = "";

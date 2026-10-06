@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Write panel/assets/panel.svg and Source/UI/PanelGeometry.inc from layout.json.
+"""Refresh Source/UI/PanelGeometry.inc from panel/assets/layout.json.
 
-Positions stay in layout.json. This script does not move a jack. The SVG is the
-resizable panel (no baked PNG). Re-run from the repo root:
+The faceplate art is panel/assets/panel.svg and panel/assets/panel_bg.svg
+(the Ronin export). This script does not rewrite those files. Re-run from
+the repo root after a layout change:
 
   python3 panel/emit_panel_svg.py
 """
@@ -77,6 +78,18 @@ LIVE = {
     ("S&H", "OUT"): (16, 1, 1),
     ("S&H", "CLOCK"): (16, 2, 0),
 }
+
+# layout.json "default" is the art generator's drawing cycle. Mixer levels
+# reset to the faceplate value, not that cycle.
+FACE_DEFAULT = {
+    ("MIX", "LEVEL 1"): 0.80,
+    ("MIX", "LEVEL 2"): 0.80,
+    ("MIX", "LEVEL 3"): 0.80,
+}
+
+
+def cf(value):
+    return f"{float(value):.2f}f"
 
 INK = "#dcd6c2"
 GOLD = "#c29f4c"
@@ -228,7 +241,7 @@ def build_inc(lay):
         "    const char* label;",
         "    float x;",
         "    float y;",
-        "    int module; // 0 none, 1 Ext In, 2 Output, 3 Noise, 4 VCF, 5 VCA 1, 6 VCA 2, 7 EG 1",
+        "    int module; // 0 none, 1 Ext In, 2 Output, 3 Noise, 4 VCF, 5 VCA 1, 6 VCA 2, 7 EG 1, 8 MG, 9 VCO, 10 EG 2, 11 Ring, 12 Divider, 13 Inverter, 14 Integrator, 15 Mixer, 16 Sample and hold",
         "    int port;",
         "    int dir; // 0 in, 1 out, -1 when the jack is not on the graph",
         "};",
@@ -249,16 +262,62 @@ def build_inc(lay):
         "",
         "inline constexpr float kPanelW = 1600.0f;",
         "inline constexpr float kPanelH = 640.0f;",
-        "inline constexpr float kEffectSwitchX = 1524.0f;",
-        "inline constexpr float kEffectSwitchY = 16.0f;",
-        "inline constexpr float kEffectSwitchW = 48.0f;",
-        "inline constexpr float kEffectSwitchH = 16.0f;",
         "",
-        "// Momentary gate under the EXT IN GATE jack. Round cap, same metal as the knobs.",
-        "// The view paints it before the cables. Centre is the EXT IN jack column.",
-        "inline constexpr float kExtInButtonCx = 1444.1f;",
-        "inline constexpr float kExtInButtonCy = 376.0f;",
-        "inline constexpr float kExtInButtonRadius = 18.0f;",
+    ]
+    rocker = lay["power"]["rocker"]
+    lines += [
+        "// Power rocker. Left half is off, right half is on. The view paints the cap.",
+        f"inline constexpr float kPowerX = {cf(rocker[0])};",
+        f"inline constexpr float kPowerY = {cf(rocker[1])};",
+        f"inline constexpr float kPowerW = {cf(rocker[2])};",
+        f"inline constexpr float kPowerH = {cf(rocker[3])};",
+        "",
+    ]
+    hold = lay["buttons"][0]
+    hit = hold["hit"]
+    lines += [
+        "// Latching HOLD key under the EXT IN jacks. The view paints the cap before the cables.",
+        f"inline constexpr float kHoldCx = {cf(hold['cx'])};",
+        f"inline constexpr float kHoldCy = {cf(hold['cy'])};",
+        f"inline constexpr float kHoldHitX = {cf(hit[0])};",
+        f"inline constexpr float kHoldHitY = {cf(hit[1])};",
+        f"inline constexpr float kHoldHitW = {cf(hit[2])};",
+        f"inline constexpr float kHoldHitH = {cf(hit[3])};",
+        "",
+    ]
+    screen = lay["screen"]
+    bezel, lcd, key = screen["bezel"], screen["lcd"], screen["button"]
+    lines += [
+        "// Preset LCD in the top bar. The glass is in the SVG. The view draws the dots.",
+        f"inline constexpr float kPresetBezelX = {cf(bezel[0])};",
+        f"inline constexpr float kPresetBezelY = {cf(bezel[1])};",
+        f"inline constexpr float kPresetBezelW = {cf(bezel[2])};",
+        f"inline constexpr float kPresetBezelH = {cf(bezel[3])};",
+        f"inline constexpr float kPresetLcdX = {cf(lcd[0])};",
+        f"inline constexpr float kPresetLcdY = {cf(lcd[1])};",
+        f"inline constexpr float kPresetLcdW = {cf(lcd[2])};",
+        f"inline constexpr float kPresetLcdH = {cf(lcd[3])};",
+        f"inline constexpr float kPresetKeyX = {cf(key[0])};",
+        f"inline constexpr float kPresetKeyY = {cf(key[1])};",
+        f"inline constexpr float kPresetKeyW = {cf(key[2])};",
+        f"inline constexpr float kPresetKeyH = {cf(key[3])};",
+        f"inline constexpr int kPresetChars = {int(screen['chars'])};",
+        "",
+    ]
+    meter = lay["meter"]
+    face, pivot = meter["face"], meter["pivot"]
+    lines += [
+        "// VU face is in the SVG. The view draws the needle from the selected jack.",
+        f"inline constexpr float kMeterFaceX = {cf(face[0])};",
+        f"inline constexpr float kMeterFaceY = {cf(face[1])};",
+        f"inline constexpr float kMeterFaceW = {cf(face[2])};",
+        f"inline constexpr float kMeterFaceH = {cf(face[3])};",
+        f"inline constexpr float kMeterPivotX = {cf(pivot[0])};",
+        f"inline constexpr float kMeterPivotY = {cf(pivot[1])};",
+        f"inline constexpr float kMeterRadius = {cf(meter['radius'])};",
+        f"inline constexpr float kMeterScale = {cf(meter['scale'])};",
+        f"inline constexpr float kMeterMinAngle = {cf(meter['minAngle'])};",
+        f"inline constexpr float kMeterMaxAngle = {cf(meter['maxAngle'])};",
         "",
     ]
     labels = lay["labels"]
@@ -288,9 +347,10 @@ def build_inc(lay):
     for knob in knobs:
         kind = 1 if knob["label"] == "RATIO SWITCH" else 0
         hit = knob["hit"]
+        default = FACE_DEFAULT.get((knob["section"], knob["label"]), knob["default"])
         lines.append(
             f'    {{ "{c_escape(knob["section"])}", "{c_escape(knob["label"])}", '
-            f'{knob["cx"]:.1f}f, {knob["cy"]:.1f}f, {knob["radius"]:.1f}f, {knob["default"]:.2f}f, '
+            f'{knob["cx"]:.1f}f, {knob["cy"]:.1f}f, {knob["radius"]:.1f}f, {default:.2f}f, '
             f'{hit[0]:.1f}f, {hit[1]:.1f}f, {hit[2]:.1f}f, {hit[3]:.1f}f, {kind} }},'
         )
     lines.append("};")
@@ -305,15 +365,13 @@ def main():
     assert len(lay["knobs"]) == 31, len(lay["knobs"])
     titles = [column["title"] for column in lay["columns"]]
     assert titles[-2:] == ["EXT IN", "OUTPUT"], titles
-    svg = build_svg(lay)
-    assert "kbody" not in svg
-    os.makedirs(os.path.dirname(SVG), exist_ok=True)
+    bg = os.path.join(os.path.dirname(SVG), "panel_bg.svg")
+    assert os.path.isfile(SVG), SVG
+    assert os.path.isfile(bg), bg
     os.makedirs(os.path.dirname(INC), exist_ok=True)
-    with open(SVG, "w") as handle:
-        handle.write(svg)
     with open(INC, "w") as handle:
         handle.write(build_inc(lay))
-    print(f"wrote {SVG} ({len(svg)} bytes) and {INC}")
+    print(f"wrote {INC}")
 
 
 if __name__ == "__main__":

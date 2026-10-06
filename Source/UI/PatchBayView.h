@@ -34,6 +34,7 @@ public:
     int visualCount() const noexcept { return count_; }
     void visualEnds (int index, int& jackA, int& jackB) const;
     bool menuOpen() const;
+    bool presetMenuOpen() const noexcept { return presetMenu_; }
     const juce::String& statusText() const noexcept { return status_; }
     float outputMix() const noexcept { return audioProcessor.effectIsOn() ? 1.0f : 0.0f; }
     int knobCount() const noexcept { return kPanelKnobCount; }
@@ -71,8 +72,12 @@ private:
     void setKnobValue (int index, float value);
     int labelAt (float x, float y) const;
     int cableNear (float x, float y) const;
-    bool switchAt (float x, float y) const;
+    int powerHalfAt (float x, float y) const;
     bool extInButtonAt (float x, float y) const;
+    bool presetAt (float x, float y) const;
+    int presetRowAt (float x, float y) const;
+    void choosePreset (int index);
+    void reloadPublishedCables();
     int swatchAt (float x, float y) const;
     juce::AudioProcessorParameter* parameterForKnob (int index) const;
     void endGesture();
@@ -113,7 +118,8 @@ private:
     bool downMoved_ = false;
     bool downShift_ = false;
     bool effectPress_ = false;
-    bool extInPress_ = false;
+    bool presetMenu_ = false;
+    int presetHi_ = 0;
     bool knobDrag_ = false;
     bool knobDragMoved_ = false;
     bool knobSuppressSwitchStep_ = false;

@@ -89,6 +89,7 @@ public:
     void disconnectJacks (int sourceModule, int sourcePort, int destModule, int destPort);
     void setOutputMix (float zeroToOne);
     void setExtInButtonHeld (bool held);
+    bool extInButtonHeld() const noexcept;
 
     // Output Wet until a jack has been selected. Selecting does not patch.
     Meter& meter() noexcept { return meter_; }

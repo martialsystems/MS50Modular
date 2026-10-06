@@ -26,55 +26,249 @@ CablePaint paintFor (int color)
     }
 }
 
-// Round momentary. Same cap stack as a column knob, with no pointer.
-// Pressed: the cap sinks and a gold pip shows, the same gold as the panel rules.
-void paintExtInHold (juce::Graphics& g, juce::Point<float> origin, float scale, bool pressed)
+// Latching square key. The HOLD legend is already drawn on the plate.
+// The lamp is on only while the gate is latched and the effect is on.
+void paintExtInHold (juce::Graphics& g, juce::Point<float> origin, float scale, bool lit)
 {
-    const float cx = origin.x + kExtInButtonCx * scale;
-    const float cy = origin.y + kExtInButtonCy * scale;
-    const float radius = 15.0f * scale;
-    const float shadow = (15.0f + 4.0f) * scale;
+    const float cx = origin.x + kHoldCx * scale;
+    const float cy = origin.y + kHoldCy * scale;
+    if (lit)
+    {
+        juce::ColourGradient glow (juce::Colour (0xffffd27a).withAlpha (0.55f), cx, cy,
+                                   juce::Colour (0xffffd27a).withAlpha (0.0f), cx, cy - 24.0f * scale,
+                                   true);
+        g.setGradientFill (glow);
+        g.fillEllipse (cx - 24.0f * scale, cy - 24.0f * scale, 48.0f * scale, 48.0f * scale);
+    }
+
+    const float cap = 26.0f * scale;
+    const float x = cx - 13.0f * scale;
+    const float y = cy - 13.0f * scale;
+    const juce::Colour shellHi = lit ? juce::Colour (0xfffff6d6) : juce::Colour (0xfff4eedc);
+    const juce::Colour shellLo = lit ? juce::Colour (0xffe2b65a) : juce::Colour (0xffb3ab94);
+    juce::ColourGradient shell (shellHi, x, y, shellLo, x + cap, y + cap, false);
+    g.setGradientFill (shell);
+    g.fillRoundedRectangle (x, y, cap, cap, 3.0f * scale);
+    g.setColour (juce::Colour (0xff6f6a5a));
+    g.drawRoundedRectangle (x, y, cap, cap, 3.0f * scale, 0.9f * scale);
+
+    g.setColour (juce::Colour (0xff7e7764).withAlpha (0.55f));
+    g.fillRoundedRectangle (x, cy + 9.0f * scale, cap, 4.0f * scale, 2.0f * scale);
+
+    const float faceX = cx - 9.5f * scale;
+    const float faceY = cy - 10.0f * scale;
+    const float faceW = 19.0f * scale;
+    const float faceH = 17.0f * scale;
+    const juce::Colour faceHi = lit ? juce::Colour (0xfffffbe8) : juce::Colour (0xfff8f3e4);
+    const juce::Colour faceLo = lit ? juce::Colour (0xfff5cf7a) : juce::Colour (0xffd0c8b2);
+    const float gx = faceX + faceW * 0.45f;
+    const float gy = faceY + faceH * 0.40f;
+    juce::ColourGradient face (faceHi, gx, gy, faceLo, gx + 0.8f * faceW, gy, true);
+    g.setGradientFill (face);
+    g.fillRoundedRectangle (faceX, faceY, faceW, faceH, 2.5f * scale);
+}
+
+void paintPowerRocker (juce::Graphics& g, juce::Point<float> origin, float scale, bool on)
+{
+    const float x = origin.x + kPowerX * scale;
+    const float y = origin.y + kPowerY * scale;
+    const float w = kPowerW * scale;
+    const float h = kPowerH * scale;
+    const float half = w * 0.5f;
+    const auto raised = juce::Colour (0xff3a3a3e);
+    const auto pressed = juce::Colour (0xff101012);
+    g.setColour (on ? raised : pressed);
+    g.fillRoundedRectangle (x, y, half, h, 2.5f * scale);
+    g.setColour (on ? pressed : raised);
+    g.fillRoundedRectangle (x + half, y, half, h, 2.5f * scale);
+
+    g.setColour (juce::Colour (0xff77777c));
+    const float lineLeft = on ? x + 2.0f * scale : x + half + 2.0f * scale;
+    const float lineRight = on ? x + half - 2.0f * scale : x + w - 2.0f * scale;
+    g.drawLine (lineLeft, y + 1.2f * scale, lineRight, y + 1.2f * scale, 1.0f * scale);
+    g.setColour (juce::Colours::black);
+    g.drawLine (x + half, y + scale, x + half, y + h - scale, 1.0f * scale);
+}
+
+const int* lcdRows (juce::juce_wchar ch)
+{
+    struct Glyph
+    {
+        char ch;
+        int row[7];
+    };
+    static constexpr int kBlank[7] = { 0, 0, 0, 0, 0, 0, 0 };
+    static constexpr Glyph kFont[] = {
+        { ' ', { 0, 0, 0, 0, 0, 0, 0 } },
+        { '0', { 14, 17, 19, 21, 25, 17, 14 } },
+        { '1', { 4, 12, 4, 4, 4, 4, 14 } },
+        { '2', { 14, 17, 1, 2, 4, 8, 31 } },
+        { '3', { 31, 2, 4, 2, 1, 17, 14 } },
+        { '4', { 2, 6, 10, 18, 31, 2, 2 } },
+        { '5', { 31, 16, 30, 1, 1, 17, 14 } },
+        { '6', { 6, 8, 16, 30, 17, 17, 14 } },
+        { '7', { 31, 1, 2, 4, 8, 8, 8 } },
+        { '8', { 14, 17, 17, 14, 17, 17, 14 } },
+        { '9', { 14, 17, 17, 15, 1, 2, 12 } },
+        { 'A', { 14, 17, 17, 17, 31, 17, 17 } },
+        { 'B', { 30, 17, 17, 30, 17, 17, 30 } },
+        { 'C', { 14, 17, 16, 16, 16, 17, 14 } },
+        { 'D', { 28, 18, 17, 17, 17, 18, 28 } },
+        { 'E', { 31, 16, 16, 30, 16, 16, 31 } },
+        { 'F', { 31, 16, 16, 30, 16, 16, 16 } },
+        { 'G', { 14, 17, 16, 23, 17, 17, 15 } },
+        { 'H', { 17, 17, 17, 31, 17, 17, 17 } },
+        { 'I', { 14, 4, 4, 4, 4, 4, 14 } },
+        { 'J', { 7, 2, 2, 2, 2, 18, 12 } },
+        { 'K', { 17, 18, 20, 24, 20, 18, 17 } },
+        { 'L', { 16, 16, 16, 16, 16, 16, 31 } },
+        { 'M', { 17, 27, 21, 21, 17, 17, 17 } },
+        { 'N', { 17, 17, 25, 21, 19, 17, 17 } },
+        { 'O', { 14, 17, 17, 17, 17, 17, 14 } },
+        { 'P', { 30, 17, 17, 30, 16, 16, 16 } },
+        { 'Q', { 14, 17, 17, 17, 21, 18, 13 } },
+        { 'R', { 30, 17, 17, 30, 20, 18, 17 } },
+        { 'S', { 15, 16, 16, 14, 1, 1, 30 } },
+        { 'T', { 31, 4, 4, 4, 4, 4, 4 } },
+        { 'U', { 17, 17, 17, 17, 17, 17, 14 } },
+        { 'V', { 17, 17, 17, 17, 17, 10, 4 } },
+        { 'W', { 17, 17, 17, 21, 21, 21, 10 } },
+        { 'X', { 17, 17, 10, 4, 10, 17, 17 } },
+        { 'Y', { 17, 17, 17, 10, 4, 4, 4 } },
+        { 'Z', { 31, 1, 2, 4, 8, 16, 31 } },
+        { '&', { 12, 18, 20, 8, 21, 18, 13 } },
+        { '-', { 0, 0, 0, 31, 0, 0, 0 } },
+        { '+', { 0, 4, 4, 31, 4, 4, 0 } },
+        { '/', { 0, 1, 2, 4, 8, 16, 0 } },
+        { '.', { 0, 0, 0, 0, 0, 12, 12 } },
+        { '>', { 8, 4, 2, 1, 2, 4, 8 } },
+    };
+
+    const char ascii = (ch >= 32 && ch < 127) ? static_cast<char> (ch) : ' ';
+    for (const auto& glyph : kFont)
+        if (glyph.ch == ascii)
+            return glyph.row;
+    return kBlank;
+}
+
+juce::String presetScreenLine (int index, const juce::String& hostName)
+{
+    static const char* kShort[] = { "DRY", "NOISE MIXER", "VOICE", "RING", "S&H", "FEEDBACK" };
+    const juce::String name = (index >= 0 && index < 6) ? juce::String (kShort[index]) : hostName.toUpperCase();
+    return (juce::String (index + 1).paddedLeft ('0', 2) + " " + name).substring (0, kPresetChars);
+}
+
+void paintLcdDots (juce::Graphics& g, juce::Rectangle<float> area, const juce::String& text,
+                   juce::Colour ink, float ghostAlpha)
+{
+    const float pitch = juce::jmin (area.getWidth() / (static_cast<float> (kPresetChars) * 6.0f),
+                                     area.getHeight() / 8.0f);
+    const float dot = pitch * 0.86f;
+    const float ox = area.getX() + (area.getWidth() - static_cast<float> (kPresetChars) * 6.0f * pitch) * 0.5f
+                     + pitch * 0.5f;
+    const float oy = area.getY() + (area.getHeight() - 7.0f * pitch) * 0.5f;
+    for (int column = 0; column < kPresetChars; ++column)
+    {
+        const juce::juce_wchar ch = column < text.length() ? text[column] : static_cast<juce::juce_wchar> (' ');
+        const int* rows = lcdRows (ch);
+        for (int row = 0; row < 7; ++row)
+        {
+            for (int bit = 0; bit < 5; ++bit)
+            {
+                const bool on = ((rows[row] >> (4 - bit)) & 1) != 0;
+                g.setColour (ink.withAlpha (on ? 0.9f : ghostAlpha));
+                g.fillRect (ox + (static_cast<float> (column) * 6.0f + static_cast<float> (bit)) * pitch,
+                            oy + static_cast<float> (row) * pitch,
+                            dot, dot);
+            }
+        }
+    }
+}
+
+juce::Rectangle<float> presetMenuDesign (int count)
+{
+    return { kPresetBezelX,
+             kPresetBezelY + kPresetBezelH + 3.0f,
+             (kPresetKeyX + kPresetKeyW) - kPresetBezelX,
+             10.0f + static_cast<float> (count) * 21.0f - 3.0f };
+}
+
+void paintKnobCap (juce::Graphics& g, juce::Point<float> centre, float radius, float scale, bool isSwitch, float value)
+{
+    const float shadow = radius + 4.0f * scale;
     g.setColour (juce::Colours::black.withAlpha (0.45f));
-    g.fillEllipse (cx + scale - shadow, cy + 2.0f * scale - shadow, shadow * 2.0f, shadow * 2.0f);
+    g.fillEllipse (centre.x + scale - shadow, centre.y + 2.0f * scale - shadow, shadow * 2.0f, shadow * 2.0f);
 
     const float skirt = radius + 3.0f * scale;
     g.setColour (juce::Colour (0xff08080a));
-    g.fillEllipse (cx - skirt, cy - skirt, skirt * 2.0f, skirt * 2.0f);
+    g.fillEllipse (centre.x - skirt, centre.y - skirt, skirt * 2.0f, skirt * 2.0f);
+    g.setColour (juce::Colours::black);
+    g.drawEllipse (centre.x - skirt, centre.y - skirt, skirt * 2.0f, skirt * 2.0f, 0.8f * scale);
 
-    g.setColour (juce::Colour (0xff3c3c3f));
-    g.drawEllipse (cx - (radius + 1.2f * scale), cy - (radius + 1.2f * scale),
-                   (radius + 1.2f * scale) * 2.0f, (radius + 1.2f * scale) * 2.0f, 1.6f * scale);
+    juce::Path ring;
+    const float ringRadius = radius + 1.2f * scale;
+    ring.addEllipse (centre.x - ringRadius, centre.y - ringRadius, ringRadius * 2.0f, ringRadius * 2.0f);
+    const float dashes[] = { 0.8f * scale, 1.6f * scale };
+    juce::Path dashed;
+    juce::PathStrokeType (2.4f * scale).createDashedStroke (dashed, ring, dashes, 2);
+    g.setColour (juce::Colour (0xff3c3c3f).withAlpha (0.75f));
+    g.fillPath (dashed);
 
-    const float sink = pressed ? 1.4f * scale : 0.0f;
-    g.setColour (juce::Colour (pressed ? 0xff101012 : 0xff1a1a1b));
-    g.fillEllipse (cx - radius, cy - radius + sink, radius * 2.0f, radius * 2.0f);
+    const float body = radius - 0.3f * scale;
+    juce::ColourGradient metal (juce::Colour (0xff4b4b4e), centre.x - body, centre.y - body,
+                                juce::Colour (0xff060607), centre.x + body, centre.y + body, false);
+    metal.addColour (0.5, juce::Colour (0xff1a1a1b));
+    g.setGradientFill (metal);
+    g.fillEllipse (centre.x - body, centre.y - body, body * 2.0f, body * 2.0f);
+    g.setColour (juce::Colours::black);
+    g.drawEllipse (centre.x - body, centre.y - body, body * 2.0f, body * 2.0f, 0.8f * scale);
 
-    const float face = radius * (pressed ? 0.72f : 0.82f);
-    g.setColour (juce::Colour (pressed ? 0xff1c1c1e : 0xff2a2a2c));
-    g.fillEllipse (cx - face, cy - face + sink, face * 2.0f, face * 2.0f);
+    const float cap = radius * 0.8f;
+    juce::ColourGradient top (juce::Colour (0xff2a2a2c), centre.x - cap, centre.y - cap,
+                              juce::Colour (0xff131314), centre.x + cap, centre.y + cap, false);
+    g.setGradientFill (top);
+    g.fillEllipse (centre.x - cap, centre.y - cap, cap * 2.0f, cap * 2.0f);
+    g.setColour (juce::Colour (0xff050505));
+    g.drawEllipse (centre.x - cap, centre.y - cap, cap * 2.0f, cap * 2.0f, 0.8f * scale);
 
-    g.setColour (juce::Colours::white.withAlpha (pressed ? 0.05f : 0.18f));
-    const float hx = face * 0.62f;
-    const float hy = face * 0.36f;
-    g.fillEllipse (cx - face * 0.22f, cy - face * 0.48f + sink, hx, hy);
+    juce::Path shine;
+    shine.addEllipse (-radius * 0.45f, -radius * 0.28f, radius * 0.90f, radius * 0.56f);
+    shine.applyTransform (juce::AffineTransform::translation (centre.x - radius * 0.28f, centre.y - radius * 0.32f)
+                              .followedBy (juce::AffineTransform::rotation (juce::degreesToRadians (-35.0f),
+                                                                             centre.x, centre.y)));
+    g.setColour (juce::Colours::white.withAlpha (0.16f));
+    g.fillPath (shine);
 
-    if (pressed)
+    g.setColour (juce::Colour (0xfff1ede0));
+    const float angle = juce::degreesToRadians (panelKnobAngleDegrees (isSwitch, value));
+    juce::Line<float> pointer (centre.x, centre.y - radius * 0.1f,
+                               centre.x, centre.y - (radius - 1.5f * scale));
+    pointer.applyTransform (juce::AffineTransform::rotation (angle, centre.x, centre.y));
+    g.drawLine (pointer, 2.4f * scale);
+}
+
+std::unique_ptr<juce::Drawable> loadPanelBackground()
+{
+    if (auto drawn = juce::Drawable::createFromImageData (PanelAssets::panel_bg_svg, PanelAssets::panel_bg_svgSize))
+        return drawn;
+
+    // The grain filter is optional. Vector wear stays if the filter rejects the parse.
+    juce::String svg (reinterpret_cast<const char*> (PanelAssets::panel_bg_svg),
+                      static_cast<size_t> (PanelAssets::panel_bg_svgSize));
+    for (;;)
     {
-        g.setColour (juce::Colour (0xffc29f4c));
-        const float pip = 3.6f * scale;
-        g.fillEllipse (cx - pip, cy - pip + sink, pip * 2.0f, pip * 2.0f);
-        g.setColour (juce::Colour (0xfff3dc92));
-        const float glint = 1.4f * scale;
-        g.fillEllipse (cx - glint - 0.6f * scale, cy - glint - 0.8f * scale + sink, glint * 2.0f, glint * 2.0f);
+        const int open = svg.indexOfIgnoreCase ("<filter");
+        if (open < 0)
+            break;
+        const int close = svg.indexOfIgnoreCase (open, "</filter>");
+        if (close < 0)
+            break;
+        svg = svg.substring (0, open) + svg.substring (close + 9);
     }
 
-    g.setColour (juce::Colour (0xffdcd6c2));
-    g.setFont (juce::Font (juce::FontOptions ("Helvetica", 11.0f * scale, juce::Font::bold)));
-    const float labelTop = origin.y + (kExtInButtonCy + kExtInButtonRadius + 5.0f) * scale;
-    g.drawText ("HOLD",
-                juce::Rectangle<float> (cx - 28.0f * scale, labelTop, 56.0f * scale, 13.0f * scale),
-                juce::Justification::centred,
-                false);
+    if (auto xml = juce::parseXML (svg))
+        return juce::Drawable::createFromSVG (*xml);
+    return {};
 }
 
 float clampf (float value, float low, float high)
@@ -335,38 +529,18 @@ PatchBayView::PatchBayView (MS50ModularAudioProcessor& processor)
 {
     setWantsKeyboardFocus (true);
     stroke_.preallocateSpace (768);
-    panel_ = juce::Drawable::createFromImageData (PanelAssets::panel_svg, PanelAssets::panel_svgSize);
     menu_ = std::make_unique<StackMenu> (*this);
     addChildComponent (*menu_);
     for (int i = 0; i < kPanelKnobCount; ++i)
         knobValue_[i] = kPanelKnobs[i].valueDefault;
 
-    Cable published[kPatchBayMaxCables] {};
-    const int publishedCount = audioProcessor.copyPublishedCables (published, kPatchBayMaxCables);
-    count_ = loadPublishedCables (cables_, kPatchBayMaxCables, published, publishedCount,
-                                  audioProcessor.extInGraphIndex(),
-                                  audioProcessor.outputGraphIndex(),
-                                  audioProcessor.noiseGraphIndex(),
-                                  audioProcessor.vcfGraphIndex(),
-                                  audioProcessor.vca1GraphIndex(),
-                                  audioProcessor.vca2GraphIndex(),
-                                  audioProcessor.eg1GraphIndex(),
-                                  audioProcessor.mgGraphIndex(),
-                                  audioProcessor.vcoGraphIndex(),
-                                  audioProcessor.eg2GraphIndex(),
-                                  audioProcessor.ringGraphIndex(),
-                                  audioProcessor.dividerGraphIndex(),
-                                  audioProcessor.inverterGraphIndex(),
-                                  audioProcessor.integratorGraphIndex(),
-                                  audioProcessor.mixerGraphIndex(),
-                                  audioProcessor.sampleHoldGraphIndex());
+    panel_ = loadPanelBackground();
+    reloadPublishedCables();
     startTimerHz (60);
 }
 
 PatchBayView::~PatchBayView()
 {
-    if (extInPress_)
-        audioProcessor.setExtInButtonHeld (false);
     stopTimer();
 }
 
@@ -707,23 +881,91 @@ int PatchBayView::cableNear (float x, float y) const
     return hit;
 }
 
-bool PatchBayView::switchAt (float x, float y) const
+int PatchBayView::powerHalfAt (float x, float y) const
 {
-    return x >= kEffectSwitchX - 28.0f && x <= kEffectSwitchX + kEffectSwitchW + 8.0f
-           && y >= 8.0f && y <= 36.0f;
+    if (x < kPowerX || x > kPowerX + kPowerW || y < kPowerY || y > kPowerY + kPowerH)
+        return -1;
+    return x < kPowerX + kPowerW * 0.5f ? 0 : 1;
 }
 
 bool PatchBayView::extInButtonAt (float x, float y) const
 {
-    const float dx = x - kExtInButtonCx;
-    const float dy = y - kExtInButtonCy;
-    const float reach = kExtInButtonRadius + 2.0f;
-    if (dx * dx + dy * dy <= reach * reach)
-        return true;
+    return x >= kHoldHitX && x <= kHoldHitX + kHoldHitW
+           && y >= kHoldHitY && y <= kHoldHitY + kHoldHitH;
+}
 
-    const float labelTop = kExtInButtonCy + kExtInButtonRadius + 5.0f;
-    return x >= kExtInButtonCx - 28.0f && x <= kExtInButtonCx + 28.0f
-           && y >= labelTop && y <= labelTop + 13.0f;
+bool PatchBayView::presetAt (float x, float y) const
+{
+    const bool bezel = x >= kPresetBezelX && x <= kPresetBezelX + kPresetBezelW
+                       && y >= kPresetBezelY && y <= kPresetBezelY + kPresetBezelH;
+    const bool key = x >= kPresetKeyX && x <= kPresetKeyX + kPresetKeyW
+                     && y >= kPresetKeyY && y <= kPresetKeyY + kPresetKeyH;
+    return bezel || key;
+}
+
+int PatchBayView::presetRowAt (float x, float y) const
+{
+    const int count = audioProcessor.getNumPrograms();
+    const auto box = presetMenuDesign (count);
+    if (x < box.getX() || x > box.getRight() || y < box.getY() || y > box.getBottom())
+        return -1;
+    const int row = static_cast<int> (std::floor ((y - box.getY() - 5.0f) / 21.0f));
+    if (row < 0 || row >= count)
+        return -1;
+    return row;
+}
+
+void PatchBayView::reloadPublishedCables()
+{
+    for (int i = 0; i < kPatchBayMaxCables; ++i)
+        ropes_[i].ready = false;
+
+    Cable published[kPatchBayMaxCables] {};
+    const int publishedCount = audioProcessor.copyPublishedCables (published, kPatchBayMaxCables);
+    count_ = loadPublishedCables (cables_, kPatchBayMaxCables, published, publishedCount,
+                                  audioProcessor.extInGraphIndex(),
+                                  audioProcessor.outputGraphIndex(),
+                                  audioProcessor.noiseGraphIndex(),
+                                  audioProcessor.vcfGraphIndex(),
+                                  audioProcessor.vca1GraphIndex(),
+                                  audioProcessor.vca2GraphIndex(),
+                                  audioProcessor.eg1GraphIndex(),
+                                  audioProcessor.mgGraphIndex(),
+                                  audioProcessor.vcoGraphIndex(),
+                                  audioProcessor.eg2GraphIndex(),
+                                  audioProcessor.ringGraphIndex(),
+                                  audioProcessor.dividerGraphIndex(),
+                                  audioProcessor.inverterGraphIndex(),
+                                  audioProcessor.integratorGraphIndex(),
+                                  audioProcessor.mixerGraphIndex(),
+                                  audioProcessor.sampleHoldGraphIndex());
+}
+
+void PatchBayView::choosePreset (int index)
+{
+    if (index < 0 || index >= audioProcessor.getNumPrograms())
+        return;
+
+    presetMenu_ = false;
+    if (menu_ != nullptr && menu_->isVisible())
+        menu_->setVisible (false);
+    endGesture();
+    effectPress_ = false;
+    cancelGrab();
+
+    audioProcessor.setCurrentProgram (index);
+    if (audioProcessor.getCurrentProgram() != index)
+    {
+        repaint();
+        return;
+    }
+
+    for (int i = 0; i < kPanelKnobCount; ++i)
+        knobValue_[i] = kPanelKnobs[i].valueDefault;
+    syncHostKnobs();
+    reloadPublishedCables();
+    prepareRopes (true);
+    repaint();
 }
 
 juce::AudioProcessorParameter* PatchBayView::parameterForKnob (int index) const
@@ -1032,33 +1274,14 @@ void PatchBayView::paint (juce::Graphics& g)
     const float scale = panelScale();
     const auto area = juce::Rectangle<float> (origin.x, origin.y, kPanelW * scale, kPanelH * scale);
     if (panel_ != nullptr)
-        panel_->drawWithin (g, area, juce::RectanglePlacement::stretchToFit, 1.0f);
+    {
+        // Wear sticks outside the viewBox. Fit the viewBox, not the drawable bounds, so the knobs land on the ticks.
+        juce::Graphics::ScopedSaveState clip (g);
+        g.reduceClipRegion (area.toNearestInt());
+        panel_->draw (g, 1.0f, juce::AffineTransform::scale (scale, scale).translated (origin.x, origin.y));
+    }
     else
         g.fillAll (juce::Colour (0xff1a1a1c));
-
-    {
-        // Covers the static needle drawn in the panel SVG. Pivot matches that window.
-        constexpr float columnX = 1318.2f;
-        constexpr float columnW = 82.3f;
-        const float cx = columnX + columnW * 0.5f;
-        constexpr float pivotY = 109.0f;
-        const auto window = juce::Rectangle<float> (origin.x + (cx - 19.0f) * scale,
-                                                    origin.y + 85.0f * scale,
-                                                    38.0f * scale,
-                                                    26.0f * scale);
-        g.setColour (juce::Colour (0xff1a1408));
-        g.fillRoundedRectangle (window, 2.0f * scale);
-
-        const float unit = Meter::needle (audioProcessor.meterVolts());
-        const float angle = unit * 0.85f;
-        constexpr float length = 16.0f;
-        const auto pivot = juce::Point<float> (origin.x + cx * scale, origin.y + pivotY * scale);
-        const auto tip = juce::Point<float> (origin.x + (cx + std::sin (angle) * length) * scale,
-                                             origin.y + (pivotY - std::cos (angle) * length) * scale);
-        g.setColour (juce::Colour (0xff111111));
-        g.drawLine (pivot.x, pivot.y, tip.x, tip.y, 1.5f * scale);
-        g.fillEllipse (pivot.x - 2.0f * scale, pivot.y - 2.0f * scale, 4.0f * scale, 4.0f * scale);
-    }
 
     int levelA[kPatchBayMaxCables] {};
     int levelB[kPatchBayMaxCables] {};
@@ -1069,31 +1292,45 @@ void PatchBayView::paint (juce::Graphics& g)
         return juce::Point<float> (origin.x + x * scale, origin.y + y * scale);
     };
 
+    {
+        // Printed ticks are the VU face, from -20 to +3. The needle is the selected jack: ±5 V across that arc.
+        const float unit = Meter::needle (audioProcessor.meterVolts());
+        const float angleDeg = kMeterMinAngle + (kMeterMaxAngle - kMeterMinAngle) * (unit + 1.0f) * 0.5f;
+        const float angle = juce::degreesToRadians (angleDeg);
+        const float hub = 17.0f * kMeterScale;
+        const float reach = kMeterRadius + 5.0f * kMeterScale;
+        const auto face = juce::Rectangle<float> (origin.x + kMeterFaceX * scale,
+                                                  origin.y + kMeterFaceY * scale,
+                                                  kMeterFaceW * scale,
+                                                  kMeterFaceH * scale);
+        auto polar = [&] (float radius)
+        {
+            return screenPoint (kMeterPivotX + radius * std::sin (angle),
+                                kMeterPivotY - radius * std::cos (angle));
+        };
+        const auto start = polar (hub);
+        const auto tip = polar (reach);
+        {
+            juce::Graphics::ScopedSaveState clip (g);
+            g.reduceClipRegion (face.toNearestInt());
+            g.setColour (juce::Colour (0xff141414));
+            g.drawLine (start.x, start.y, tip.x, tip.y, 1.3f * kMeterScale * scale);
+            juce::ColourGradient glass (juce::Colour (0xfffff8e0).withAlpha (0.18f), face.getX(), face.getY(),
+                                        juce::Colour (0xffe8c870).withAlpha (0.04f), face.getRight(), face.getBottom(),
+                                        false);
+            g.setGradientFill (glass);
+            g.fillRect (face);
+        }
+    }
+
     for (int i = 0; i < kPanelKnobCount; ++i)
     {
         const PanelKnobRec& knob = kPanelKnobs[i];
-        const auto centre = screenPoint (knob.cx, knob.cy);
-        const float radius = knob.radius * scale;
-        const float shadow = (knob.radius + 4.0f) * scale;
-        g.setColour (juce::Colours::black.withAlpha (0.45f));
-        g.fillEllipse (centre.x + scale - shadow, centre.y + 2.0f * scale - shadow, shadow * 2.0f, shadow * 2.0f);
-        g.setColour (juce::Colour (0xff08080a));
-        g.fillEllipse (centre.x - (radius + 3.0f * scale), centre.y - (radius + 3.0f * scale),
-                       (radius + 3.0f * scale) * 2.0f, (radius + 3.0f * scale) * 2.0f);
-        g.setColour (juce::Colour (0xff1a1a1b));
-        g.fillEllipse (centre.x - radius, centre.y - radius, radius * 2.0f, radius * 2.0f);
-        g.setColour (juce::Colour (0xff2a2a2c));
-        const float cap = radius * 0.8f;
-        g.fillEllipse (centre.x - cap, centre.y - cap, cap * 2.0f, cap * 2.0f);
-        g.setColour (juce::Colour (0xfff1ede0));
-        const float angle = juce::degreesToRadians (panelKnobAngleDegrees (knob.kind == 1, knobValue_[i]));
-        juce::Line<float> pointer (centre.x, centre.y - radius * 0.1f,
-                                   centre.x, centre.y - (radius - 1.5f * scale));
-        pointer.applyTransform (juce::AffineTransform::rotation (angle, centre.x, centre.y));
-        g.drawLine (pointer, 2.4f * scale);
+        paintKnobCap (g, screenPoint (knob.cx, knob.cy), knob.radius * scale, scale,
+                      knob.kind == 1, knobValue_[i]);
     }
 
-    paintExtInHold (g, origin, scale, extInPress_);
+    paintExtInHold (g, origin, scale, audioProcessor.extInButtonHeld() && audioProcessor.effectIsOn());
 
     for (int cable = 0; cable < count_; ++cable)
     {
@@ -1177,11 +1414,17 @@ void PatchBayView::paint (juce::Graphics& g)
     }
 
     const bool effectOn = audioProcessor.effectIsOn();
-    const float thumbDesignX = effectOn ? (kEffectSwitchX + kEffectSwitchW - 22.0f) : (kEffectSwitchX + 2.0f);
-    const auto thumbOrigin = screenPoint (thumbDesignX, kEffectSwitchY + 2.0f);
-    const juce::Rectangle<float> thumb (thumbOrigin.x, thumbOrigin.y, 20.0f * scale, 12.0f * scale);
-    g.setColour (effectOn ? juce::Colour (0xffc29f4c) : juce::Colour (0xff2a2a2c));
-    g.fillRoundedRectangle (thumb, 6.0f * scale);
+    paintPowerRocker (g, origin, scale, effectOn);
+    if (effectOn)
+    {
+        const int program = audioProcessor.getCurrentProgram();
+        const auto lcd = juce::Rectangle<float> (origin.x + (kPresetLcdX + 2.0f) * scale,
+                                                 origin.y + (kPresetLcdY + 1.0f) * scale,
+                                                 (kPresetLcdW - 4.0f) * scale,
+                                                 (kPresetLcdH - 2.0f) * scale);
+        paintLcdDots (g, lcd, presetScreenLine (program, audioProcessor.getProgramName (program)),
+                      juce::Colour (0xff1e2419), 0.09f);
+    }
 
     juce::String line = status_;
     const bool presetAlert = line.isEmpty() && ! grabActive_ && audioProcessor.presetError().isNotEmpty();
@@ -1200,9 +1443,52 @@ void PatchBayView::paint (juce::Graphics& g)
     {
         g.setColour (status_.isNotEmpty() || presetAlert ? juce::Colour (0xffffe08a) : juce::Colour (0xffd8d2bd));
         g.setFont (juce::Font (juce::FontOptions (13.0f * scale)));
-        const auto textOrigin = screenPoint (300.0f, 10.0f);
-        g.drawText (line, juce::Rectangle<float> (textOrigin.x, textOrigin.y, 900.0f * scale, 20.0f * scale),
+        const auto textOrigin = screenPoint (24.0f, 600.0f);
+        g.drawText (line, juce::Rectangle<float> (textOrigin.x, textOrigin.y, 1000.0f * scale, 20.0f * scale),
                     juce::Justification::centredLeft, true);
+    }
+
+    if (presetMenu_ && effectOn)
+    {
+        const int programs = audioProcessor.getNumPrograms();
+        const auto box = presetMenuDesign (programs);
+        const auto menu = juce::Rectangle<float> (origin.x + box.getX() * scale,
+                                                  origin.y + box.getY() * scale,
+                                                  box.getWidth() * scale,
+                                                  box.getHeight() * scale);
+        g.setColour (juce::Colour (0xff0a0a0b));
+        g.fillRoundedRectangle (menu, 4.0f * scale);
+        g.setColour (juce::Colour (0xffc29f4c));
+        g.drawRoundedRectangle (menu, 4.0f * scale, 1.2f * scale);
+
+        const int current = audioProcessor.getCurrentProgram();
+        for (int row = 0; row < programs; ++row)
+        {
+            const bool hi = row == presetHi_;
+            const auto rowRect = juce::Rectangle<float> (origin.x + (box.getX() + 5.0f) * scale,
+                                                         origin.y + (box.getY() + 5.0f + static_cast<float> (row) * 21.0f) * scale,
+                                                         (box.getWidth() - 10.0f) * scale,
+                                                         18.0f * scale);
+            if (hi)
+            {
+                g.setColour (juce::Colour (0xff1e2419));
+                g.fillRoundedRectangle (rowRect, 1.5f * scale);
+            }
+            else
+            {
+                juce::ColourGradient glass (juce::Colour (0xff8f9a7c), rowRect.getX(), rowRect.getY(),
+                                            juce::Colour (0xff94a083), rowRect.getX(), rowRect.getBottom(), false);
+                glass.addColour (0.5, juce::Colour (0xffa6b192));
+                g.setGradientFill (glass);
+                g.fillRoundedRectangle (rowRect, 1.5f * scale);
+            }
+            const juce::String shown = (juce::String (row == current ? ">" : " ")
+                                        + presetScreenLine (row, audioProcessor.getProgramName (row)))
+                                           .substring (0, kPresetChars);
+            const auto dots = rowRect.reduced (3.0f * scale, 1.0f * scale);
+            paintLcdDots (g, dots, shown, hi ? juce::Colour (0xffa6b192) : juce::Colour (0xff1e2419),
+                          hi ? 0.08f : 0.09f);
+        }
     }
 }
 
@@ -1249,6 +1535,28 @@ void PatchBayView::mouseDown (const juce::MouseEvent& event)
         return;
     }
 
+    if (presetMenu_)
+    {
+        if (! audioProcessor.effectIsOn())
+        {
+            presetMenu_ = false;
+        }
+        else
+        {
+            if (menuOpen())
+                menu_->setVisible (false);
+            const int row = presetRowAt (design.x, design.y);
+            if (! event.mods.isRightButtonDown() && row >= 0)
+                choosePreset (row);
+            else
+            {
+                presetMenu_ = false;
+                repaint();
+            }
+            return;
+        }
+    }
+
     if (menuOpen())
         menu_->setVisible (false);
 
@@ -1269,15 +1577,30 @@ void PatchBayView::mouseDown (const juce::MouseEvent& event)
         return;
     }
 
-    if (switchAt (design.x, design.y))
+    if (presetAt (design.x, design.y))
+    {
+        if (audioProcessor.effectIsOn())
+        {
+            cancelGrab();
+            presetMenu_ = true;
+            presetHi_ = audioProcessor.getCurrentProgram();
+        }
+        repaint();
+        return;
+    }
+
+    const int half = powerHalfAt (design.x, design.y);
+    if (half >= 0)
     {
         endGesture();
         effectPress_ = true;
+        if (half == 0)
+            presetMenu_ = false;
         if (auto* parameter = audioProcessor.effectParameter())
         {
             gestureParam_ = parameter;
             parameter->beginChangeGesture();
-            parameter->setValueNotifyingHost (parameter->getValue() < 0.5f ? 1.0f : 0.0f);
+            parameter->setValueNotifyingHost (half == 1 ? 1.0f : 0.0f);
         }
         repaint();
         return;
@@ -1285,8 +1608,7 @@ void PatchBayView::mouseDown (const juce::MouseEvent& event)
 
     if (extInButtonAt (design.x, design.y))
     {
-        extInPress_ = true;
-        audioProcessor.setExtInButtonHeld (true);
+        audioProcessor.setExtInButtonHeld (! audioProcessor.extInButtonHeld());
         repaint();
         return;
     }
@@ -1343,7 +1665,7 @@ void PatchBayView::mouseDrag (const juce::MouseEvent& event)
     hoverJack_ = jackAt (design.x, design.y);
     hoverLabel_ = labelAt (design.x, design.y);
 
-    if (effectPress_ || extInPress_)
+    if (effectPress_)
         return;
 
     if (downActive_ && ! grabActive_ && std::hypot (design.x - downX_, design.y - downY_) > 6.0f)
@@ -1397,14 +1719,6 @@ void PatchBayView::mouseUp (const juce::MouseEvent& event)
     {
         effectPress_ = false;
         endGesture();
-        return;
-    }
-
-    if (extInPress_)
-    {
-        extInPress_ = false;
-        audioProcessor.setExtInButtonHeld (false);
-        repaint();
         return;
     }
 
@@ -1511,6 +1825,44 @@ float PatchBayView::knobValue (int index) const
 
 bool PatchBayView::keyPressed (const juce::KeyPress& key)
 {
+    if (presetMenu_)
+    {
+        if (! audioProcessor.effectIsOn())
+        {
+            presetMenu_ = false;
+        }
+        else
+        {
+            if (key == juce::KeyPress::escapeKey)
+            {
+                presetMenu_ = false;
+                repaint();
+                return true;
+            }
+            const int count = audioProcessor.getNumPrograms();
+            if (key == juce::KeyPress::upKey)
+            {
+                if (presetHi_ > 0)
+                    --presetHi_;
+                repaint();
+                return true;
+            }
+            if (key == juce::KeyPress::downKey)
+            {
+                if (presetHi_ + 1 < count)
+                    ++presetHi_;
+                repaint();
+                return true;
+            }
+            if (key == juce::KeyPress::returnKey)
+            {
+                choosePreset (presetHi_);
+                return true;
+            }
+            return true;
+        }
+    }
+
     if (key != juce::KeyPress::escapeKey)
         return false;
 
