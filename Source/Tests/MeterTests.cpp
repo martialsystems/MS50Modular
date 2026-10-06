@@ -126,6 +126,11 @@ int testMeterFollowsSelectedJack()
     check (process.find ("portVolts") == std::string::npos, "process() does not read the meter");
 
     const std::string view = readFile (MS50_PATCH_BAY_VIEW_SOURCE);
+    const std::string paint = functionBody (view, "void PatchBayView::paint");
+    const auto holdPaint = paint.find ("paintExtInHold");
+    const auto cablePaint = paint.find ("for (int cable");
+    check (holdPaint != std::string::npos && cablePaint != std::string::npos && holdPaint < cablePaint,
+           "the hold button is painted before the cables");
     const std::string down = functionBody (view, "void PatchBayView::mouseDown");
     check (down.find ("selectMeter") != std::string::npos, "mouse down on a jack selects the meter");
     const std::string select = functionBody (view, "void PatchBayView::selectMeter");

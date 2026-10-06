@@ -350,6 +350,57 @@ private:
             format.writeImageToStream (snapshot, stream);
         }
 
+        {
+            const auto centre = bay->designToLocal (kExtInButtonCx, kExtInButtonCy);
+            const auto topLeft = bay->designToLocal (kExtInButtonCx - 80.0f, kExtInButtonCy - 90.0f);
+            const auto bottomRight = bay->designToLocal (kExtInButtonCx + 80.0f, kExtInButtonCy + 70.0f);
+            const juce::Rectangle<int> crop (static_cast<int> (topLeft.x),
+                                              static_cast<int> (topLeft.y),
+                                              static_cast<int> (bottomRight.x - topLeft.x),
+                                              static_cast<int> (bottomRight.y - topLeft.y));
+            const auto upClip = snapshot.getClippedImage (crop.getIntersection (snapshot.getBounds()));
+            const int capX = juce::jlimit (0, snapshot.getWidth() - 1, static_cast<int> (centre.x));
+            const int capY = juce::jlimit (0, snapshot.getHeight() - 1, static_cast<int> (centre.y));
+            const auto capPixel = snapshot.getPixelAt (capX, capY);
+            expect (capPixel.getRed() < 80 && capPixel.getGreen() < 80 && capPixel.getBlue() < 80,
+                    "hold cap is the dark knob face");
+            juce::File upFile ("/tmp/ms50_hold_up.png");
+            upFile.deleteFile();
+            juce::FileOutputStream upStream (upFile);
+            if (upStream.openedOk())
+            {
+                juce::PNGImageFormat format;
+                format.writeImageToStream (upClip, upStream);
+            }
+
+            auto source = juce::Desktop::getInstance().getMainMouseSource();
+            const juce::ModifierKeys mods (juce::ModifierKeys::leftButtonModifier);
+            const auto time = juce::Time::getCurrentTime();
+            juce::MouseEvent down (source, centre, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                   bay, bay, time, centre, time, 1, false);
+            bay->mouseDown (down);
+            juce::Image heldShot (juce::Image::ARGB, bay->getWidth(), bay->getHeight(), true);
+            juce::Graphics heldGraphics (heldShot);
+            bay->paintEntireComponent (heldGraphics, true);
+            const auto downClip = heldShot.getClippedImage (crop.getIntersection (heldShot.getBounds()));
+            juce::File downFile ("/tmp/ms50_hold_down.png");
+            downFile.deleteFile();
+            juce::FileOutputStream downStream (downFile);
+            if (downStream.openedOk())
+            {
+                juce::PNGImageFormat format;
+                format.writeImageToStream (downClip, downStream);
+            }
+            expect (knobPixelsDiffer (snapshot, heldShot, crop), "holding the button repaints the cap");
+            const auto heldPixel = heldShot.getPixelAt (capX, capY);
+            expect (heldPixel.getRed() > capPixel.getRed() + 40 && heldPixel.getGreen() > capPixel.getGreen() + 20,
+                    "holding the button shows the gold pip");
+
+            juce::MouseEvent up (source, centre, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                 bay, bay, time, centre, time, 1, false);
+            bay->mouseUp (up);
+        }
+
         bool foundRope = false;
         float ropeX = 0.0f;
         float ropeY = 0.0f;

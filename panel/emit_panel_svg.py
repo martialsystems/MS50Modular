@@ -254,6 +254,12 @@ def build_inc(lay):
         "inline constexpr float kEffectSwitchW = 48.0f;",
         "inline constexpr float kEffectSwitchH = 16.0f;",
         "",
+        "// Momentary gate under the EXT IN GATE jack. Round cap, same metal as the knobs.",
+        "// The view paints it before the cables. Centre is the EXT IN jack column.",
+        "inline constexpr float kExtInButtonCx = 1444.1f;",
+        "inline constexpr float kExtInButtonCy = 376.0f;",
+        "inline constexpr float kExtInButtonRadius = 18.0f;",
+        "",
     ]
     labels = lay["labels"]
     lines.append(f"inline constexpr int kPanelLabelCount = {len(labels)};")

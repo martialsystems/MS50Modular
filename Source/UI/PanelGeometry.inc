@@ -40,11 +40,11 @@ inline constexpr float kEffectSwitchY = 16.0f;
 inline constexpr float kEffectSwitchW = 48.0f;
 inline constexpr float kEffectSwitchH = 16.0f;
 
-// Momentary gate under the EXT IN GATE jack. Painted by the view, not panel art.
-inline constexpr float kExtInButtonX = 1412.0f;
-inline constexpr float kExtInButtonY = 348.0f;
-inline constexpr float kExtInButtonW = 64.0f;
-inline constexpr float kExtInButtonH = 22.0f;
+// Momentary gate under the EXT IN GATE jack. Round cap, same metal as the knobs.
+// The view paints it before the cables. Centre is the EXT IN jack column.
+inline constexpr float kExtInButtonCx = 1444.1f;
+inline constexpr float kExtInButtonCy = 376.0f;
+inline constexpr float kExtInButtonRadius = 18.0f;
 
 inline constexpr int kPanelLabelCount = 109;
 inline constexpr PanelLabelRec kPanelLabels[] = {

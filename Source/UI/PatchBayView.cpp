@@ -26,6 +26,57 @@ CablePaint paintFor (int color)
     }
 }
 
+// Round momentary. Same cap stack as a column knob, with no pointer.
+// Pressed: the cap sinks and a gold pip shows, the same gold as the panel rules.
+void paintExtInHold (juce::Graphics& g, juce::Point<float> origin, float scale, bool pressed)
+{
+    const float cx = origin.x + kExtInButtonCx * scale;
+    const float cy = origin.y + kExtInButtonCy * scale;
+    const float radius = 15.0f * scale;
+    const float shadow = (15.0f + 4.0f) * scale;
+    g.setColour (juce::Colours::black.withAlpha (0.45f));
+    g.fillEllipse (cx + scale - shadow, cy + 2.0f * scale - shadow, shadow * 2.0f, shadow * 2.0f);
+
+    const float skirt = radius + 3.0f * scale;
+    g.setColour (juce::Colour (0xff08080a));
+    g.fillEllipse (cx - skirt, cy - skirt, skirt * 2.0f, skirt * 2.0f);
+
+    g.setColour (juce::Colour (0xff3c3c3f));
+    g.drawEllipse (cx - (radius + 1.2f * scale), cy - (radius + 1.2f * scale),
+                   (radius + 1.2f * scale) * 2.0f, (radius + 1.2f * scale) * 2.0f, 1.6f * scale);
+
+    const float sink = pressed ? 1.4f * scale : 0.0f;
+    g.setColour (juce::Colour (pressed ? 0xff101012 : 0xff1a1a1b));
+    g.fillEllipse (cx - radius, cy - radius + sink, radius * 2.0f, radius * 2.0f);
+
+    const float face = radius * (pressed ? 0.72f : 0.82f);
+    g.setColour (juce::Colour (pressed ? 0xff1c1c1e : 0xff2a2a2c));
+    g.fillEllipse (cx - face, cy - face + sink, face * 2.0f, face * 2.0f);
+
+    g.setColour (juce::Colours::white.withAlpha (pressed ? 0.05f : 0.18f));
+    const float hx = face * 0.62f;
+    const float hy = face * 0.36f;
+    g.fillEllipse (cx - face * 0.22f, cy - face * 0.48f + sink, hx, hy);
+
+    if (pressed)
+    {
+        g.setColour (juce::Colour (0xffc29f4c));
+        const float pip = 3.6f * scale;
+        g.fillEllipse (cx - pip, cy - pip + sink, pip * 2.0f, pip * 2.0f);
+        g.setColour (juce::Colour (0xfff3dc92));
+        const float glint = 1.4f * scale;
+        g.fillEllipse (cx - glint - 0.6f * scale, cy - glint - 0.8f * scale + sink, glint * 2.0f, glint * 2.0f);
+    }
+
+    g.setColour (juce::Colour (0xffdcd6c2));
+    g.setFont (juce::Font (juce::FontOptions ("Helvetica", 11.0f * scale, juce::Font::bold)));
+    const float labelTop = origin.y + (kExtInButtonCy + kExtInButtonRadius + 5.0f) * scale;
+    g.drawText ("HOLD",
+                juce::Rectangle<float> (cx - 28.0f * scale, labelTop, 56.0f * scale, 13.0f * scale),
+                juce::Justification::centred,
+                false);
+}
+
 float clampf (float value, float low, float high)
 {
     if (value < low)
@@ -664,8 +715,15 @@ bool PatchBayView::switchAt (float x, float y) const
 
 bool PatchBayView::extInButtonAt (float x, float y) const
 {
-    return x >= kExtInButtonX && x <= kExtInButtonX + kExtInButtonW
-           && y >= kExtInButtonY && y <= kExtInButtonY + kExtInButtonH;
+    const float dx = x - kExtInButtonCx;
+    const float dy = y - kExtInButtonCy;
+    const float reach = kExtInButtonRadius + 2.0f;
+    if (dx * dx + dy * dy <= reach * reach)
+        return true;
+
+    const float labelTop = kExtInButtonCy + kExtInButtonRadius + 5.0f;
+    return x >= kExtInButtonCx - 28.0f && x <= kExtInButtonCx + 28.0f
+           && y >= labelTop && y <= labelTop + 13.0f;
 }
 
 juce::AudioProcessorParameter* PatchBayView::parameterForKnob (int index) const
@@ -1035,6 +1093,8 @@ void PatchBayView::paint (juce::Graphics& g)
         g.drawLine (pointer, 2.4f * scale);
     }
 
+    paintExtInHold (g, origin, scale, extInPress_);
+
     for (int cable = 0; cable < count_; ++cable)
     {
         if (! ropes_[cable].ready)
@@ -1122,14 +1182,6 @@ void PatchBayView::paint (juce::Graphics& g)
     const juce::Rectangle<float> thumb (thumbOrigin.x, thumbOrigin.y, 20.0f * scale, 12.0f * scale);
     g.setColour (effectOn ? juce::Colour (0xffc29f4c) : juce::Colour (0xff2a2a2c));
     g.fillRoundedRectangle (thumb, 6.0f * scale);
-
-    const auto holdOrigin = screenPoint (kExtInButtonX, kExtInButtonY);
-    const juce::Rectangle<float> hold (holdOrigin.x, holdOrigin.y, kExtInButtonW * scale, kExtInButtonH * scale);
-    g.setColour (extInPress_ ? juce::Colour (0xffc29f4c) : juce::Colour (0xff2a2a2c));
-    g.fillRoundedRectangle (hold, 4.0f * scale);
-    g.setColour (juce::Colour (0xffd8d2bd));
-    g.setFont (juce::Font (juce::FontOptions (9.0f * scale)));
-    g.drawText ("HOLD", hold, juce::Justification::centred, false);
 
     juce::String line = status_;
     const bool presetAlert = line.isEmpty() && ! grabActive_ && audioProcessor.presetError().isNotEmpty();
