@@ -160,7 +160,7 @@ else
   cat <<EOF
 FL_INSTALL_OK
 In FL Studio: Options, Manage plugins, Find plugins.
-The previous scan failed before it stored a plugin type, so the Effect control cannot clear that row.
+The stored Effects record does not match this bundle, so it was removed.
 Find plugins writes a new record from this universal bundle.
 Do not copy the bundle into /Library/Audio/Plug-Ins/VST3.
 EOF
