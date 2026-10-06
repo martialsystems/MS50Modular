@@ -118,20 +118,50 @@ arch -arm64 "$work/check-arm64" "$USER_LINK"
 arch -x86_64 "$work/check-x64" "$USER_LINK"
 echo "symlink ${USER_LINK} -> ${BUNDLE}"
 
-for folder in Effects Generators; do
-  for ext in nfo fst; do
-    record="$DB/$folder/VST3/MS-50 Modular.$ext"
-    if [[ -f "$record" ]]; then
-      rm -f "$record"
-      echo "removed ${record}"
-    fi
-  done
+remove_record() {
+  local record="$1"
+  if [[ -f "$record" ]]; then
+    rm -f "$record"
+    echo "removed ${record}"
+  fi
+}
+
+# scanflags 1, a plugin type, a guid, and this symlink. A newer binary makes it stale.
+effects_record_is_current() {
+  local nfo="$DB/Effects/VST3/MS-50 Modular.nfo"
+  [[ -f "$nfo" ]] || return 1
+  grep -E -q '^ps_file_scanflags_0=1$' "$nfo" || return 1
+  grep -E -q '^ps_file_type_0=' "$nfo" || return 1
+  grep -E -q '^ps_file_guid_0=' "$nfo" || return 1
+  grep -F -x -q "ps_file_filename_0=${USER_LINK}" "$nfo" || return 1
+  if [[ "$BINARY" -nt "$nfo" ]]; then
+    return 1
+  fi
+  return 0
+}
+
+for ext in nfo fst; do
+  remove_record "$DB/Generators/VST3/MS-50 Modular.$ext"
+  remove_record "$DB/Generators/New/MS-50 Modular.$ext"
 done
 
-cat <<EOF
+if effects_record_is_current; then
+  echo "Keeping the verified Effects record. This bundle is not newer than that scan."
+  cat <<EOF
+FL_INSTALL_OK
+The verified Effects record is still in place.
+Do not copy the bundle into /Library/Audio/Plug-Ins/VST3.
+EOF
+else
+  for ext in nfo fst; do
+    remove_record "$DB/Effects/VST3/MS-50 Modular.$ext"
+    remove_record "$DB/Effects/New/MS-50 Modular.$ext"
+  done
+  cat <<EOF
 FL_INSTALL_OK
 In FL Studio: Options, Manage plugins, Find plugins.
 The previous scan failed before it stored a plugin type, so the Effect control cannot clear that row.
 Find plugins writes a new record from this universal bundle.
 Do not copy the bundle into /Library/Audio/Plug-Ins/VST3.
 EOF
+fi

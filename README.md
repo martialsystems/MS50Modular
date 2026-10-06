@@ -126,7 +126,7 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build --config Debug
 ```
 
-FL Studio does not open that Debug bundle. After a VST3 change, quit FL Studio and Plugin Manager, run `scripts/install_fl_plugin.sh`, then Find plugins. The script publishes one universal Release bundle through `~/Library/Audio/Plug-Ins/VST3/MS-50 Modular.vst3`. The procedure is in `docs/BUILD_GUIDE.md` under FL Studio install (2026-10-05).
+FL Studio does not open that Debug bundle. After a VST3 change, quit FL Studio and Plugin Manager, then run `scripts/install_fl_plugin.sh`. Find plugins when that script removes the Effects record. The script publishes one universal Release bundle through `~/Library/Audio/Plug-Ins/VST3/MS-50 Modular.vst3`. The procedure is in `docs/BUILD_GUIDE.md` under FL Studio install (2026-10-05).
 
 Requirements: CMake 3.22 or newer, a C++20 compiler, git (JUCE 8 is fetched by CMake, not vendored). Format: VST3 only. `IS_SYNTH` false. MIDI input off.
 
@@ -149,7 +149,7 @@ Read these three files before editing code: `docs/01-research.md`, `docs/METHODO
 *   When that step's acceptance checks pass, merge the branch into `main` and push `main` before the next step. Leave it unmerged only when the user says to keep it on the branch.
 *   Do not commit DAW projects, samples, `.env` files, or scans of the Korg schematics.
 *   UI work that changes a control or a cable must be clicked through in a real plugin host or a standalone window before the step is called done. Say which host.
-*   After a VST3 change that should load in FL Studio, run `scripts/install_fl_plugin.sh` and then Find plugins. That is the rescan step. Do not copy a second bundle into `/Library/Audio/Plug-Ins/VST3`.
+*   After a VST3 change that should load in FL Studio, run `scripts/install_fl_plugin.sh`. Find plugins when that script removes the Effects record. Do not copy a second bundle into `/Library/Audio/Plug-Ins/VST3`.
 
 ## License note
 

@@ -210,7 +210,7 @@ After a change that should be heard in FL Studio, quit FL Studio and Plugin Mana
 scripts/install_fl_plugin.sh
 ```
 
-The script builds target `MS50Modular_VST3` as a Release bundle for arm64 and x86_64 under `build/fl-release/`. It loads each slice, requires subcategory Fx, processes one dry stereo block, and runs `scripts/sine_through_fx.py` on that bundle. It then points `~/Library/Audio/Plug-Ins/VST3/MS-50 Modular.vst3` at that bundle and deletes `MS-50 Modular.nfo` and `MS-50 Modular.fst` from the Effects and Generators plugin-database folders. In FL Studio, use Find plugins so the new record is written from this bundle.
+The script builds target `MS50Modular_VST3` as a Release bundle for arm64 and x86_64 under `build/fl-release/`. It loads each slice, requires subcategory Fx, processes one dry stereo block, and runs `scripts/sine_through_fx.py` on that bundle. It then points `~/Library/Audio/Plug-Ins/VST3/MS-50 Modular.vst3` at that bundle. A failed Effects record, or one older than the new binary, is deleted, including the New-folder copies. A record that already verified this same bundle is kept. Generator copies are removed. When the record was deleted, use Find plugins so FL Studio writes a new one.
 
 Keep one copy. A second bundle in `/Library/Audio/Plug-Ins/VST3` is a second row. Building the static library target `MS50Modular` does not refresh the VST3. The Debug tree stays arm64 for `MS50ModularTests` and `MS50PanelProbe`.
 

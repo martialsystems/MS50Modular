@@ -44,7 +44,7 @@ The four lines are `SINE_DRY`, `SINE_LEFT`, `SINE_WET_SILENCE`, and `SINE_RMS`. 
 
 ## FL Studio rescan (2026-10-05)
 
-Quit FL Studio and Plugin Manager, run `scripts/install_fl_plugin.sh`, then Find plugins. The script's slice check must print `LOAD_OK` for arm64 and for x86_64, with subcategory Fx and a dry-block error below 1e-5. The user-folder symlink is the only installed copy. A failed earlier scan leaves an Effects row with no plugin type: Find plugins replaces that row. The Debug bundle is not the one FL Studio opens.
+Quit FL Studio and Plugin Manager, then run `scripts/install_fl_plugin.sh`. The script's slice check must print `LOAD_OK` for arm64 and for x86_64, with subcategory Fx and a dry-block error below 1e-5. The user-folder symlink is the only installed copy. A failed earlier scan leaves an Effects row with no plugin type: Find plugins replaces that row. A record that already verified this bundle is kept when the binary is not newer. The Debug bundle is not the one FL Studio opens.
 
 ## Each module
 
