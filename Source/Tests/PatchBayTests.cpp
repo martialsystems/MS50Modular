@@ -41,7 +41,7 @@ bool sameCable (const Cable& a, const Cable& b)
 
 int testPanelStackRule()
 {
-    check (kPanelJackCount == 58, "panel jack count");
+    check (kPanelJackCount == 57, "panel jack count");
     check (sizeof (Cable) == sizeof (int) * 4, "Cable stays four ids");
 
     ExtIn ext;
@@ -147,7 +147,7 @@ int testPanelStackRule()
 
 int testPanelKnobs()
 {
-    check (kPanelKnobCount == 31, "panel knob count");
+    check (kPanelKnobCount == 33, "panel knob count");
 
     const int vco = panelJackIndex ("VCO", "HZ/V");
     const int extL = panelJackIndex ("EXT IN", "L");
@@ -188,12 +188,12 @@ int testPanelKnobs()
            "reversed wheel up is a downward push");
 
     check (kPanelKnobs[ratio].kind == 1, "divider control is the switch");
-    check (kPanelKnobs[ratio].valueDefault == 0.5f, "switch default is 4");
-    check (panelKnobSwitchClick (0.5f) == 1.0f, "click steps 4 to 16");
-    check (panelKnobSwitchClick (1.0f) == 0.0f, "click steps 16 to 2");
-    check (panelKnobSwitchClick (0.0f) == 0.5f, "click steps 2 to 4");
-    check (panelKnobDrag (1.0f, -40.0f, false, true) == 0.5f, "switch drag snaps");
-    check (panelKnobFromWheel (0.5f, 1.0f, false, false, true) == 1.0f, "wheel up steps the switch");
+    check (kPanelKnobs[ratio].valueDefault == 0.0f, "switch default is 2");
+    check (panelKnobSwitchClick (0.0f) == 1.0f, "click steps 2 to 4");
+    check (panelKnobSwitchClick (1.0f) == 0.0f, "click steps 4 to 2");
+    check (panelKnobClamp (0.5f, true) == 1.0f && panelKnobClamp (0.4f, true) == 0.0f, "switch has two positions");
+    check (panelKnobDrag (1.0f, -40.0f, false, true) == 0.0f, "switch drag snaps");
+    check (panelKnobFromWheel (0.0f, 1.0f, false, false, true) == 1.0f, "wheel up steps the switch");
     check (panelKnobAngleDegrees (false, 0.0f) == -135.0f, "rotary start angle");
     check (panelKnobAngleDegrees (false, 1.0f) == 135.0f, "rotary end angle");
     check (panelKnobAngleDegrees (true, 0.5f) == 0.0f, "switch centre angle");

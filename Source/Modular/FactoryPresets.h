@@ -7,6 +7,7 @@
 #include "Mg.h"
 #include "Mixer.h"
 #include "Noise.h"
+#include "PanelDefaults.h"
 #include "PatchGraph.h"
 #include "Ring.h"
 #include "SampleHold.h"
@@ -66,7 +67,7 @@ inline float factoryVca1Initial (int index) noexcept
     return open ? kFeedbackVca1Initial : 0.0f;
 }
 
-// Host knobs restored when a program loads. Voice and Feedback use the shared row.
+// Host knobs restored when a program loads. Voice and Feedback use the shared row from PanelDefaults.h.
 // Hold replaces the envelope, filter, and VCO range on that row.
 // Filter loop replaces cutoff and peak. MG rate, S&H rate, and integrator time are separate restores.
 struct FactoryProgramKnobs {
@@ -81,7 +82,9 @@ struct FactoryProgramKnobs {
 
 inline FactoryProgramKnobs factoryProgramKnobs (int index) noexcept
 {
-    FactoryProgramKnobs knobs { 0.50f, 0.30f, 0.50f, 0.30f, 0.68f, 0.42f, 0.50f };
+    FactoryProgramKnobs knobs { PanelDefault::kVcfCutoff, PanelDefault::kVcfPeak, PanelDefault::kEg1Attack,
+                                PanelDefault::kEg1Decay,  PanelDefault::kEg1Sustain, PanelDefault::kEg1Release,
+                                PanelDefault::kVcoRange };
     if (index == kHoldPreset)
     {
         knobs.vcfCutoff = kHoldVcfCutoff;
@@ -106,17 +109,17 @@ inline float factoryMgRate (int index) noexcept
         return kMgFilterRate;
     if (index == kRingDronePreset)
         return kRingDroneRate;
-    return 0.50f;
+    return PanelDefault::kMgRate;
 }
 
 inline float factorySampleHoldRate (int index) noexcept
 {
-    return index == kSteppedCutoffPreset ? kSteppedCutoffRate : 0.50f;
+    return index == kSteppedCutoffPreset ? kSteppedCutoffRate : PanelDefault::kSampleHoldRate;
 }
 
 inline float factoryIntegratorTime (int index) noexcept
 {
-    return index == kDelayedBouncePreset ? kDelayedBounceTime : 0.50f;
+    return index == kDelayedBouncePreset ? kDelayedBounceTime : PanelDefault::kIntegratorTime;
 }
 
 struct FactoryCable {
@@ -322,13 +325,13 @@ inline bool loadFactoryPreset (PatchGraph& graph, int index)
 
     if (graph.moduleCount() > FactoryModule::Mixer)
     {
-        graph.writePresetKnob (FactoryModule::Mixer, Mixer::kKnobLevel1, 0.8f);
-        graph.writePresetKnob (FactoryModule::Mixer, Mixer::kKnobLevel2, 0.8f);
-        graph.writePresetKnob (FactoryModule::Mixer, Mixer::kKnobLevel3, 0.8f);
+        graph.writePresetKnob (FactoryModule::Mixer, Mixer::kKnobLevel1, PanelDefault::kMixerLevel);
+        graph.writePresetKnob (FactoryModule::Mixer, Mixer::kKnobLevel2, PanelDefault::kMixerLevel);
+        graph.writePresetKnob (FactoryModule::Mixer, Mixer::kKnobLevel3, PanelDefault::kMixerLevel);
     }
 
     if (graph.moduleCount() > FactoryModule::SampleHold)
-        graph.writePresetKnob (FactoryModule::SampleHold, SampleHold::kKnobRate, 0.50f);
+        graph.writePresetKnob (FactoryModule::SampleHold, SampleHold::kKnobRate, PanelDefault::kSampleHoldRate);
 
     for (int module = 0; module < graph.moduleCount(); ++module)
         if (Module* item = graph.moduleAt (module))

@@ -45,17 +45,18 @@ int testDividerOnlyTwoAndFour()
     check (std::strcmp (divider.port (Divider::kIn).name, "In") == 0, "input name");
     check (std::strcmp (divider.port (Divider::kDiv2).name, "Div2") == 0, "div2 name");
     check (std::strcmp (divider.port (Divider::kDiv4).name, "Div4") == 0, "div4 name");
-    check (faceKnobBinding ("DIV", "RATIO SWITCH").knob == FaceKnob::None, "ratio switch stays a picture");
+    const FaceKnobBinding ratio = faceKnobBinding ("DIV", "RATIO SWITCH");
+    check (ratio.knob == FaceKnob::DividerRatio && ratio.index < 0, "ratio switch is a host setting, not a module knob");
+    check (ratio.fallback == 0.0f && std::strcmp (ratio.parameterId, "dividerRatio") == 0, "ratio switch starts on /2");
 
     const int in = panelJackIndex ("DIV", "IN");
     const int div2 = panelJackIndex ("DIV", "/2");
     const int div4 = panelJackIndex ("DIV", "/4");
-    const int div16 = panelJackIndex ("DIV", "/16");
-    check (in >= 0 && div2 >= 0 && div4 >= 0 && div16 >= 0, "divider jacks exist");
+    check (in >= 0 && div2 >= 0 && div4 >= 0, "divider jacks exist");
+    check (panelJackIndex ("DIV", "/16") < 0, "no /16 jack");
     check (kPanelJacks[in].module == 12 && kPanelJacks[in].port == 0 && kPanelJacks[in].dir == 0, "in");
     check (kPanelJacks[div2].module == 12 && kPanelJacks[div2].port == 1 && kPanelJacks[div2].dir == 1, "/2");
     check (kPanelJacks[div4].module == 12 && kPanelJacks[div4].port == 2 && kPanelJacks[div4].dir == 1, "/4");
-    check (kPanelJacks[div16].module == 0 && kPanelJacks[div16].port < 0, "/16 stays a hole");
 
     const int wet = panelJackIndex ("OUTPUT", "WET");
     PanelLink refused;

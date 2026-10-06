@@ -140,7 +140,11 @@ private:
     juce::AudioParameterFloat* vcfCutoff_ = nullptr;
     juce::AudioParameterFloat* vcfPeak_ = nullptr;
     juce::AudioParameterFloat* vcfAmount_ = nullptr;
+    juce::AudioParameterFloat* vca1Initial_ = nullptr;
+    juce::AudioParameterFloat* vca1Mod_ = nullptr;
     juce::AudioParameterFloat* vca1LowCut_ = nullptr;
+    juce::AudioParameterFloat* vca2Initial_ = nullptr;
+    juce::AudioParameterFloat* vca2Mod_ = nullptr;
     juce::AudioParameterFloat* eg1Attack_ = nullptr;
     juce::AudioParameterFloat* eg1Decay_ = nullptr;
     juce::AudioParameterFloat* eg1Sustain_ = nullptr;
@@ -163,6 +167,9 @@ private:
     juce::AudioParameterFloat* sampleHoldRate_ = nullptr;
     juce::AudioParameterFloat* outputLevel_ = nullptr;
     juce::AudioParameterFloat* outputMix_ = nullptr;
+    juce::AudioParameterFloat* extInThreshold_ = nullptr;
+    juce::AudioParameterFloat* extInRelease_ = nullptr;
+    juce::AudioParameterFloat* dividerRatio_ = nullptr;
     Meter meter_;
     int currentProgram_ = kDefaultFactoryPreset;
     juce::String presetError_;

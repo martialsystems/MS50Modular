@@ -55,9 +55,9 @@ int testEg2HasNoSustainKnob()
     const FaceKnobBinding attack = faceKnobBinding ("EG 2", "ATTACK");
     const FaceKnobBinding release = faceKnobBinding ("EG 2", "RELEASE");
     check (hold.knob == FaceKnob::Eg2Hold && std::strcmp (hold.parameterName, "EG 2 Hold") == 0, "hold name");
-    check (hold.fallback == 0.50f && delay.fallback == 0.30f, "hold and delay faceplate");
-    check (attack.knob == FaceKnob::Eg2Attack && attack.fallback == 0.68f, "attack faceplate");
-    check (release.knob == FaceKnob::Eg2Release && release.fallback == 0.42f, "release faceplate");
+    check (hold.fallback == 0.30f && delay.fallback == 0.0f, "hold and delay faceplate");
+    check (attack.knob == FaceKnob::Eg2Attack && attack.fallback == 0.05f, "attack faceplate");
+    check (release.knob == FaceKnob::Eg2Release && release.fallback == 0.30f, "release faceplate");
     return finish ("testEg2HasNoSustainKnob");
 }
 

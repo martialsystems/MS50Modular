@@ -18,6 +18,8 @@
 #include "Modular/Vca2.h"
 #include "Modular/Vcf.h"
 #include "Modular/Vco.h"
+#include "UI/FaceKnobs.h"
+#include "UI/PatchBayLogic.h"
 
 #include <cmath>
 #include <cstdio>
@@ -227,8 +229,9 @@ int testFactoryPresetCount()
     check (programs.find ("kFactoryPresetCount") != std::string::npos, "the host list reports the factory count");
     const std::string programKnobs = functionBody (processor, "void MS50ModularAudioProcessor::applyProgramParameters");
     check (programKnobs.find ("factoryProgramKnobs") != std::string::npos, "a program restores its own host knobs");
-    check (ctor.find ("connectFactoryCables") != std::string::npos, "the opening patch is the factory cables");
-    check (ctor.find ("loadFactoryPreset") == std::string::npos, "construction does not swap in another preset");
+    check (ctor.find ("setCurrentProgram (kDefaultFactoryPreset)") != std::string::npos,
+           "a fresh instance loads Voice the same way choosing it does");
+    check (ctor.find ("connectFactoryCables") == std::string::npos, "construction does not patch its own cable list");
     check (choose.find ("loadFactoryPreset") != std::string::npos, "choosing a program loads that preset");
     check (processor.find ("vca1Initial") != std::string::npos, "session state keeps VCA 1 Initial");
     const std::string restore = functionBody (processor, "void MS50ModularAudioProcessor::setStateInformation");
@@ -354,10 +357,10 @@ int testHoldPreset()
     const FactoryProgramKnobs voice = factoryProgramKnobs (kDefaultFactoryPreset);
     const FactoryProgramKnobs feedback = factoryProgramKnobs (kFeedbackPreset);
     const FactoryProgramKnobs hold = factoryProgramKnobs (kHoldPreset);
-    check (voice.eg1Attack == 0.50f && voice.eg1Decay == 0.30f && voice.eg1Sustain == 0.68f
-               && voice.eg1Release == 0.42f && voice.vcfCutoff == 0.50f && voice.vcfPeak == 0.30f
+    check (voice.eg1Attack == 0.05f && voice.eg1Decay == 0.30f && voice.eg1Sustain == 0.60f
+               && voice.eg1Release == 0.30f && voice.vcfCutoff == 0.45f && voice.vcfPeak == 0.20f
                && voice.vcoRange == 0.50f,
-           "Voice keeps the shared knob row");
+           "Voice is the default table");
     check (feedback.eg1Attack == voice.eg1Attack && feedback.eg1Sustain == voice.eg1Sustain
                && feedback.vcfCutoff == voice.vcfCutoff && feedback.vcoRange == voice.vcoRange,
            "Feedback keeps the shared knob row");
@@ -478,25 +481,105 @@ void checkNear (float value, float want, const char* message)
     }
 }
 
+// FaceKnobs, layout.json (through PanelGeometry.inc), double-click reset and the Voice program
+// all read Source/Modular/PanelDefaults.h. A fresh instance is Voice, so they must agree.
+int testOneDefaultTable()
+{
+    const std::string processor = readFile (MS50_PROCESSOR_SOURCE);
+    const std::string restore = functionBody (processor, "void MS50ModularAudioProcessor::applyProgramParameters");
+    for (int i = 0; i < kPanelKnobCount; ++i)
+    {
+        const PanelKnobRec& knob = kPanelKnobs[i];
+        const FaceKnobBinding binding = faceKnobBinding (knob.section, knob.label);
+        if (binding.knob == FaceKnob::None)
+        {
+            std::printf ("  FAIL %s %s is not bound\n", knob.section, knob.label);
+            ++gChecks;
+            continue;
+        }
+        if (binding.fallback != knob.valueDefault)
+        {
+            std::printf ("  FAIL %s %s: FaceKnobs %.4f, layout %.4f\n", knob.section, knob.label,
+                         static_cast<double> (binding.fallback), static_cast<double> (knob.valueDefault));
+            ++gChecks;
+        }
+        const std::string restored = std::string ("restore (") + binding.parameterId + "_,";
+        if (restore.find (restored) == std::string::npos)
+        {
+            std::printf ("  FAIL %s is not restored by a program load\n", binding.parameterId);
+            ++gChecks;
+        }
+    }
+
+    auto fallback = [] (const char* section, const char* label) { return faceKnobBinding (section, label).fallback; };
+    const int voice = kDefaultFactoryPreset;
+    const FactoryProgramKnobs row = factoryProgramKnobs (voice);
+    check (row.vcfCutoff == fallback ("VCF", "CUTOFF") && row.vcfPeak == fallback ("VCF", "PEAK"), "Voice filter is the table");
+    check (row.eg1Attack == fallback ("EG 1", "ATTACK") && row.eg1Decay == fallback ("EG 1", "DECAY")
+               && row.eg1Sustain == fallback ("EG 1", "SUSTAIN") && row.eg1Release == fallback ("EG 1", "RELEASE"),
+           "Voice envelope is the table");
+    check (row.vcoRange == fallback ("VCO", "RANGE"), "Voice range is the table");
+    check (factoryMgRate (voice) == fallback ("MG", "RATE"), "Voice MG rate is the table");
+    check (factorySampleHoldRate (voice) == fallback ("S&H", "RATE"), "Voice S&H rate is the table");
+    check (factoryIntegratorTime (voice) == fallback ("INT", "TIME"), "Voice integrator time is the table");
+    check (factoryVca1Initial (voice) == fallback ("VCA 1", "INITIAL"), "Voice VCA 1 Initial is the table");
+    check (factoryPresetEffect (voice), "Voice is effect on");
+
+    check (fallback ("EG 1", "ATTACK") == 0.05f && fallback ("EG 1", "DECAY") == 0.30f
+               && fallback ("EG 1", "SUSTAIN") == 0.60f && fallback ("EG 1", "RELEASE") == 0.30f,
+           "fresh EG 1 is 0.05 / 0.3 / 0.6 / 0.3");
+    check (fallback ("VCF", "CUTOFF") == 0.45f && fallback ("VCF", "PEAK") == 0.20f && fallback ("VCF", "MOD") == 0.40f,
+           "fresh VCF is 0.45 / 0.2 / 0.4");
+    check (fallback ("MIX", "LEVEL 1") == 0.80f && fallback ("MIX", "LEVEL 2") == 0.80f && fallback ("MIX", "LEVEL 3") == 0.80f,
+           "mixer levels are 0.8");
+
+    // The old placeholder cycle repeated 0.50, 0.30, 0.68, 0.42, 0.78 down every column.
+    int cycle = 0;
+    for (int i = 0; i + 3 < kPanelKnobCount; ++i)
+    {
+        if (kPanelKnobs[i].valueDefault == 0.50f && kPanelKnobs[i + 1].valueDefault == 0.30f
+            && kPanelKnobs[i + 2].valueDefault == 0.68f && kPanelKnobs[i + 3].valueDefault == 0.42f)
+            ++cycle;
+    }
+    check (cycle == 0, "no 0.50 / 0.30 / 0.68 / 0.42 cycle");
+
+    ExtIn ext;
+    check (std::fabs (ext.presetKnob (ExtIn::kKnobThreshold) - fallback ("EXT IN", "THRESHOLD")) < 1.0e-4f,
+           "Ext In threshold default is the module's 0.2 V");
+    check (std::fabs (ext.presetKnob (ExtIn::kKnobRelease) - fallback ("EXT IN", "RELEASE")) < 1.0e-4f,
+           "Ext In release default is the module's 80 ms");
+
+    std::string layout = MS50_PROCESSOR_SOURCE;
+    const auto source = layout.rfind ("/Source/");
+    if (source != std::string::npos)
+    {
+        layout.replace (source, std::string::npos, "/panel/assets/layout.json");
+        const std::string text = readFile (layout.c_str());
+        check (text.find ("\"law\": \"linear") != std::string::npos, "layout.json meter law is linear");
+        check (text.find ("dB/20") == std::string::npos, "layout.json has no dB meter law");
+    }
+    return finish ("testOneDefaultTable");
+}
+
 void applyHostRow (Rack& rack, int index)
 {
     const FactoryProgramKnobs knobs = factoryProgramKnobs (index);
     rack.vcf.setKnob (Vcf::kKnobCutoff, knobs.vcfCutoff);
     rack.vcf.setKnob (Vcf::kKnobPeak, knobs.vcfPeak);
-    rack.vcf.setKnob (Vcf::kKnobAmount, 0.68f);
-    rack.vca1.setKnob (Vca1::kKnobLowCut, 0.68f);
-    rack.vca1.setKnob (Vca1::kKnobIntensity, 0.85f);
+    rack.vcf.setKnob (Vcf::kKnobAmount, PanelDefault::kVcfMod);
+    rack.vca1.setKnob (Vca1::kKnobLowCut, PanelDefault::kVca1LowCut);
+    rack.vca1.setKnob (Vca1::kKnobIntensity, PanelDefault::kVca1Mod);
     rack.eg1.setKnob (Eg1::kKnobAttack, knobs.eg1Attack);
     rack.eg1.setKnob (Eg1::kKnobDecay, knobs.eg1Decay);
     rack.eg1.setKnob (Eg1::kKnobSustain, knobs.eg1Sustain);
     rack.eg1.setKnob (Eg1::kKnobRelease, knobs.eg1Release);
     rack.mg.setKnob (MgModule::kKnobFrequency, factoryMgRate (index));
-    rack.mg.setKnob (MgModule::kKnobPw, 0.30f);
+    rack.mg.setKnob (MgModule::kKnobPw, PanelDefault::kMgPw);
     rack.vco.setKnob (Vco::kKnobScale, knobs.vcoRange);
-    rack.vco.setKnob (Vco::kKnobFine, 0.30f);
-    rack.vco.setKnob (Vco::kKnobPw, 0.68f);
-    rack.vco.setKnob (Vco::kKnobAmountA, 0.42f);
-    rack.vco.setKnob (Vco::kKnobAmountB, 0.78f);
+    rack.vco.setKnob (Vco::kKnobFine, PanelDefault::kVcoFine);
+    rack.vco.setKnob (Vco::kKnobPw, PanelDefault::kVcoPw);
+    rack.vco.setKnob (Vco::kKnobAmountA, PanelDefault::kVcoFm1);
+    rack.vco.setKnob (Vco::kKnobAmountB, PanelDefault::kVcoFm2);
     rack.integrator.setKnob (Integrator::kKnobTime, factoryIntegratorTime (index));
     rack.sampleHold.setKnob (SampleHold::kKnobRate, factorySampleHoldRate (index));
 }
@@ -566,10 +649,11 @@ int testSelfModPresets()
     const FactoryProgramKnobs feedback = factoryProgramKnobs (kFeedbackPreset);
     const FactoryProgramKnobs hold = factoryProgramKnobs (kHoldPreset);
     const FactoryProgramKnobs filterLoop = factoryProgramKnobs (kFilterLoopPreset);
-    check (voice.vcfCutoff == 0.50f && voice.vcfPeak == 0.30f && voice.eg1Attack == 0.50f
-               && voice.eg1Decay == 0.30f && voice.eg1Sustain == 0.68f && voice.eg1Release == 0.42f
-               && voice.vcoRange == 0.50f,
-           "Voice keeps the shared knob row");
+    check (voice.vcfCutoff == PanelDefault::kVcfCutoff && voice.vcfPeak == PanelDefault::kVcfPeak
+               && voice.eg1Attack == PanelDefault::kEg1Attack && voice.eg1Decay == PanelDefault::kEg1Decay
+               && voice.eg1Sustain == PanelDefault::kEg1Sustain && voice.eg1Release == PanelDefault::kEg1Release
+               && voice.vcoRange == PanelDefault::kVcoRange,
+           "Voice is the default table");
     check (feedback.vcfCutoff == voice.vcfCutoff && feedback.vcfPeak == voice.vcfPeak
                && feedback.eg1Attack == voice.eg1Attack && feedback.vcoRange == voice.vcoRange,
            "Feedback keeps the shared knob row");
@@ -599,8 +683,8 @@ int testSelfModPresets()
     check (restore.find ("factoryMgRate") != std::string::npos, "programs restore the MG rate");
     check (restore.find ("factorySampleHoldRate") != std::string::npos, "programs restore the S&H rate");
     check (restore.find ("factoryIntegratorTime") != std::string::npos, "programs restore the integrator time");
-    check (restore.find ("outputLevel_, 0.70f") != std::string::npos, "Output Level stays 0.70");
-    check (restore.find ("outputMix_, 1.0f") != std::string::npos, "Output Mix stays 1");
+    check (restore.find ("outputLevel_, PanelDefault::kOutputLevel") != std::string::npos, "Output Level is the default table");
+    check (restore.find ("outputMix_, PanelDefault::kOutputMix") != std::string::npos, "Output Mix is the default table");
     std::string presetHeader = MS50_PROCESSOR_SOURCE;
     const auto presetSlash = presetHeader.rfind ('/');
     check (presetSlash != std::string::npos, "factory header path");
@@ -608,7 +692,7 @@ int testSelfModPresets()
     {
         presetHeader.replace (presetSlash, std::string::npos, "/Modular/FactoryPresets.h");
         const std::string load = functionBody (readFile (presetHeader.c_str()), "inline bool loadFactoryPreset");
-        const auto sharedRate = load.find ("SampleHold::kKnobRate, 0.50f");
+        const auto sharedRate = load.find ("SampleHold::kKnobRate, PanelDefault::kSampleHoldRate");
         const auto namedKnobs = load.find ("writeFactoryProgramKnobs");
         check (sharedRate != std::string::npos && namedKnobs != std::string::npos && sharedRate < namedKnobs,
                "the shared S&H rate is written before the preset rate");
@@ -729,9 +813,9 @@ int testSelfModPresets()
     armWet (rack);
     skipSamples (rack, 1000);
     const double droneEarly = takeRms (rack, 2400, false);
-    // Host MG pulse width is 0.30, so the triangle crosses 0 halfway through the rise.
+    // Host MG pulse width is the table's PW, so the triangle crosses 0 halfway through the rise.
     const double mgHz = 0.01 * std::pow (20000.0, static_cast<double> (kRingDroneRate));
-    const int zeroSample = static_cast<int> ((0.30 * 0.5 / mgHz) * 48000.0);
+    const int zeroSample = static_cast<int> ((static_cast<double> (PanelDefault::kMgPw) * 0.5 / mgHz) * 48000.0);
     const int skipToZero = zeroSample - 1000 - 2400 - 1200;
     check (skipToZero > 0, "Ring drone quiet window is after the loud window");
     skipSamples (rack, skipToZero);
@@ -831,8 +915,8 @@ int testSelfModPresets()
     check (cablesMatch (rack.graph, kPresetFeedback, 4), "Feedback cables stay");
     check (rack.graph.delayedCableCount() == 1 && rack.graph.cableIsDelayed (3), "Feedback still delays VCF SigOut to VCF Cutoff");
     checkNear (rack.vca1.initial(), kFeedbackVca1Initial, "Feedback still sets VCA 1 Initial to 0.7");
-    checkNear (factoryProgramKnobs (kFeedbackPreset).vcfCutoff, 0.50f, "Feedback cutoff travel stays 0.50");
-    checkNear (factoryProgramKnobs (kFeedbackPreset).vcfPeak, 0.30f, "Feedback peak travel stays 0.30");
+    checkNear (factoryProgramKnobs (kFeedbackPreset).vcfCutoff, PanelDefault::kVcfCutoff, "Feedback cutoff is the default table");
+    checkNear (factoryProgramKnobs (kFeedbackPreset).vcfPeak, PanelDefault::kVcfPeak, "Feedback peak is the default table");
 
     check (loadFactoryPreset (rack.graph, kHoldPreset), "Hold loads after the self-mod presets");
     check (cablesMatch (rack.graph, kPresetHold, 6), "Hold cables stay");

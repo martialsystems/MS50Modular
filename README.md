@@ -51,7 +51,7 @@ The editor is the landscape panel: knobs in an upper band, jacks in labeled colu
 *   Stereo in and stereo out. Processing modules are mono.
 *   Click-drag patch cables on the landscape panel. An input sums every cable on it. An output may feed several inputs (stand-in S-27).
 *   Stack order, cable color, and cable shape do not change the sound. A 1978 MS-50 jack took one plug. This plugin stacks. Drag a plug onto empty space to unpatch it, or right-click the cable. Shift-drag adds a cable. Click an occupied jack to choose or reorder the stack.
-*   The editor is that panel. Column knobs turn. A turn does not drive a module that is not in the graph. The top MIX control is Output mix, and Output level stays 1. Sample and hold, the mixer, and the meter are drawn and are not graph modules. The divider /16 jack stays unmapped.
+*   The editor is that panel. Column knobs turn. A turn does not drive a module that is not in the graph. The top MIX control is Output mix, and Output level stays 1. Sample and hold, the mixer, and the meter are drawn and are not graph modules. The divider has /2 and /4 jacks and a two-position switch; there is no /16. Knob defaults live in one table, `Source/Modular/PanelDefaults.h` (see `docs/presets.md`).
 *   Rope cables are drawn on the message thread.
 *   Port types: audio, CV, gate. Illegal cables are refused.
 *   No heap allocation on the audio thread.

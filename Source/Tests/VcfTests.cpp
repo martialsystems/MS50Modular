@@ -273,11 +273,11 @@ int testVcfPanelJacks()
     check (peak.knob == FaceKnob::VcfPeak && std::strcmp (peak.parameterName, "VCF Peak") == 0, "peak name");
     check (amount.knob == FaceKnob::VcfAmount && std::strcmp (amount.parameterName, "VCF Cutoff Amount") == 0,
            "amount name");
-    check (cutoff.minimum == 0.0f && cutoff.maximum == 1.0f && cutoff.fallback == 0.50f, "cutoff range");
-    check (peak.fallback == 0.30f && amount.fallback == 0.68f, "peak and amount defaults");
+    check (cutoff.minimum == 0.0f && cutoff.maximum == 1.0f && cutoff.fallback == 0.45f, "cutoff range");
+    check (peak.fallback == 0.20f && amount.fallback == 0.40f, "peak and amount defaults");
     const FaceKnobBinding mix = faceKnobBinding ("OUTPUT", "MIX");
     check (mix.knob == FaceKnob::OutputMix && mix.fallback == 1.0f, "output mix is a host knob");
-    check (faceKnobBinding ("DIV", "RATIO SWITCH").knob == FaceKnob::None, "divider stays a picture");
+    check (faceKnobBinding ("DIV", "RATIO SWITCH").knob == FaceKnob::DividerRatio, "divider switch is a host setting");
     check (outputMixAfterSwitch (false, 1.0f) == 0.0f, "effect off ignores mix");
     check (outputMixForEffect (false) == 0.0f && outputMixForEffect (true) == 1.0f, "default mix is dry off and wet on");
     return finish ("testVcfPanelJacks");

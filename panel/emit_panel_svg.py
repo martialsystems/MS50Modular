@@ -79,13 +79,15 @@ LIVE = {
     ("S&H", "CLOCK"): (16, 2, 0),
 }
 
-# layout.json "default" is the art generator's drawing cycle. Mixer levels
-# reset to the faceplate value, not that cycle.
-FACE_DEFAULT = {
-    ("MIX", "LEVEL 1"): 0.80,
-    ("MIX", "LEVEL 2"): 0.80,
-    ("MIX", "LEVEL 3"): 0.80,
-}
+# layout.json "default" is the one default table (Source/Modular/PanelDefaults.h).
+# A test checks that FaceKnobs, this file and the Voice program agree.
+
+
+def knob_default(value):
+    # Two decimals, or four when the table needs them (Ext In 0.3758 and 0.5316).
+    text = f"{float(value):.4f}".rstrip("0")
+    whole, frac = text.split(".")
+    return f"{whole}.{frac.ljust(2, '0')}f"
 
 
 def cf(value):
@@ -112,7 +114,7 @@ def baseline(rect):
 
 
 def knob_ticks(knob):
-    # Bodies are drawn live. The divider switch has 2 / 4 / 16 labels and no tick ring.
+    # Bodies are drawn live. The divider switch has 2 / 4 labels and no tick ring.
     if knob["label"] == "RATIO SWITCH":
         return ""
     cx, cy, r = knob["cx"], knob["cy"], knob["radius"]
@@ -266,7 +268,7 @@ def build_inc(lay):
     ]
     rocker = lay["power"]["rocker"]
     lines += [
-        "// Power rocker. Left half is off, right half is on. The raised end points at that word.",
+        "// EFFECT rocker (layout key \"power\"). Left half is off (dry), right half is on (wet). The raised end points at that word.",
         f"inline constexpr float kPowerX = {cf(rocker[0])};",
         f"inline constexpr float kPowerY = {cf(rocker[1])};",
         f"inline constexpr float kPowerW = {cf(rocker[2])};",
@@ -348,10 +350,10 @@ def build_inc(lay):
     for knob in knobs:
         kind = 1 if knob["label"] == "RATIO SWITCH" else 0
         hit = knob["hit"]
-        default = FACE_DEFAULT.get((knob["section"], knob["label"]), knob["default"])
+        default = knob_default(knob["default"])
         lines.append(
             f'    {{ "{c_escape(knob["section"])}", "{c_escape(knob["label"])}", '
-            f'{knob["cx"]:.1f}f, {knob["cy"]:.1f}f, {knob["radius"]:.1f}f, {default:.2f}f, '
+            f'{knob["cx"]:.1f}f, {knob["cy"]:.1f}f, {knob["radius"]:.1f}f, {default}, '
             f'{hit[0]:.1f}f, {hit[1]:.1f}f, {hit[2]:.1f}f, {hit[3]:.1f}f, {kind} }},'
         )
     lines.append("};")
@@ -362,8 +364,8 @@ def build_inc(lay):
 def main():
     lay = json.load(open(LAY))
     assert lay["canvas"] == [W, H]
-    assert len(lay["jacks"]) == 58, len(lay["jacks"])
-    assert len(lay["knobs"]) == 31, len(lay["knobs"])
+    assert len(lay["jacks"]) == 57, len(lay["jacks"])
+    assert len(lay["knobs"]) == 33, len(lay["knobs"])
     titles = [column["title"] for column in lay["columns"]]
     assert titles[-2:] == ["EXT IN", "OUTPUT"], titles
     bg = os.path.join(os.path.dirname(SVG), "panel_bg.svg")
