@@ -36,7 +36,7 @@ struct PanelKnobRec {
 inline constexpr float kPanelW = 1600.0f;
 inline constexpr float kPanelH = 640.0f;
 
-// Power rocker. Left half is off, right half is on. The view paints the cap.
+// Power rocker. Left half is off, right half is on. The raised end points at that word.
 inline constexpr float kPowerX = 1524.00f;
 inline constexpr float kPowerY = 17.00f;
 inline constexpr float kPowerW = 40.00f;
@@ -284,7 +284,7 @@ inline constexpr PanelKnobRec kPanelKnobs[] = {
     { "MIX", "LEVEL 1", 1208.1f, 101.0f, 13.0f, 0.80f, 1187.1f, 80.0f, 42.0f, 42.0f, 0 },
     { "MIX", "LEVEL 2", 1208.1f, 151.0f, 13.0f, 0.80f, 1187.1f, 130.0f, 42.0f, 42.0f, 0 },
     { "MIX", "LEVEL 3", 1208.1f, 201.0f, 13.0f, 0.80f, 1187.1f, 180.0f, 42.0f, 42.0f, 0 },
-    { "OUTPUT", "MIX", 1509.0f, 101.0f, 13.0f, 0.50f, 1488.0f, 80.0f, 42.0f, 42.0f, 0 },
+    { "OUTPUT", "MIX", 1509.0f, 101.0f, 13.0f, 1.00f, 1488.0f, 80.0f, 42.0f, 42.0f, 0 },
     { "OUTPUT", "LEVEL", 1509.0f, 151.0f, 13.0f, 0.70f, 1488.0f, 130.0f, 42.0f, 42.0f, 0 },
 };
 

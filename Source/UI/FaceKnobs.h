@@ -31,6 +31,7 @@ enum class FaceKnob {
     MixerLevel2,
     MixerLevel3,
     SampleHoldRate,
+    OutputMix,
     OutputLevel
 };
 
@@ -106,8 +107,12 @@ inline FaceKnobBinding faceKnobBinding (const char* section, const char* label)
         return { FaceKnob::MixerLevel3, 2, 0.0f, 1.0f, 0.80f, "mixerLevel3", "Mixer Level 3" };
     if (faceKnobText (section, "S&H") && faceKnobText (label, "RATE"))
         return { FaceKnob::SampleHoldRate, 0, 0.0f, 1.0f, 0.50f, "sampleHoldRate", "S&H Rate" };
+    // Index stays off the two preset knobs. The switch gates this travel:
+    // off ignores it, on blends dry * (1 - mix) + wet * mix. Default 1 is the patch.
+    if (faceKnobText (section, "OUTPUT") && faceKnobText (label, "MIX"))
+        return { FaceKnob::OutputMix, -1, 0.0f, 1.0f, 1.0f, "outputMix", "Output Mix" };
     // Index stays off the two preset knobs. The processor maps this travel
-    // through outputLevelGain after the effect mix. 0.7 is unity, 1 is 2x.
+    // through outputLevelGain after the blend. 0.7 is unity, 1 is 2x.
     if (faceKnobText (section, "OUTPUT") && faceKnobText (label, "LEVEL"))
         return { FaceKnob::OutputLevel, -1, 0.0f, 1.0f, 0.70f, "outputLevel", "Output Level" };
 

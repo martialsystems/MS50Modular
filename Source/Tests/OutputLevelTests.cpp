@@ -199,7 +199,7 @@ int testOutputLevelScalesDry()
     check (near (outputLevelGain (1.0f), 2.0f), "full level is twice as loud");
     check (near (outputLevelGain (0.0f), 0.0f), "zero level is silence");
     check (level.index != 0 && level.index != 1, "not an output preset knob");
-    check (faceKnobBinding ("OUTPUT", "MIX").knob == FaceKnob::None, "output mix stays a picture");
+    check (faceKnobBinding ("OUTPUT", "MIX").knob == FaceKnob::OutputMix, "output mix is a separate host knob");
 
     const int face = panelKnobIndex ("OUTPUT", "LEVEL");
     check (face >= 0, "output level is on the plate");

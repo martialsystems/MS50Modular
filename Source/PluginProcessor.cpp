@@ -56,6 +56,7 @@ MS50ModularAudioProcessor::MS50ModularAudioProcessor()
     addKnobParameter (faceKnobBinding ("MIX", "LEVEL 3"));
     addKnobParameter (faceKnobBinding ("S&H", "RATE"));
     addKnobParameter (faceKnobBinding ("OUTPUT", "LEVEL"));
+    addKnobParameter (faceKnobBinding ("OUTPUT", "MIX"));
 
     extModuleIndex_ = graph.addModule (extIn);
     outputModuleIndex_ = graph.addModule (output);
@@ -144,6 +145,8 @@ void MS50ModularAudioProcessor::addKnobParameter (const FaceKnobBinding& binding
         sampleHoldRate_ = parameter;
     else if (binding.knob == FaceKnob::OutputLevel)
         outputLevel_ = parameter;
+    else if (binding.knob == FaceKnob::OutputMix)
+        outputMix_ = parameter;
 }
 
 juce::AudioParameterFloat* MS50ModularAudioProcessor::floatParameter (FaceKnob knob) const noexcept
@@ -198,6 +201,8 @@ juce::AudioParameterFloat* MS50ModularAudioProcessor::floatParameter (FaceKnob k
         return sampleHoldRate_;
     if (knob == FaceKnob::OutputLevel)
         return outputLevel_;
+    if (knob == FaceKnob::OutputMix)
+        return outputMix_;
     return nullptr;
 }
 
@@ -244,9 +249,16 @@ void MS50ModularAudioProcessor::applyHostControls()
     apply (mixerLevel2_, mixer, Mixer::kKnobLevel2);
     apply (mixerLevel3_, mixer, Mixer::kKnobLevel3);
     apply (sampleHoldRate_, sampleHold, SampleHold::kKnobRate);
-    output.setMix (outputMixForEffect (effectIsOn()));
+    const float mixKnob = outputMix_ != nullptr ? outputMix_->convertTo0to1 (outputMix_->get()) : 1.0f;
+    output.setMix (outputMixAfterSwitch (effectIsOn(), mixKnob));
     if (outputLevel_ != nullptr)
         output.setOutputLevel (outputLevel_->convertTo0to1 (outputLevel_->get()));
+}
+
+float MS50ModularAudioProcessor::effectiveOutputMix() const noexcept
+{
+    const float mixKnob = outputMix_ != nullptr ? outputMix_->convertTo0to1 (outputMix_->get()) : 1.0f;
+    return outputMixAfterSwitch (effectIsOn(), mixKnob);
 }
 
 int MS50ModularAudioProcessor::copyPublishedCables (Cable* dest, int capacity) const
@@ -286,7 +298,10 @@ void MS50ModularAudioProcessor::setOutputMix (float zeroToOne)
     jassert (onMessageThread());
     if (! onMessageThread())
         return;
-    output.setMix (zeroToOne);
+    const float clamped = zeroToOne < 0.0f ? 0.0f : (zeroToOne > 1.0f ? 1.0f : zeroToOne);
+    if (outputMix_ != nullptr)
+        outputMix_->setValueNotifyingHost (outputMix_->convertTo0to1 (clamped));
+    applyHostControls();
 }
 
 void MS50ModularAudioProcessor::setExtInButtonHeld (bool held)
@@ -454,6 +469,7 @@ void MS50ModularAudioProcessor::applyProgramParameters (int index)
     restore (mixerLevel3_, 0.80f);
     restore (sampleHoldRate_, 0.50f);
     restore (outputLevel_, 0.70f);
+    restore (outputMix_, 1.0f);
 }
 
 void MS50ModularAudioProcessor::setCurrentProgram (int index)

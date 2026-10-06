@@ -2,6 +2,7 @@
 
 #include "UI/PatchBayView.h"
 
+#include "Modular/EffectSwitch.h"
 #include "PanelAssets.h"
 
 #include <algorithm>
@@ -82,14 +83,17 @@ void paintPowerRocker (juce::Graphics& g, juce::Point<float> origin, float scale
     const float half = w * 0.5f;
     const auto raised = juce::Colour (0xff3a3a3e);
     const auto pressed = juce::Colour (0xff101012);
-    g.setColour (on ? raised : pressed);
+    // Printed OFF is left of the rocker and ON is right of it.
+    // The raised end points at the active word. Right half stays the ON click.
+    const bool raisedOnRight = on;
+    g.setColour (raisedOnRight ? pressed : raised);
     g.fillRoundedRectangle (x, y, half, h, 2.5f * scale);
-    g.setColour (on ? pressed : raised);
+    g.setColour (raisedOnRight ? raised : pressed);
     g.fillRoundedRectangle (x + half, y, half, h, 2.5f * scale);
 
     g.setColour (juce::Colour (0xff77777c));
-    const float lineLeft = on ? x + 2.0f * scale : x + half + 2.0f * scale;
-    const float lineRight = on ? x + half - 2.0f * scale : x + w - 2.0f * scale;
+    const float lineLeft = raisedOnRight ? x + half + 2.0f * scale : x + 2.0f * scale;
+    const float lineRight = raisedOnRight ? x + w - 2.0f * scale : x + half - 2.0f * scale;
     g.drawLine (lineLeft, y + 1.2f * scale, lineRight, y + 1.2f * scale, 1.0f * scale);
     g.setColour (juce::Colours::black);
     g.drawLine (x + half, y + scale, x + half, y + h - scale, 1.0f * scale);
@@ -1022,6 +1026,11 @@ void PatchBayView::choosePreset (int index)
     repaint();
 }
 
+float PatchBayView::outputMix() const noexcept
+{
+    return audioProcessor.effectiveOutputMix();
+}
+
 juce::AudioProcessorParameter* PatchBayView::parameterForKnob (int index) const
 {
     if (index < 0 || index >= kPanelKnobCount)
@@ -1643,6 +1652,7 @@ void PatchBayView::mouseDown (const juce::MouseEvent& event)
         {
             gestureParam_ = parameter;
             parameter->beginChangeGesture();
+            // Left half is printed OFF (dry). Right half is printed ON (wet).
             parameter->setValueNotifyingHost (half == 1 ? 1.0f : 0.0f);
         }
         repaint();

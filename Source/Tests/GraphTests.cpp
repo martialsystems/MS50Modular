@@ -462,6 +462,8 @@ int testLevelZeroIsSilence();
 int testLeftOnlyStaysLeft();
 int testSineDryStereoPasses();
 int testOutputLevelScalesDry();
+int testOutputMixBlendsWet();
+int testEffectOnIsWet();
 int testSineLeftOnlyStaysLeft();
 int testSineWetUnpatchedIsSilence();
 int testSineRmsInRange();
@@ -567,6 +569,8 @@ int main()
     failed += testLeftOnlyStaysLeft();
     failed += testSineDryStereoPasses();
     failed += testOutputLevelScalesDry();
+    failed += testOutputMixBlendsWet();
+    failed += testEffectOnIsWet();
     failed += testSineLeftOnlyStaysLeft();
     failed += testSineWetUnpatchedIsSilence();
     failed += testSineRmsInRange();

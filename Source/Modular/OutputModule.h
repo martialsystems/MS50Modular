@@ -8,7 +8,9 @@
 // Step 3 runs mix 0 and level 1 so a dry cable is a host-unit pass.
 // Later schematic defaults are mix 1 and level 0.8 (S-23).
 //
-// Output Level is a separate gain after that mix. It is not preset knob 1.
+// mix_ is the blend coefficient after the effect switch. Off forces 0.
+// On writes the Output Mix knob. Schematic trim and Output Level follow.
+// Output Level is not preset knob 1.
 // Travel 0 is silence, 0.7 (the host default) is unity, and 1 is twice as loud.
 // Unity sits on the default so a dry buffer at that Level matches the input.
 inline constexpr float outputLevelGain (float knob) noexcept

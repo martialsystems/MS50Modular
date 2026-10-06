@@ -71,6 +71,7 @@ add_executable(MS50ModularTests
   Source/Tests/Step3Tests.cpp
   Source/Tests/SineThroughFxTests.cpp
   Source/Tests/OutputLevelTests.cpp
+  Source/Tests/OutputMixTests.cpp
   Source/Tests/NoiseTests.cpp
   Source/Tests/PatchBayTests.cpp
   Source/Tests/VcfTests.cpp

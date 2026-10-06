@@ -266,7 +266,7 @@ def build_inc(lay):
     ]
     rocker = lay["power"]["rocker"]
     lines += [
-        "// Power rocker. Left half is off, right half is on. The view paints the cap.",
+        "// Power rocker. Left half is off, right half is on. The raised end points at that word.",
         f"inline constexpr float kPowerX = {cf(rocker[0])};",
         f"inline constexpr float kPowerY = {cf(rocker[1])};",
         f"inline constexpr float kPowerW = {cf(rocker[2])};",

@@ -88,6 +88,7 @@ public:
     PatchGraph::ConnectResult connectJacks (int sourceModule, int sourcePort, int destModule, int destPort);
     void disconnectJacks (int sourceModule, int sourcePort, int destModule, int destPort);
     void setOutputMix (float zeroToOne);
+    float effectiveOutputMix() const noexcept;
     void setExtInButtonHeld (bool held);
     bool extInButtonHeld() const noexcept;
 
@@ -161,6 +162,7 @@ private:
     juce::AudioParameterFloat* mixerLevel3_ = nullptr;
     juce::AudioParameterFloat* sampleHoldRate_ = nullptr;
     juce::AudioParameterFloat* outputLevel_ = nullptr;
+    juce::AudioParameterFloat* outputMix_ = nullptr;
     Meter meter_;
     int currentProgram_ = kDefaultFactoryPreset;
     juce::String presetError_;

@@ -36,7 +36,7 @@ public:
     bool menuOpen() const;
     bool presetMenuOpen() const noexcept { return presetMenu_; }
     const juce::String& statusText() const noexcept { return status_; }
-    float outputMix() const noexcept { return audioProcessor.effectIsOn() ? 1.0f : 0.0f; }
+    float outputMix() const noexcept;
     int knobCount() const noexcept { return kPanelKnobCount; }
     float knobValue (int index) const;
     const juce::String& knobReadout() const noexcept { return knobReadout_; }

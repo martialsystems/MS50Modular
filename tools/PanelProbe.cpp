@@ -124,6 +124,16 @@ bool near (float actual, float expected)
     return std::fabs (actual - expected) < 1.0e-3f;
 }
 
+float rockerBrightness (PatchBayView& bay, float designX, float designY)
+{
+    const auto image = paintBay (bay);
+    const auto local = bay.designToLocal (designX, designY);
+    const int x = juce::jlimit (0, image.getWidth() - 1, static_cast<int> (local.x));
+    const int y = juce::jlimit (0, image.getHeight() - 1, static_cast<int> (local.y));
+    const auto pixel = image.getPixelAt (x, y);
+    return static_cast<float> (pixel.getRed() + pixel.getGreen() + pixel.getBlue());
+}
+
 int publishedCount (MS50ModularAudioProcessor& processor)
 {
     Cable cables[kPatchBayMaxCables] {};
@@ -325,6 +335,59 @@ private:
             expect (publishedCount (*processor) == factoryCount, "output level does not change the eight cables");
         }
 
+        const int mixKnob = panelKnobIndex ("OUTPUT", "MIX");
+        auto* mixParam = processor->parameterForPanelKnob ("OUTPUT", "MIX");
+        expect (mixKnob >= 0 && mixParam != nullptr, "output mix knob is wired");
+        if (mixKnob >= 0 && mixParam != nullptr)
+        {
+            expect (mixParam->getName (64) == "Output Mix", "output mix parameter name");
+            expect (near (mixParam->getValue(), 1.0f), "output mix starts at 1");
+            expect (near (bay->knobValue (mixKnob), 1.0f), "output mix cap starts at 1");
+            expect (! processor->effectIsOn(), "mix check starts with the effect off");
+            const float levelBefore = levelParam != nullptr ? levelParam->getValue() : -1.0f;
+            const float mixX = kPanelKnobs[mixKnob].cx;
+            const float mixY = kPanelKnobs[mixKnob].cy;
+
+            dragKnobLocal (*bay, mixX, mixY, 200.0f, false);
+            expect (near (bay->knobValue (mixKnob), 0.0f), "output mix drags to 0");
+            expect (near (hostLeftAfter (*processor, 0.5f, 0.0f), 0.5f), "effect off, mix 0 stays dry");
+            dragKnobLocal (*bay, mixX, mixY, -200.0f, false);
+            expect (near (bay->knobValue (mixKnob), 1.0f), "output mix drags back to 1");
+            expect (near (hostLeftAfter (*processor, 0.5f, 0.0f), 0.5f), "effect off, mix 1 stays dry");
+
+            clickAt (*bay, kPowerX + kPowerW * 0.75f, kPowerY + kPowerH * 0.5f);
+            expect (processor->effectIsOn(), "printed ON turns the effect on");
+            dragKnobLocal (*bay, mixX, mixY, 200.0f, false);
+            expect (near (bay->knobValue (mixKnob), 0.0f), "effect on, mix drags to 0");
+            expect (near (bay->outputMix(), 0.0f), "effect on, mix 0 is dry");
+            expect (near (hostLeftAfter (*processor, 0.02f, 0.02f), 0.02f), "effect on, mix 0 passes the dry cable");
+            dragKnobLocal (*bay, mixX, mixY, -100.0f, false);
+            expect (near (bay->knobValue (mixKnob), 0.5f), "output mix lands on 0.5");
+            const float blended = hostLeftAfter (*processor, 0.02f, 0.02f);
+            expect (blended > 0.005f && blended < 0.015f, "effect on, mix 0.5 blends dry with the patch");
+            dragKnobLocal (*bay, mixX, mixY, -100.0f, false);
+            expect (near (bay->knobValue (mixKnob), 1.0f), "output mix returns to the patch");
+            expect (std::fabs (hostLeftAfter (*processor, 0.02f, 0.02f)) < 1.0e-3f, "effect on, mix 1 is the patch");
+            expect (publishedCount (*processor) == factoryCount, "output mix does not change the eight cables");
+            if (levelParam != nullptr)
+                expect (near (levelParam->getValue(), levelBefore), "output mix leaves output level");
+
+            {
+                auto source = juce::Desktop::getInstance().getMainMouseSource();
+                const juce::ModifierKeys mods (juce::ModifierKeys::leftButtonModifier);
+                const auto time = juce::Time::getCurrentTime();
+                const auto at = bay->designToLocal (mixX, mixY);
+                juce::MouseEvent click (source, at, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                        bay, bay, time, at, time, 2, false);
+                bay->mouseDoubleClick (click);
+            }
+            expect (near (bay->knobValue (mixKnob), 1.0f), "double-click resets output mix");
+            clickAt (*bay, kPowerX + kPowerW * 0.25f, kPowerY + kPowerH * 0.5f);
+            expect (! processor->effectIsOn(), "printed OFF turns the effect off");
+            expect (near (bay->outputMix(), 0.0f), "printed OFF ignores mix");
+            expect (near (hostLeftAfter (*processor, 0.5f, 0.0f), 0.5f), "printed OFF passes the dry cable");
+        }
+
         const auto there = bay->designToLocal (100.0f, 80.0f);
         const auto back = bay->localToDesign (there);
         expect (std::fabs (back.x - 100.0f) < 0.6f && std::fabs (back.y - 80.0f) < 0.6f, "design mapping at 1280x512");
@@ -481,10 +544,17 @@ private:
         const float offX = kPowerX + kPowerW * 0.25f;
         clickAt (*bay, onX, powerY);
         expect (bay->outputMix() == 1.0f, "power rocker turns on");
+        expect (processor->effectIsOn(), "right half is wet");
+        expect (rockerBrightness (*bay, onX, powerY) > rockerBrightness (*bay, offX, powerY) + 20.0f,
+                "raised end points at ON");
         clickAt (*bay, onX, powerY);
         expect (bay->outputMix() == 1.0f, "power rocker on stays on");
         clickAt (*bay, offX, powerY);
         expect (bay->outputMix() == 0.0f, "power rocker turns off");
+        expect (! processor->effectIsOn(), "left half is dry");
+        expect (rockerBrightness (*bay, offX, powerY) > rockerBrightness (*bay, onX, powerY) + 20.0f,
+                "raised end points at OFF");
+        expect (near (hostLeftAfter (*processor, 0.5f, 0.0f), 0.5f), "printed OFF stays a dry pass");
         {
             const auto offPaint = paintBay (*bay);
             const auto lcd0 = bay->designToLocal (kPresetLcdX, kPresetLcdY);
@@ -633,6 +703,8 @@ private:
         expect (publishedCount (*processor) == 2, "dry replaces the cables");
         if (auto* restoredLevel = processor->parameterForPanelKnob ("OUTPUT", "LEVEL"))
             expect (near (restoredLevel->getValue(), 0.7f), "preset restore puts output level back at 0.7");
+        if (auto* restoredMix = processor->parameterForPanelKnob ("OUTPUT", "MIX"))
+            expect (near (restoredMix->getValue(), 1.0f), "preset restore puts output mix back at 1");
 
         finish();
     }
