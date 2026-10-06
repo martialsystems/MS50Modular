@@ -1,12 +1,10 @@
-Copyright (c) 2026 Martial Systems LLC. All rights reserved.
-
-The Korg MS-50, the MS-50 name, and the circuit designs of that instrument are the property of Korg Inc. Martial Systems LLC claims copyright only in the original text of this repository and in any code later written here. The work is an independent study of published schematics and of the literature cited in the research summary. Korg has not produced, sponsored, or endorsed it. No license is granted to the MS-50 design, to the Korg drawings, or to the Korg trademarks. The instrument's name is used only to identify the subject of the study.
+Copyright (c) 2026 Martial Systems LLC. All rights reserved. RONIN is part of the Jidai Collection.
 
 # Software schematic
 
 Date: 2026-09-21.
 
-This is the signal path of the plugin. It is not a redraw of the Korg PCB and it does not copy the Korg drawing. Confirmed facts are cited by sheet id from `01-research.md`. Numbers that the sheets do not print use a stand-in id from `METHODOLOGY.md`.
+This is the signal path of the plugin. It is not a redraw of the original PCB and it does not copy the original drawings. Confirmed facts are cited by sheet id. Numbers that the sheets do not print use a stand-in id from `docs/METHODOLOGY.md`.
 
 ## System
 
@@ -80,7 +78,7 @@ An input starts at 0 V on each sample. Every cable into that input adds the sour
 
 Stack order, cable color, and cable shape do not change the sum. Reordering the plugs drawn on a jack does not publish. `Cable` stores four integers: source module, source port, destination module, destination port.
 
-A 1978 MS-50 jack took one plug. This plugin stacks.
+A jack on the 1978 hardware took one plug. This plugin stacks.
 
 The panel cable is undirected. The graph orients it from output to input. A drag may start on either jack. Dropping on empty space, or a right-click away from a jack, removes that cable. Shift-drag adds another cable on an occupied jack. Clicking an occupied jack opens the stack chooser. Escape cancels a drag that has not been published.
 
@@ -153,7 +151,7 @@ Cable 8 is fan-out (S-27). Mix defaults to 1 (fully wet). A silent input does no
 
 ## Ext In
 
-Purpose: plugin boundary. Not an MS-50 module. Provides the stereo pair, a mono sum for the mono rack, and a gate so EG 1 can run before phase 2 TRIG SW and ESP exist.
+Purpose: plugin boundary. Not a hardware module. Provides the stereo pair, a mono sum for the mono rack, and a gate so EG 1 can run before phase 2 TRIG SW and ESP exist.
 
 Knobs:
 
@@ -179,7 +177,7 @@ Failure modes: full-scale stereo summing to more than ±5 V. Do not clip the mon
 
 Test: `testExtInMonoAveragesStereo`. Left +1 V-equivalent, right -1, mono 0. `testExtInGateFiresAboveThreshold`. `testExtInButtonForcesGate`.
 
-CONFIRMED: nothing inside this block is an MS-50 circuit. STAND-IN: S-22, and the ±5 V input scaling tied to S-01.
+CONFIRMED: nothing inside this block is a hardware circuit. STAND-IN: S-22, and the ±5 V input scaling tied to S-01.
 
 ## Output
 
@@ -257,7 +255,7 @@ duty = clamp(0.05 + pwKnob * 0.90 + pwmVolts / 5 * 0.5, 0.05, 0.95)
 
 Outputs: saw, triangle, and pulse each scaled to ±5 V (S-02).
 
-Failure modes: patching a 1 V/octave keyboard into Hz/V will not play octaves. That is correct. Patching Hz/V into Oct/V will not play Korg octaves. Also correct. Do not add sync.
+Failure modes: patching a 1 V/octave keyboard into Hz/V will not play octaves. That is correct. Patching Hz/V into Oct/V will not play octaves either. Also correct. Do not add sync.
 
 Test: `testScaleDoesNotChangeOctJack` (same Oct/V voltage, two scale positions, the ratio of frequencies equals the footage ratio only through the linear term; with Hz/V unpatched, changing scale changes pitch by the footage ratio). `testOctIsOneVoltPerOctave`. `testHzPerVoltIsLinear`. `testThreeOutputsAlwaysRun`. `testPwmMovesDutyNotPitch`.
 
@@ -296,7 +294,7 @@ Step 20 additions, still not a WDF and not a claim of measured CA3019 parameters
 *   Apply `tanh` in the feedback path as the stand-in for D5 to D12.
 *   A larger `|SigIn|` may reduce the effective bias slightly so cutoff and resonance fall. The coefficient of that pull is S-10 and starts small enough that a -12 dBFS saw does not mute the filter. Do not encode 250 Hz or 200 Hz.
 
-Failure modes: Q above 8 in step 8. Hard-coded self-oscillation frequency. Using a Korg-35 or OTA formula. A highpass mode (that is the AM8319, not this sheet).
+Failure modes: Q above 8 in step 8. Hard-coded self-oscillation frequency. Using a different filter topology or an OTA formula. A highpass mode (that is the AM8319, not this sheet).
 
 Test step 8: `testVcfPassesDcOrLow` (a 30 Hz sine is louder than a 15 kHz sine at low cutoff). `testVcfPeakIncreasesResonance` (ring longer at peak 1 than peak 0, and the output stays finite). `testVcfPositiveCvRaisesCutoff`.
 
@@ -405,7 +403,7 @@ OutC: OutA - sustain*5 V, so a sustain of 0.5 sits at 0 V and the peak is +5 V o
 
 OutC's centering is S-14 and is the first EG1 voltage to replace if a manual turns up. OutA and OutB's 5 V span is also S-14, chosen to match the EG2 cartoons.
 
-Failure modes: one output. MS-20 EG1 timing (delay then attack then release) on this module. A sustain that is a time rather than a level.
+Failure modes: one output. EG timing from a related synth (delay then attack then release) on this module. A sustain that is a time rather than a level.
 
 Test: `testEg1SustainLevel`. `testEg1OutBIsNegation`. `testEg1ReleasesWhenTriggerLifts`. `testEg1HasDecay`. `testEg1ThreeJacks`. `testEg1UnpatchedTrigIsIdle` (no cable, Trig forced to +5 V, envelope stays at 0).
 

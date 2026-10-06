@@ -13,11 +13,15 @@ if [[ ! -x "$CMAKE" ]]; then
 fi
 
 BUILD="$ROOT/build/fl-release"
-BUNDLE="$BUILD/MS50Modular_artefacts/Release/VST3/MS-50 Modular.vst3"
-BINARY="$BUNDLE/Contents/MacOS/MS-50 Modular"
+NAME="RONIN"
+OLD_NAME="MS-50 Modular"   # the product name before RONIN; its link and scan records are cleared below
+BUNDLE="$BUILD/MS50Modular_artefacts/Release/VST3/$NAME.vst3"
+BINARY="$BUNDLE/Contents/MacOS/$NAME"
 USER_DIR="${HOME}/Library/Audio/Plug-Ins/VST3"
-USER_LINK="$USER_DIR/MS-50 Modular.vst3"
-SYSTEM_COPY="/Library/Audio/Plug-Ins/VST3/MS-50 Modular.vst3"
+USER_LINK="$USER_DIR/$NAME.vst3"
+OLD_LINK="$USER_DIR/$OLD_NAME.vst3"
+SYSTEM_COPY="/Library/Audio/Plug-Ins/VST3/$NAME.vst3"
+OLD_SYSTEM_COPY="/Library/Audio/Plug-Ins/VST3/$OLD_NAME.vst3"
 DB="${HOME}/Documents/Image-Line/FL Studio/Presets/Plugin database/Installed"
 SDK="$ROOT/build/_deps/juce-src/modules/juce_audio_processors/format_types/VST3_SDK"
 
@@ -28,8 +32,15 @@ if pgrep -x pluginmanager >/dev/null 2>&1 || pgrep -x PluginManager >/dev/null 2
   exit 1
 fi
 
-if [[ -e "$SYSTEM_COPY" || -L "$SYSTEM_COPY" ]]; then
-  echo "Remove ${SYSTEM_COPY} first. FL Studio lists that copy separately from the user folder." >&2
+for copy in "$SYSTEM_COPY" "$OLD_SYSTEM_COPY"; do
+  if [[ -e "$copy" || -L "$copy" ]]; then
+    echo "Remove ${copy} first. FL Studio lists that copy separately from the user folder." >&2
+    exit 1
+  fi
+done
+
+if [[ -e "$OLD_LINK" && ! -L "$OLD_LINK" ]]; then
+  echo "Refusing to remove a real bundle at ${OLD_LINK}. Move it out of the VST3 folder, then run this again." >&2
   exit 1
 fi
 
@@ -79,7 +90,7 @@ if ! grep -q '"Fx"' "$moduleinfo"; then
   exit 1
 fi
 
-work="$(mktemp -d "${TMPDIR:-/tmp}/ms50-fl-check.XXXXXX")"
+work="$(mktemp -d "${TMPDIR:-/tmp}/ronin-fl-check.XXXXXX")"
 cleanup() { rm -rf "$work"; }
 trap cleanup EXIT
 
@@ -108,6 +119,11 @@ else
 fi
 
 mkdir -p "$USER_DIR"
+# The same plugin under its old name would show up twice in FL Studio.
+if [[ -L "$OLD_LINK" ]]; then
+  rm -f "$OLD_LINK"
+  echo "removed old symlink ${OLD_LINK}"
+fi
 ln -sfn "$BUNDLE" "$USER_LINK"
 if [[ "$(readlink "$USER_LINK")" != "$BUNDLE" ]]; then
   echo "Symlink ${USER_LINK} does not point at the Release bundle." >&2
@@ -128,7 +144,7 @@ remove_record() {
 
 # scanflags 1, a plugin type, a guid, and this symlink. A newer binary makes it stale.
 effects_record_is_current() {
-  local nfo="$DB/Effects/VST3/MS-50 Modular.nfo"
+  local nfo="$DB/Effects/VST3/$NAME.nfo"
   [[ -f "$nfo" ]] || return 1
   grep -E -q '^ps_file_scanflags_0=1$' "$nfo" || return 1
   grep -E -q '^ps_file_type_0=' "$nfo" || return 1
@@ -141,8 +157,12 @@ effects_record_is_current() {
 }
 
 for ext in nfo fst; do
-  remove_record "$DB/Generators/VST3/MS-50 Modular.$ext"
-  remove_record "$DB/Generators/New/MS-50 Modular.$ext"
+  for name in "$NAME" "$OLD_NAME"; do
+    remove_record "$DB/Generators/VST3/$name.$ext"
+    remove_record "$DB/Generators/New/$name.$ext"
+  done
+  remove_record "$DB/Effects/VST3/$OLD_NAME.$ext"
+  remove_record "$DB/Effects/New/$OLD_NAME.$ext"
 done
 
 if effects_record_is_current; then
@@ -154,8 +174,8 @@ Do not copy the bundle into /Library/Audio/Plug-Ins/VST3.
 EOF
 else
   for ext in nfo fst; do
-    remove_record "$DB/Effects/VST3/MS-50 Modular.$ext"
-    remove_record "$DB/Effects/New/MS-50 Modular.$ext"
+    remove_record "$DB/Effects/VST3/$NAME.$ext"
+    remove_record "$DB/Effects/New/$NAME.$ext"
   done
   cat <<EOF
 FL_INSTALL_OK

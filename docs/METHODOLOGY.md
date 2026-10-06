@@ -1,6 +1,4 @@
-Copyright (c) 2026 Martial Systems LLC. All rights reserved.
-
-The Korg MS-50, the MS-50 name, and the circuit designs of that instrument are the property of Korg Inc. Martial Systems LLC claims copyright only in the original text of this repository and in any code later written here. The work is an independent study of published schematics and of the literature cited in the research summary. Korg has not produced, sponsored, or endorsed it. No license is granted to the MS-50 design, to the Korg drawings, or to the Korg trademarks. The instrument's name is used only to identify the subject of the study.
+Copyright (c) 2026 Martial Systems LLC. All rights reserved. RONIN is part of the Jidai Collection.
 
 # Methodology
 
@@ -12,7 +10,7 @@ The plugin is a white-box modular instrument. Each module has a stated signal pa
 
 The hardware was not available for measurement. What exists is a schematic set, one peer-reviewed analysis of the filter (Rest, Parker, Werner, DAFx 2017), and a handful of public recordings. That evidence describes topology, a few labeled voltages, and one filter circuit. It does not describe a corpus of paired input and output audio.
 
-A neural model would fit those recordings, including the room, the other synths in the video, and the effects some of them print. It would also be free to invent a Korg-35 filter, one pitch law, and two ADSRs, which are the usual mistakes listed in the research. A modular FX plugin with animated cables needs separate modules anyway. The structure has to exist as objects, not as a single black box.
+A neural model would fit those recordings, including the room, the other synths in the video, and the effects some of them print. It would also be free to invent the wrong filter, one pitch law, and two ADSRs, which are the usual mistakes listed in the research. A modular FX plugin with animated cables needs separate modules anyway. The structure has to exist as objects, not as a single black box.
 
 White-box here means: the phase 1 VCO is a digital oscillator with the confirmed control topology, not a SPICE netlist of the 2SC1583. The phase 1 filter starts as a 2-pole lowpass (step 8) and moves toward the diode bridge (step 20). Both stages are written down. Neither stage claims to be a transistor-level copy.
 
@@ -22,13 +20,13 @@ When two sources disagree, the higher one wins.
 
 | Rank | Source | Use |
 |---|---|---|
-| 1 | Korg drawings, 78-11-8 and 78-11-9, KOD-A40038 through A40049 | Jack names, knob names, topology, parts that are printed (CA3019, RC4200, 4013, 555, 7815/7915, +18 V on the VCO, MG voltage cartoons, EG2 voltage cartoons, footage switch) |
+| 1 | The original service drawings, 78-11-8 and 78-11-9, KOD-A40038 through A40049 | Jack names, knob names, topology, parts that are printed (CA3019, RC4200, 4013, 555, 7815/7915, +18 V on the VCO, MG voltage cartoons, EG2 voltage cartoons, footage switch) |
 | 2 | Rest, Parker, Werner, DAFx-17 paper 88 | Filter small-signal structure, which parts of their model were simplified, the warning that 1N4148 parameters are substitutes |
 | 3 | Public recordings and Alex Ball's panel survey | Listening checks and the VCA 1 / VCA 2 panel mapping |
-| 4 | Inference in `docs/01-research.md` | Trigger polarity, MG modulation law, EG2 time order. Usable only where the research marks INFERRED |
+| 4 | Inference in the research summary (in git history) | Trigger polarity, MG modulation law, EG2 time order. Usable only where the research marks INFERRED |
 | 5 | Stand-ins in this file | Plugin numbers that the drawings do not print |
 
-MS-20 owner's manual voltages are rank 4 at best and only as a warning. They are not copied onto the MS-50.
+Owner's manual voltages from related synths are rank 4 at best and only as a warning. They are not copied onto this rack.
 
 Panel mapping that is inferred, not printed: the sheet says `VCA` for the CA3019 audio VCA with `LO CUT` and `INTENSITY`, and `MVCA` for the optocoupler. This packet calls them VCA 1 and VCA 2 because that is the only published panel description that matches those knobs (Alex Ball). Code comments must say "schematic name VCA" and "schematic name MVCA".
 
@@ -39,7 +37,7 @@ The target is a patched modular FX that a reader of the drawings would recognize
 *   Confirmed topology is present: two VCO pitch jacks, scale switch on Hz/V only, simultaneous VCO waves, diode-bridge filter goal, two different VCAs, MG ranges and voltage cartoons, EG1 ADSR with three outs, EG2 without decay or sustain, divider by 2 and by 4 only, inverter gain -1, integrator as lag, ring mod as a four-quadrant multiply.
 *   Confirmed labels that have numbers are reproduced on the internal volt scale below.
 *   Unknowns are stand-ins, each with an id, a single constant, and a replacement test.
-*   Listening against public video is qualitative. There will be no null against a Gladén recording. Those files include an MS-20, a room, and unknown knob positions.
+*   Listening against public video is qualitative. There will be no null against a Gladén recording. Those files include other synths, a room, and unknown knob positions.
 
 Out of target for steps 0 to 20: transistor VCO, measured Hz/V tracking error, CA3019 Shockley parameters from a datasheet (the paper says the datasheet does not give them), optocoupler lag in milliseconds, EG time in seconds per knob degree, noise spectrum in dB, buffered versus passive multiples.
 
@@ -73,7 +71,7 @@ Rules:
 
 *   One id, one constant. Modules call the constant. They do not restate the number.
 *   A CONFIRMED quantity does not get a stand-in id. MG frequency endpoints 0.01 Hz and 200 Hz are confirmed. The pot taper between them is S-16.
-*   PAPER-SUBSTITUTE is a stand-in that came from the DAFx paper's 1N4148 fit (S-10). It is not a Korg number.
+*   PAPER-SUBSTITUTE is a stand-in that came from the DAFx paper's 1N4148 fit (S-10). It is not a number from the drawings.
 *   Do not "improve" a stand-in by ear during a step whose acceptance test is functional. Ear changes get a new id and a note of what was listened to.
 
 ### Stand-in register
@@ -106,7 +104,7 @@ Rules:
 | S-24 | Feedback edge | In a cycle, the newest cable is the back-edge and delays one sample | A different deterministic rule, if documented in the same change as the tests |
 | S-25 | Control rate | Knobs and CV are read every audio sample. There is no slower CV block | A profiled need for a coarser rate. Do not add one for style |
 | S-26 | EG2 timeline | See SCHEMATICS, EG2. No sustain plateau | An owner's sentence or a scope shot of hold versus delay |
-| S-27 | Output fan-out | One output may feed many inputs. An input sums every cable that lands on it. Stack order, cable color, and cable shape do not change that sum. A 1978 MS-50 jack took one plug. This plugin stacks | If a later pass removes fan-out, the multiples module (phase 2) becomes required first |
+| S-27 | Output fan-out | One output may feed many inputs. An input sums every cable that lands on it. Stack order, cable color, and cable shape do not change that sum. A jack on the 1978 hardware took one plug. This plugin stacks | If a later pass removes fan-out, the multiples module (phase 2) becomes required first |
 
 Footage frequencies used with S-03 and S-04, equal-tempered C, A440. These pitches are a stand-in for what "32'" meant at the jack with no cable inserted. The switch positions 32', 16', 8', 4' are confirmed. The hertz numbers are not.
 
@@ -127,7 +125,7 @@ Stack order is the order of the plugs drawn on that jack. Changing it moves the 
 
 Cable color is one of red, white, yellow, or green. Cable shape is the rope drawn on the message thread. Neither is a field on `Cable`. `Cable` stays four integers: source module, source port, destination module, destination port.
 
-A 1978 MS-50 jack took one plug. This plugin stacks, on the panel and in the graph.
+A jack on the 1978 hardware took one plug. This plugin stacks, on the panel and in the graph.
 
 Gestures on the panel:
 
@@ -153,17 +151,17 @@ EXT IN is the column immediately left of OUTPUT. VCO is the left column. Tick ma
 
 ## How to A/B against public recordings
 
-Do this after step 8 (filter stand-in) and again after step 20 (diode-bridge pass). Do not treat adjectives as data. One listener called the MS-50 harsher than his MS-20. Another called it softer.
+Do this after step 8 (filter stand-in) and again after step 20 (diode-bridge pass). Do not treat adjectives as data. One listener called the original harsher than a related synth. Another called it softer.
 
 Procedure:
 
 1. Play the reference video from the start time in `docs/TESTPLAN.md`. Note only what the uploader claimed about the patch (saw, peak down, peak up, filter alone, Hz/V, S-trig, effects on or off).
 2. Set the plugin to the same claim. Unknown knobs stay at the packet defaults. Write the knob values into the test note.
 3. Listen for the structural checks in the test plan: peak changes the tone, full peak can ring, a hot input in step 20 moves more than the level, Hz/V and OCT/V do not track the same keyboard, EG2 has no sustain flat-top, MG pulse is unipolar.
-4. Record the plugin dry from the host, no extra plug-ins. Store that recording outside the repo (see `docs/REPO_SETUP.md`).
+4. Record the plugin dry from the host, no extra plug-ins. Store that recording outside the repo.
 5. Write three lines: what matched, what did not, which stand-in id would have to move. Do not retune S-numbers in the same session as the listening. A second change, with the id edited and the test note linked, is the retune.
 
-Files that are not dry enough for timbre: Dr. Kunz (Small Stone, SDD-3000, dbx) and the Perfect Circuit jam (MS-20 in the same mix). They are patch ideas only.
+Files that are not dry enough for timbre: Dr. Kunz (Small Stone, SDD-3000, dbx) and the Perfect Circuit jam (another synth in the same mix). They are patch ideas only.
 
 ## Definition of done for a module
 
