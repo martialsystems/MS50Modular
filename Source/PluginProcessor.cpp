@@ -444,17 +444,18 @@ void MS50ModularAudioProcessor::applyProgramParameters (int index)
     if (effectOn_ != nullptr)
         effectOn_->setValueNotifyingHost (factoryPresetEffect (index) ? 1.0f : 0.0f);
 
-    restore (vcfCutoff_, 0.50f);
-    restore (vcfPeak_, 0.30f);
+    const FactoryProgramKnobs knobs = factoryProgramKnobs (index);
+    restore (vcfCutoff_, knobs.vcfCutoff);
+    restore (vcfPeak_, knobs.vcfPeak);
     restore (vcfAmount_, 0.68f);
     restore (vca1LowCut_, 0.68f);
-    restore (eg1Attack_, 0.50f);
-    restore (eg1Decay_, 0.30f);
-    restore (eg1Sustain_, 0.68f);
-    restore (eg1Release_, 0.42f);
+    restore (eg1Attack_, knobs.eg1Attack);
+    restore (eg1Decay_, knobs.eg1Decay);
+    restore (eg1Sustain_, knobs.eg1Sustain);
+    restore (eg1Release_, knobs.eg1Release);
     restore (mgRate_, 0.50f);
     restore (mgPw_, 0.30f);
-    restore (vcoRange_, 0.50f);
+    restore (vcoRange_, knobs.vcoRange);
     restore (vcoFine_, 0.30f);
     restore (vcoPw_, 0.68f);
     restore (vcoFm1_, 0.42f);

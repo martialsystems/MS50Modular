@@ -545,6 +545,7 @@ int testMeterFollowsSelectedJack();
 int testFactoryPresetCount();
 int testPresetNoiseToMixerRoundTrip();
 int testPresetBadVersionStillRejected();
+int testHoldPreset();
 int testPresetRoundTrip();
 int testPresetRejectsBadVersion();
 int testFeedbackIsOneSample();
@@ -652,6 +653,7 @@ int main()
     failed += testFactoryPresetCount();
     failed += testPresetNoiseToMixerRoundTrip();
     failed += testPresetBadVersionStillRejected();
+    failed += testHoldPreset();
     failed += testPresetRoundTrip();
     failed += testPresetRejectsBadVersion();
     failed += testFeedbackIsOneSample();

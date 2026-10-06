@@ -161,8 +161,9 @@ const int* lcdRows (juce::juce_wchar ch)
 
 juce::String presetScreenLine (int index, const juce::String& hostName)
 {
-    static const char* kShort[] = { "DRY", "NOISE MIXER", "VOICE", "RING", "S&H", "FEEDBACK" };
-    const juce::String name = (index >= 0 && index < 6) ? juce::String (kShort[index]) : hostName.toUpperCase();
+    static const char* kShort[] = { "DRY", "NOISE MIXER", "VOICE", "RING", "S&H", "FEEDBACK", "HOLD" };
+    const int shorts = static_cast<int> (sizeof (kShort) / sizeof (kShort[0]));
+    const juce::String name = (index >= 0 && index < shorts) ? juce::String (kShort[index]) : hostName.toUpperCase();
     return (juce::String (index + 1).paddedLeft ('0', 2) + " " + name).substring (0, kPresetChars);
 }
 

@@ -165,11 +165,11 @@ double vcaOutRms (Rack& rack, int samples)
 
 int testFactoryPresetCount()
 {
-    check (kFactoryPresetCount == 6, "six factory presets");
+    check (kFactoryPresetCount == 7, "seven factory presets");
     check (kDefaultFactoryPreset == 2, "default program is Voice");
-    const char* names[] = { "Dry", "Noise to mixer", "Voice", "Ring", "S&H", "Feedback" };
-    const bool effect[] = { false, true, true, true, true, true };
-    const int counts[] = { 2, 2, 8, 3, 4, 4 };
+    const char* names[] = { "Dry", "Noise to mixer", "Voice", "Ring", "S&H", "Feedback", "Hold" };
+    const bool effect[] = { false, true, true, true, true, true, true };
+    const int counts[] = { 2, 2, 8, 3, 4, 4, 6 };
     for (int i = 0; i < kFactoryPresetCount; ++i)
     {
         check (std::strcmp (factoryPresetName (i), names[i]) == 0, "preset name");
@@ -218,7 +218,9 @@ int testFactoryPresetCount()
     const std::string programs = functionBody (processor, "int MS50ModularAudioProcessor::getNumPrograms()");
     const std::string ctor = functionBody (processor, "MS50ModularAudioProcessor::MS50ModularAudioProcessor()");
     const std::string choose = functionBody (processor, "void MS50ModularAudioProcessor::setCurrentProgram");
-    check (programs.find ("kFactoryPresetCount") != std::string::npos, "the host list reports six programs");
+    check (programs.find ("kFactoryPresetCount") != std::string::npos, "the host list reports the factory count");
+    const std::string programKnobs = functionBody (processor, "void MS50ModularAudioProcessor::applyProgramParameters");
+    check (programKnobs.find ("factoryProgramKnobs") != std::string::npos, "a program restores its own host knobs");
     check (ctor.find ("connectFactoryCables") != std::string::npos, "the opening patch is the factory cables");
     check (ctor.find ("loadFactoryPreset") == std::string::npos, "construction does not swap in another preset");
     check (choose.find ("loadFactoryPreset") != std::string::npos, "choosing a program loads that preset");
@@ -306,4 +308,157 @@ int testPresetBadVersionStillRejected()
     check (std::fabs (rack.mixer.presetKnob (Mixer::kKnobLevel1) - level) < 1.0e-6f, "rejected load keeps the level");
     check (cablesMatch (rack.graph, kPresetNoiseToMixer, 2), "the noise-to-mixer cables stay");
     return finish ("testPresetBadVersionStillRejected");
+}
+
+double takeRms (Rack& rack, int samples, bool host)
+{
+    double sum = 0.0;
+    for (int i = 0; i < samples; ++i)
+    {
+        rack.graph.process();
+        const double y = host ? static_cast<double> (rack.output.hostLeft())
+                              : static_cast<double> (rack.vca1.portValue[Vca1::kOut]);
+        sum += y * y;
+    }
+    if (samples <= 0)
+        return 0.0;
+    return std::sqrt (sum / static_cast<double> (samples));
+}
+
+void skipSamples (Rack& rack, int samples)
+{
+    for (int i = 0; i < samples; ++i)
+        rack.graph.process();
+}
+
+bool holdHasExtAudio (const PatchGraph& graph)
+{
+    Cable live[PatchGraph::kMaxCables] {};
+    const int count = graph.copyPublishedCables (live, PatchGraph::kMaxCables);
+    for (int i = 0; i < count; ++i)
+    {
+        if (live[i].sourceModule == FactoryModule::Ext && live[i].sourcePort >= 0 && live[i].sourcePort <= 2)
+            return true;
+    }
+    return false;
+}
+
+int testHoldPreset()
+{
+    const FactoryProgramKnobs voice = factoryProgramKnobs (kDefaultFactoryPreset);
+    const FactoryProgramKnobs feedback = factoryProgramKnobs (kFeedbackPreset);
+    const FactoryProgramKnobs hold = factoryProgramKnobs (kHoldPreset);
+    check (voice.eg1Attack == 0.50f && voice.eg1Decay == 0.30f && voice.eg1Sustain == 0.68f
+               && voice.eg1Release == 0.42f && voice.vcfCutoff == 0.50f && voice.vcfPeak == 0.30f
+               && voice.vcoRange == 0.50f,
+           "Voice keeps the shared knob row");
+    check (feedback.eg1Attack == voice.eg1Attack && feedback.eg1Sustain == voice.eg1Sustain
+               && feedback.vcfCutoff == voice.vcfCutoff && feedback.vcoRange == voice.vcoRange,
+           "Feedback keeps the shared knob row");
+    check (std::fabs (hold.eg1Attack - kHoldEg1Attack) < 1.0e-6f, "Hold attack is 0.10");
+    check (std::fabs (hold.eg1Decay - kHoldEg1Decay) < 1.0e-6f, "Hold decay is 0.30");
+    check (std::fabs (hold.eg1Sustain - kHoldEg1Sustain) < 1.0e-6f, "Hold sustain is 0.70");
+    check (std::fabs (hold.eg1Release - kHoldEg1Release) < 1.0e-6f, "Hold release is 0.40");
+    check (std::fabs (hold.vcfCutoff - kHoldVcfCutoff) < 1.0e-6f, "Hold cutoff is 0.45");
+    check (std::fabs (hold.vcfPeak - kHoldVcfPeak) < 1.0e-6f, "Hold peak is 0.20");
+    check (std::fabs (hold.vcoRange - kHoldVcoRange) < 1.0e-6f, "Hold range is the 8' footage");
+
+    Rack rack;
+    rack.addAll();
+    check (rack.graph.connect (0, 0, 1, 0), "a cable that Hold must replace");
+    check (loadFactoryPreset (rack.graph, kHoldPreset), "Hold loads");
+    check (rack.graph.cableCount() == 6, "Hold replaces the old cable");
+    check (cablesMatch (rack.graph, kPresetHold, 6), "Hold cables");
+    check (rack.graph.delayedCableCount() == 0, "Hold has no delayed cable");
+    check (! holdHasExtAudio (rack.graph), "Hold has no Ext In audio cable");
+    check (factoryPresetEffect (kHoldPreset), "Hold is effect on");
+    check (std::fabs (rack.vca1.initial()) < 1.0e-6f, "Hold leaves VCA 1 Initial at 0");
+    check (std::fabs (rack.eg1.presetKnob (Eg1::kKnobAttack) - kHoldEg1Attack) < 1.0e-6f, "Hold writes EG 1 Attack");
+    check (std::fabs (rack.eg1.presetKnob (Eg1::kKnobDecay) - kHoldEg1Decay) < 1.0e-6f, "Hold writes EG 1 Decay");
+    check (std::fabs (rack.eg1.presetKnob (Eg1::kKnobSustain) - kHoldEg1Sustain) < 1.0e-6f, "Hold writes EG 1 Sustain");
+    check (std::fabs (rack.eg1.presetKnob (Eg1::kKnobRelease) - kHoldEg1Release) < 1.0e-6f, "Hold writes EG 1 Release");
+    check (std::fabs (rack.vcf.presetKnob (Vcf::kKnobCutoff) - kHoldVcfCutoff) < 1.0e-6f, "Hold writes VCF Cutoff");
+    check (std::fabs (rack.vcf.presetKnob (Vcf::kKnobPeak) - kHoldVcfPeak) < 1.0e-6f, "Hold writes VCF Peak");
+    check (std::fabs (rack.vco.presetKnob (Vco::kKnobScale) - kHoldVcoRange) < 1.0e-6f, "Hold writes VCO Range");
+    check (rack.vco.presetScaleIndex() == 2, "Hold range is 8', a mid note");
+
+    rack.output.setMix (1.0f);
+    rack.output.setLevel (1.0f);
+    rack.output.setOutputLevel (0.70f);
+    rack.graph.prepare (48000.0);
+    rack.ext.setButtonHeld (false);
+
+    double silentSum = 0.0;
+    double silentHost = 0.0;
+    int rises = 0;
+    float previous = 0.0f;
+    constexpr int kListen = 24000;
+    for (int i = 0; i < kListen; ++i)
+    {
+        rack.graph.process();
+        const double vca = static_cast<double> (rack.vca1.portValue[Vca1::kOut]);
+        const double host = static_cast<double> (rack.output.hostLeft());
+        silentSum += vca * vca;
+        silentHost += host * host;
+        const float saw = rack.vco.portValue[Vco::kSaw];
+        if (previous <= 0.0f && saw > 0.0f)
+            ++rises;
+        previous = saw;
+    }
+    const double silentRms = std::sqrt (silentSum / static_cast<double> (kListen));
+    const double silentHostRms = std::sqrt (silentHost / static_cast<double> (kListen));
+    const double sawHz = static_cast<double> (rises) * (48000.0 / static_cast<double> (kListen));
+    check (silentRms < 1.0e-5, "button up is silence at VCA 1");
+    check (silentHostRms < 1.0e-6, "button up is silence at the output");
+    check (std::fabs (rack.vcf.portValue[Vcf::kCutoff]) < 1.0e-3f, "button up leaves the filter cutoff closed");
+    check (sawHz > 110.0 && sawHz < 160.0, "the saw is a mid note near 130 Hz");
+
+    rack.ext.setButtonHeld (true);
+    const double early = takeRms (rack, 48, false);
+    skipSamples (rack, 8000);
+    const double open = takeRms (rack, 2400, false);
+    const double openHost = takeRms (rack, 2400, true);
+    const float openCutoff = rack.vcf.portValue[Vcf::kCutoff];
+    check (open > 0.05, "button down makes the saw audible");
+    check (early < open, "button down fades the saw in");
+    check (openHost > 0.005, "button down reaches Output Wet");
+    check (openCutoff > 3.0f, "button down opens the filter");
+
+    rack.ext.setButtonHeld (false);
+    const double releasing = takeRms (rack, 4800, false);
+    skipSamples (rack, 24000);
+    const double released = takeRms (rack, 2400, false);
+    check (releasing < open, "button up starts the release");
+    check (released < 1.0e-4, "button up returns to silence");
+    check (std::fabs (rack.vcf.portValue[Vcf::kCutoff]) < 0.05f, "button up closes the filter");
+
+    unsigned char blob[4096];
+    const int bytes = rack.graph.getState (blob, static_cast<int> (sizeof blob));
+    check (bytes > 16 && blob[4] == 1, "Hold saves as version 1");
+    Rack again;
+    again.addAll();
+    check (again.graph.connect (0, 0, 1, 0), "round trip starts from another cable");
+    check (again.graph.setState (blob, bytes), "Hold round trip");
+    check (cablesMatch (again.graph, kPresetHold, 6), "the round trip kept the Hold cables");
+    check (std::fabs (again.eg1.presetKnob (Eg1::kKnobAttack) - kHoldEg1Attack) < 1.0e-6f, "the round trip kept Hold attack");
+
+    check (loadFactoryPreset (rack.graph, kDefaultFactoryPreset), "Voice loads after Hold");
+    check (cablesMatch (rack.graph, kPresetVoice, 8), "Voice cables stay the eight");
+    check (std::fabs (rack.vca1.initial()) < 1.0e-6f, "Voice still clears VCA 1 Initial");
+    check (loadFactoryPreset (rack.graph, kFeedbackPreset), "Feedback loads after Hold");
+    check (cablesMatch (rack.graph, kPresetFeedback, 4), "Feedback cables stay");
+    check (std::fabs (rack.vca1.initial() - kFeedbackVca1Initial) < 1.0e-6f, "Feedback still opens VCA 1 Initial to 0.7");
+    check (rack.graph.delayedCableCount() == 1, "Feedback still delays one cable");
+    check (loadFactoryPreset (rack.graph, kHoldPreset), "Hold loads after Feedback");
+    check (std::fabs (rack.vca1.initial()) < 1.0e-6f, "Hold clears the Feedback initial");
+
+    std::string view = MS50_PROCESSOR_SOURCE;
+    const auto source = view.rfind ("/Source/");
+    check (source != std::string::npos, "panel path");
+    if (source != std::string::npos)
+    {
+        view.replace (source, std::string::npos, "/Source/UI/PatchBayView.cpp");
+        check (readFile (view.c_str()).find ("\"FEEDBACK\", \"HOLD\"") != std::string::npos, "the preset screen has HOLD");
+    }
+    return finish ("testHoldPreset");
 }
