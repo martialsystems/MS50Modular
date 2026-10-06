@@ -12,7 +12,8 @@ public:
     static constexpr int kOut = 2;
     static constexpr int kKnobLowCut = 0;
     static constexpr int kKnobIntensity = 1;
-    // Not stored in the graph blob. Feedback sets it. Every other factory preset clears it.
+    // Not stored in the graph blob. Feedback and the self-mod presets set 0.7.
+    // Voice, Hold, and the other factory presets clear it.
     static constexpr int kKnobInitial = 2;
 
     int numPorts() const override;
@@ -31,7 +32,7 @@ private:
     float lowCutHz() const;
 
     // Knob 0 is 10 Hz. Intensity is the schematic 0.85 until a test moves it.
-    // Initial stays 0 so an unpatched Env is silence, except the Feedback preset.
+    // Initial stays 0 so an unpatched Env is silence, except presets that set 0.7.
     float lowCut01_ = 0.0f;
     float intensity_ = 0.85f;
     float initial01_ = 0.0f;

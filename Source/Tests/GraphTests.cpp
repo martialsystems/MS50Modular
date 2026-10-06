@@ -546,6 +546,7 @@ int testFactoryPresetCount();
 int testPresetNoiseToMixerRoundTrip();
 int testPresetBadVersionStillRejected();
 int testHoldPreset();
+int testSelfModPresets();
 int testPresetRoundTrip();
 int testPresetRejectsBadVersion();
 int testFeedbackIsOneSample();
@@ -654,6 +655,7 @@ int main()
     failed += testPresetNoiseToMixerRoundTrip();
     failed += testPresetBadVersionStillRejected();
     failed += testHoldPreset();
+    failed += testSelfModPresets();
     failed += testPresetRoundTrip();
     failed += testPresetRejectsBadVersion();
     failed += testFeedbackIsOneSample();

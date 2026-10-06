@@ -165,11 +165,17 @@ double vcaOutRms (Rack& rack, int samples)
 
 int testFactoryPresetCount()
 {
-    check (kFactoryPresetCount == 7, "seven factory presets");
+    check (kFactoryPresetCount == 13, "thirteen factory presets");
     check (kDefaultFactoryPreset == 2, "default program is Voice");
-    const char* names[] = { "Dry", "Noise to mixer", "Voice", "Ring", "S&H", "Feedback", "Hold" };
-    const bool effect[] = { false, true, true, true, true, true, true };
-    const int counts[] = { 2, 2, 8, 3, 4, 4, 6 };
+    const char* names[] = {
+        "Dry", "Noise to mixer", "Voice", "Ring", "S&H", "Feedback", "Hold",
+        "Filter loop", "MG into filter", "Stepped cutoff", "Ring drone", "Delayed bounce", "Self ring"
+    };
+    const bool effect[] = {
+        false, true, true, true, true, true, true,
+        true, true, true, true, true, true
+    };
+    const int counts[] = { 2, 2, 8, 3, 4, 4, 6, 4, 4, 5, 5, 5, 5 };
     for (int i = 0; i < kFactoryPresetCount; ++i)
     {
         check (std::strcmp (factoryPresetName (i), names[i]) == 0, "preset name");
@@ -461,4 +467,404 @@ int testHoldPreset()
         check (readFile (view.c_str()).find ("\"FEEDBACK\", \"HOLD\"") != std::string::npos, "the preset screen has HOLD");
     }
     return finish ("testHoldPreset");
+}
+
+void checkNear (float value, float want, const char* message)
+{
+    if (std::fabs (value - want) > 1.0e-6f)
+    {
+        std::printf ("  FAIL %s (got %.6g, want %.6g)\n", message, static_cast<double> (value), static_cast<double> (want));
+        ++gChecks;
+    }
+}
+
+void applyHostRow (Rack& rack, int index)
+{
+    const FactoryProgramKnobs knobs = factoryProgramKnobs (index);
+    rack.vcf.setKnob (Vcf::kKnobCutoff, knobs.vcfCutoff);
+    rack.vcf.setKnob (Vcf::kKnobPeak, knobs.vcfPeak);
+    rack.vcf.setKnob (Vcf::kKnobAmount, 0.68f);
+    rack.vca1.setKnob (Vca1::kKnobLowCut, 0.68f);
+    rack.vca1.setKnob (Vca1::kKnobIntensity, 0.85f);
+    rack.eg1.setKnob (Eg1::kKnobAttack, knobs.eg1Attack);
+    rack.eg1.setKnob (Eg1::kKnobDecay, knobs.eg1Decay);
+    rack.eg1.setKnob (Eg1::kKnobSustain, knobs.eg1Sustain);
+    rack.eg1.setKnob (Eg1::kKnobRelease, knobs.eg1Release);
+    rack.mg.setKnob (MgModule::kKnobFrequency, factoryMgRate (index));
+    rack.mg.setKnob (MgModule::kKnobPw, 0.30f);
+    rack.vco.setKnob (Vco::kKnobScale, knobs.vcoRange);
+    rack.vco.setKnob (Vco::kKnobFine, 0.30f);
+    rack.vco.setKnob (Vco::kKnobPw, 0.68f);
+    rack.vco.setKnob (Vco::kKnobAmountA, 0.42f);
+    rack.vco.setKnob (Vco::kKnobAmountB, 0.78f);
+    rack.integrator.setKnob (Integrator::kKnobTime, factoryIntegratorTime (index));
+    rack.sampleHold.setKnob (SampleHold::kKnobRate, factorySampleHoldRate (index));
+}
+
+void armWet (Rack& rack)
+{
+    rack.ext.setButtonHeld (false);
+    rack.output.setMix (1.0f);
+    rack.output.setLevel (1.0f);
+    rack.output.setOutputLevel (0.70f);
+    rack.graph.prepare (48000.0);
+}
+
+int onlyDelayedIndex (const PatchGraph& graph)
+{
+    const int count = graph.cableCount();
+    int found = -1;
+    for (int i = 0; i < count; ++i)
+    {
+        if (! graph.cableIsDelayed (i))
+            continue;
+        if (found >= 0)
+            return -2;
+        found = i;
+    }
+    return found;
+}
+
+bool presetFeedsGateOrExt (Rack& rack)
+{
+    Cable live[PatchGraph::kMaxCables] {};
+    const int count = rack.graph.copyPublishedCables (live, PatchGraph::kMaxCables);
+    for (int i = 0; i < count; ++i)
+    {
+        if (live[i].sourceModule == FactoryModule::Ext || live[i].destModule == FactoryModule::Ext)
+            return true;
+        Module* dest = rack.graph.moduleAt (live[i].destModule);
+        if (dest == nullptr)
+            return true;
+        if (dest->port (live[i].destPort).type == PortType::Gate)
+            return true;
+    }
+    return false;
+}
+
+bool loadReplacesPlanted (Rack& rack, int index, const FactoryCable* expected, int count)
+{
+    const bool planted = rack.graph.connect (FactoryModule::Ext, 0, FactoryModule::Output, 0);
+    const bool loaded = loadFactoryPreset (rack.graph, index);
+    return planted && loaded && cablesMatch (rack.graph, expected, count) && ! presetFeedsGateOrExt (rack);
+}
+
+int testSelfModPresets()
+{
+    const float closed = 0.0f;
+    checkNear (factoryVca1Initial (0), closed, "Dry leaves VCA 1 Initial at 0");
+    checkNear (factoryVca1Initial (1), closed, "Noise to mixer leaves VCA 1 Initial at 0");
+    checkNear (factoryVca1Initial (kDefaultFactoryPreset), closed, "Voice leaves VCA 1 Initial at 0");
+    checkNear (factoryVca1Initial (3), closed, "Ring leaves VCA 1 Initial at 0");
+    checkNear (factoryVca1Initial (4), closed, "S&H leaves VCA 1 Initial at 0");
+    checkNear (factoryVca1Initial (kFeedbackPreset), kFeedbackVca1Initial, "Feedback keeps VCA 1 Initial at 0.7");
+    checkNear (factoryVca1Initial (kHoldPreset), closed, "Hold leaves VCA 1 Initial at 0");
+    for (int index = kFilterLoopPreset; index <= kSelfRingPreset; ++index)
+        checkNear (factoryVca1Initial (index), kFeedbackVca1Initial, "self-mod preset sets VCA 1 Initial to 0.7");
+
+    const FactoryProgramKnobs voice = factoryProgramKnobs (kDefaultFactoryPreset);
+    const FactoryProgramKnobs feedback = factoryProgramKnobs (kFeedbackPreset);
+    const FactoryProgramKnobs hold = factoryProgramKnobs (kHoldPreset);
+    const FactoryProgramKnobs filterLoop = factoryProgramKnobs (kFilterLoopPreset);
+    check (voice.vcfCutoff == 0.50f && voice.vcfPeak == 0.30f && voice.eg1Attack == 0.50f
+               && voice.eg1Decay == 0.30f && voice.eg1Sustain == 0.68f && voice.eg1Release == 0.42f
+               && voice.vcoRange == 0.50f,
+           "Voice keeps the shared knob row");
+    check (feedback.vcfCutoff == voice.vcfCutoff && feedback.vcfPeak == voice.vcfPeak
+               && feedback.eg1Attack == voice.eg1Attack && feedback.vcoRange == voice.vcoRange,
+           "Feedback keeps the shared knob row");
+    checkNear (hold.vcfCutoff, kHoldVcfCutoff, "Hold cutoff stays 0.45");
+    checkNear (hold.vcfPeak, kHoldVcfPeak, "Hold peak stays 0.20");
+    checkNear (hold.eg1Attack, kHoldEg1Attack, "Hold attack stays 0.10");
+    checkNear (hold.vcoRange, kHoldVcoRange, "Hold range stays 8'");
+    checkNear (filterLoop.vcfCutoff, kFilterLoopCutoff, "Filter loop cutoff is 0.4");
+    checkNear (filterLoop.vcfPeak, kFilterLoopPeak, "Filter loop peak is 0.7");
+    check (filterLoop.eg1Attack == voice.eg1Attack && filterLoop.vcoRange == voice.vcoRange,
+           "Filter loop keeps the shared envelope and range");
+    checkNear (factoryMgRate (kDefaultFactoryPreset), 0.50f, "Voice MG rate stays 0.50");
+    checkNear (factoryMgRate (kFeedbackPreset), 0.50f, "Feedback MG rate stays 0.50");
+    checkNear (factoryMgRate (kHoldPreset), 0.50f, "Hold MG rate stays 0.50");
+    checkNear (factoryMgRate (kMgFilterPreset), kMgFilterRate, "MG into filter rate is 0.3");
+    checkNear (factoryMgRate (kRingDronePreset), kRingDroneRate, "Ring drone rate is 0.25");
+    checkNear (factorySampleHoldRate (4), 0.50f, "S&H rate stays 0.50");
+    checkNear (factorySampleHoldRate (kSteppedCutoffPreset), kSteppedCutoffRate, "Stepped cutoff rate is 0.4");
+    checkNear (factoryIntegratorTime (kDefaultFactoryPreset), 0.50f, "Voice integrator time stays 0.50");
+    checkNear (factoryIntegratorTime (kFeedbackPreset), 0.50f, "Feedback integrator time stays 0.50");
+    checkNear (factoryIntegratorTime (kHoldPreset), 0.50f, "Hold integrator time stays 0.50");
+    checkNear (factoryIntegratorTime (kDelayedBouncePreset), kDelayedBounceTime, "Delayed bounce time is 0.6");
+
+    const std::string processor = readFile (MS50_PROCESSOR_SOURCE);
+    const std::string restore = functionBody (processor, "void MS50ModularAudioProcessor::applyProgramParameters");
+    check (restore.find ("factoryProgramKnobs") != std::string::npos, "programs still restore the shared knob row");
+    check (restore.find ("factoryMgRate") != std::string::npos, "programs restore the MG rate");
+    check (restore.find ("factorySampleHoldRate") != std::string::npos, "programs restore the S&H rate");
+    check (restore.find ("factoryIntegratorTime") != std::string::npos, "programs restore the integrator time");
+    check (restore.find ("outputLevel_, 0.70f") != std::string::npos, "Output Level stays 0.70");
+    check (restore.find ("outputMix_, 1.0f") != std::string::npos, "Output Mix stays 1");
+    std::string presetHeader = MS50_PROCESSOR_SOURCE;
+    const auto presetSlash = presetHeader.rfind ('/');
+    check (presetSlash != std::string::npos, "factory header path");
+    if (presetSlash != std::string::npos)
+    {
+        presetHeader.replace (presetSlash, std::string::npos, "/Modular/FactoryPresets.h");
+        const std::string load = functionBody (readFile (presetHeader.c_str()), "inline bool loadFactoryPreset");
+        const auto sharedRate = load.find ("SampleHold::kKnobRate, 0.50f");
+        const auto namedKnobs = load.find ("writeFactoryProgramKnobs");
+        check (sharedRate != std::string::npos && namedKnobs != std::string::npos && sharedRate < namedKnobs,
+               "the shared S&H rate is written before the preset rate");
+    }
+
+    Rack rack;
+    rack.addAll();
+
+    check (loadReplacesPlanted (rack, kFilterLoopPreset, kPresetFilterLoop, 4), "Filter loop replaces cables");
+    check (factoryPresetEffect (kFilterLoopPreset), "Filter loop is effect on");
+    checkNear (rack.vca1.initial(), kFeedbackVca1Initial, "Filter loop sets VCA 1 Initial");
+    checkNear (rack.vcf.presetKnob (Vcf::kKnobCutoff), kFilterLoopCutoff, "Filter loop writes cutoff");
+    checkNear (rack.vcf.presetKnob (Vcf::kKnobPeak), kFilterLoopPeak, "Filter loop writes peak");
+    check (rack.graph.delayedCableCount() == 1, "Filter loop delays one cable");
+    check (onlyDelayedIndex (rack.graph) == 3, "Filter loop delays the newest cable");
+    check (rack.graph.cableIsDelayed (3), "VCF SigOut to VCF Cutoff is delayed in Filter loop");
+    check (! rack.ext.buttonHeld(), "Filter loop does not press Hold");
+    applyHostRow (rack, kFilterLoopPreset);
+    armWet (rack);
+    skipSamples (rack, 64);
+    float cutoffMin = 1.0e9f;
+    float cutoffMax = -1.0e9f;
+    for (int i = 0; i < 4096; ++i)
+    {
+        rack.graph.process();
+        const float cutoff = rack.vcf.portValue[Vcf::kCutoff];
+        if (cutoff < cutoffMin)
+            cutoffMin = cutoff;
+        if (cutoff > cutoffMax)
+            cutoffMax = cutoff;
+    }
+    const double filterRms = takeRms (rack, 2400, false);
+    const double filterHost = takeRms (rack, 2400, true);
+    check (cutoffMax - cutoffMin > 0.5f, "Filter loop cutoff jack moves");
+    check (filterRms > 0.02, "Filter loop is audible at VCA 1 with no Hold press");
+    check (filterHost > 0.002, "Filter loop reaches Output Wet");
+
+    unsigned char blob[4096];
+    const int filterBytes = rack.graph.getState (blob, static_cast<int> (sizeof blob));
+    check (filterBytes > 16 && blob[0] == 'M' && blob[1] == 'S' && blob[2] == '5' && blob[3] == '0',
+           "Filter loop state magic stays MS50");
+    check (blob[4] == 1, "Filter loop saves as version 1");
+    Rack filterAgain;
+    filterAgain.addAll();
+    check (filterAgain.graph.setState (blob, filterBytes), "Filter loop round trip");
+    check (cablesMatch (filterAgain.graph, kPresetFilterLoop, 4), "Filter loop round trip kept the cables");
+    check (filterAgain.graph.cableIsDelayed (3), "Filter loop round trip kept the delayed cutoff cable");
+    checkNear (filterAgain.vcf.presetKnob (Vcf::kKnobCutoff), kFilterLoopCutoff, "Filter loop round trip kept cutoff");
+
+    check (loadReplacesPlanted (rack, kMgFilterPreset, kPresetMgFilter, 4), "MG into filter replaces cables");
+    check (rack.graph.delayedCableCount() == 0, "MG into filter has no delayed cable");
+    checkNear (rack.vca1.initial(), kFeedbackVca1Initial, "MG into filter sets VCA 1 Initial");
+    checkNear (rack.mg.presetKnob (MgModule::kKnobFrequency), kMgFilterRate, "MG into filter writes the rate");
+    check (! rack.ext.buttonHeld(), "MG into filter does not press Hold");
+    applyHostRow (rack, kMgFilterPreset);
+    armWet (rack);
+    skipSamples (rack, 200);
+    double earlySweep = 0.0;
+    for (int i = 0; i < 2000; ++i)
+    {
+        rack.graph.process();
+        earlySweep += static_cast<double> (rack.vcf.portValue[Vcf::kCutoff]);
+    }
+    earlySweep /= 2000.0;
+    skipSamples (rack, 48000);
+    double lateSweep = 0.0;
+    for (int i = 0; i < 2000; ++i)
+    {
+        rack.graph.process();
+        lateSweep += static_cast<double> (rack.vcf.portValue[Vcf::kCutoff]);
+    }
+    lateSweep /= 2000.0;
+    const double sweepRms = takeRms (rack, 2400, false);
+    check (std::fabs (lateSweep - earlySweep) > 0.4, "MG into filter sweeps the cutoff");
+    check (sweepRms > 0.02, "MG into filter is audible with no Hold press");
+
+    check (loadReplacesPlanted (rack, kSteppedCutoffPreset, kPresetSteppedCutoff, 5), "Stepped cutoff replaces cables");
+    check (rack.graph.delayedCableCount() == 0, "Stepped cutoff has no delayed cable");
+    checkNear (rack.vca1.initial(), kFeedbackVca1Initial, "Stepped cutoff sets VCA 1 Initial");
+    checkNear (rack.sampleHold.presetKnob (SampleHold::kKnobRate), kSteppedCutoffRate, "Stepped cutoff writes S&H rate after 0.50");
+    check (! rack.ext.buttonHeld(), "Stepped cutoff does not press Hold");
+    applyHostRow (rack, kSteppedCutoffPreset);
+    armWet (rack);
+    int jumps = 0;
+    int held = 0;
+    float previousCutoff = 0.0f;
+    bool haveCutoff = false;
+    double steppedSum = 0.0;
+    constexpr int kStepListen = 48000 * 3;
+    for (int i = 0; i < kStepListen; ++i)
+    {
+        rack.graph.process();
+        const float cutoff = rack.vcf.portValue[Vcf::kCutoff];
+        const double vca = static_cast<double> (rack.vca1.portValue[Vca1::kOut]);
+        steppedSum += vca * vca;
+        if (haveCutoff)
+        {
+            const float step = std::fabs (cutoff - previousCutoff);
+            if (step > 0.25f)
+                ++jumps;
+            else if (step < 0.02f)
+                ++held;
+        }
+        previousCutoff = cutoff;
+        haveCutoff = true;
+    }
+    const double steppedRms = std::sqrt (steppedSum / static_cast<double> (kStepListen));
+    check (jumps >= 2 && jumps <= 12, "Stepped cutoff jumps a few times");
+    check (held > (kStepListen * 9) / 10, "Stepped cutoff holds between jumps");
+    check (steppedRms > 0.02, "Stepped cutoff is audible with no Hold press");
+
+    check (loadReplacesPlanted (rack, kRingDronePreset, kPresetRingDrone, 5), "Ring drone replaces cables");
+    check (rack.graph.delayedCableCount() == 0, "Ring drone has no delayed cable");
+    checkNear (rack.vca1.initial(), kFeedbackVca1Initial, "Ring drone sets VCA 1 Initial");
+    checkNear (rack.mg.presetKnob (MgModule::kKnobFrequency), kRingDroneRate, "Ring drone writes the MG rate");
+    check (! rack.ext.buttonHeld(), "Ring drone does not press Hold");
+    applyHostRow (rack, kRingDronePreset);
+    armWet (rack);
+    skipSamples (rack, 1000);
+    const double droneEarly = takeRms (rack, 2400, false);
+    // Host MG pulse width is 0.30, so the triangle crosses 0 halfway through the rise.
+    const double mgHz = 0.01 * std::pow (20000.0, static_cast<double> (kRingDroneRate));
+    const int zeroSample = static_cast<int> ((0.30 * 0.5 / mgHz) * 48000.0);
+    const int skipToZero = zeroSample - 1000 - 2400 - 1200;
+    check (skipToZero > 0, "Ring drone quiet window is after the loud window");
+    skipSamples (rack, skipToZero);
+    const double droneLate = takeRms (rack, 2400, false);
+    if (! (droneEarly > 0.02))
+        std::printf ("  FAIL Ring drone early rms %.6g\n", droneEarly);
+    if (! (droneLate * 4.0 < droneEarly))
+        std::printf ("  FAIL Ring drone move early %.6g late %.6g\n", droneEarly, droneLate);
+    check (droneEarly > 0.02, "Ring drone is audible with no Hold press");
+    check (droneLate * 4.0 < droneEarly, "Ring drone moves with the MG triangle");
+
+    check (loadReplacesPlanted (rack, kDelayedBouncePreset, kPresetDelayedBounce, 5), "Delayed bounce replaces cables");
+    check (rack.graph.delayedCableCount() == 0, "Delayed bounce has no graph delay");
+    checkNear (rack.vca1.initial(), kFeedbackVca1Initial, "Delayed bounce sets VCA 1 Initial");
+    checkNear (rack.integrator.presetKnob (Integrator::kKnobTime), kDelayedBounceTime, "Delayed bounce writes integrator time");
+    check (! rack.ext.buttonHeld(), "Delayed bounce does not press Hold");
+    applyHostRow (rack, kDelayedBouncePreset);
+    armWet (rack);
+    double noiseStep = 0.0;
+    double lagStep = 0.0;
+    double lagSum = 0.0;
+    double lagMean = 0.0;
+    float previousNoise = 0.0f;
+    float previousLag = 0.0f;
+    constexpr int kLag = 8000;
+    for (int i = 0; i < kLag; ++i)
+    {
+        rack.graph.process();
+        const float noise = rack.noise.portValue[NoiseModule::kWhite];
+        const float lag = rack.vcf.portValue[Vcf::kCutoff];
+        lagSum += static_cast<double> (lag) * static_cast<double> (lag);
+        lagMean += static_cast<double> (lag);
+        if (i > 0)
+        {
+            noiseStep += std::fabs (static_cast<double> (noise - previousNoise));
+            lagStep += std::fabs (static_cast<double> (lag - previousLag));
+        }
+        previousNoise = noise;
+        previousLag = lag;
+    }
+    lagMean /= static_cast<double> (kLag);
+    double lagVariance = (lagSum / static_cast<double> (kLag)) - lagMean * lagMean;
+    if (lagVariance < 0.0)
+        lagVariance = 0.0;
+    const double lagDeviation = std::sqrt (lagVariance);
+    const double bounceRms = takeRms (rack, 2400, false);
+    // Time 0.6 is about 96 ms, so white noise on the cutoff moves by a few millivolts.
+    if (! (lagDeviation > 0.003))
+        std::printf ("  FAIL Delayed bounce cutoff deviation %.6g lagStep %.6g noiseStep %.6g\n",
+                     lagDeviation, lagStep, noiseStep);
+    check (noiseStep > lagStep * 20.0, "Delayed bounce cutoff moves slower than the noise");
+    check (lagDeviation > 0.003, "Delayed bounce cutoff still moves");
+    check (bounceRms > 0.02, "Delayed bounce is audible with no Hold press");
+
+    check (loadReplacesPlanted (rack, kSelfRingPreset, kPresetSelfRing, 5), "Self ring replaces cables and keeps the cycle");
+    check (factoryPresetEffect (kSelfRingPreset), "Self ring is effect on");
+    checkNear (rack.vca1.initial(), kFeedbackVca1Initial, "Self ring sets VCA 1 Initial");
+    check (rack.graph.delayedCableCount() == 1, "Self ring delays one cable");
+    Cable selfCables[PatchGraph::kMaxCables] {};
+    const int selfCount = rack.graph.copyPublishedCables (selfCables, PatchGraph::kMaxCables);
+    const int selfDelayed = onlyDelayedIndex (rack.graph);
+    check (selfCount == 5 && selfDelayed >= 0, "Self ring has one delayed index");
+    check (selfDelayed >= 0 && sameCable (selfCables[selfDelayed], FactoryModule::Ring, Ring::kOut,
+                                           FactoryModule::Ring, Ring::kB),
+           "Ring Out to Ring B is the delayed cable");
+    check (! rack.ext.buttonHeld(), "Self ring does not press Hold");
+    applyHostRow (rack, kSelfRingPreset);
+    armWet (rack);
+    const double selfRms = takeRms (rack, 4800, false);
+    const double selfHost = takeRms (rack, 2400, true);
+    check (selfRms < 1.0e-5, "Self ring stays quiet at VCA 1 with Initial 0.7");
+    check (selfHost < 1.0e-6, "Self ring stays quiet at Output Wet");
+    const int selfBytes = rack.graph.getState (blob, static_cast<int> (sizeof blob));
+    check (selfBytes > 16 && blob[4] == 1, "Self ring saves as version 1");
+    Rack selfAgain;
+    selfAgain.addAll();
+    check (selfAgain.graph.setState (blob, selfBytes), "Self ring round trip");
+    check (cablesMatch (selfAgain.graph, kPresetSelfRing, 5), "Self ring round trip kept the cycle");
+    Cable selfAgainCables[PatchGraph::kMaxCables] {};
+    selfAgain.graph.copyPublishedCables (selfAgainCables, PatchGraph::kMaxCables);
+    const int selfAgainDelayed = onlyDelayedIndex (selfAgain.graph);
+    check (selfAgainDelayed >= 0 && sameCable (selfAgainCables[selfAgainDelayed], FactoryModule::Ring, Ring::kOut,
+                                                FactoryModule::Ring, Ring::kB),
+           "Self ring round trip kept Ring Out to Ring B delayed");
+
+    check (loadFactoryPreset (rack.graph, 4), "S&H loads after Stepped cutoff");
+    check (cablesMatch (rack.graph, kPresetSampleHold, 4), "S&H cables stay");
+    checkNear (rack.sampleHold.presetKnob (SampleHold::kKnobRate), 0.50f, "S&H rate returns to 0.50");
+    checkNear (rack.vca1.initial(), 0.0f, "S&H clears VCA 1 Initial");
+
+    check (loadFactoryPreset (rack.graph, kDefaultFactoryPreset), "Voice loads after the self-mod presets");
+    check (cablesMatch (rack.graph, kPresetVoice, 8), "Voice cables stay the eight");
+    check (rack.graph.delayedCableCount() == 0, "Voice still adds no delay");
+    checkNear (rack.vca1.initial(), 0.0f, "Voice still clears VCA 1 Initial");
+
+    check (loadFactoryPreset (rack.graph, kFeedbackPreset), "Feedback loads after the self-mod presets");
+    check (cablesMatch (rack.graph, kPresetFeedback, 4), "Feedback cables stay");
+    check (rack.graph.delayedCableCount() == 1 && rack.graph.cableIsDelayed (3), "Feedback still delays VCF SigOut to VCF Cutoff");
+    checkNear (rack.vca1.initial(), kFeedbackVca1Initial, "Feedback still sets VCA 1 Initial to 0.7");
+    checkNear (factoryProgramKnobs (kFeedbackPreset).vcfCutoff, 0.50f, "Feedback cutoff travel stays 0.50");
+    checkNear (factoryProgramKnobs (kFeedbackPreset).vcfPeak, 0.30f, "Feedback peak travel stays 0.30");
+
+    check (loadFactoryPreset (rack.graph, kHoldPreset), "Hold loads after the self-mod presets");
+    check (cablesMatch (rack.graph, kPresetHold, 6), "Hold cables stay");
+    check (rack.graph.delayedCableCount() == 0, "Hold still has no delayed cable");
+    check (! holdHasExtAudio (rack.graph), "Hold still has no Ext In audio cable");
+    checkNear (rack.vca1.initial(), 0.0f, "Hold still leaves VCA 1 Initial at 0");
+    checkNear (rack.eg1.presetKnob (Eg1::kKnobAttack), kHoldEg1Attack, "Hold still writes attack");
+    checkNear (rack.vcf.presetKnob (Vcf::kKnobCutoff), kHoldVcfCutoff, "Hold still writes cutoff");
+    checkNear (rack.vcf.presetKnob (Vcf::kKnobPeak), kHoldVcfPeak, "Hold still writes peak");
+    checkNear (rack.vco.presetKnob (Vco::kKnobScale), kHoldVcoRange, "Hold still writes range");
+
+    std::string doc = MS50_PROCESSOR_SOURCE;
+    const auto source = doc.rfind ("/Source/");
+    check (source != std::string::npos, "presets doc path");
+    if (source != std::string::npos)
+    {
+        doc.replace (source, std::string::npos, "/docs/presets.md");
+        const std::string text = readFile (doc.c_str());
+        check (text.find ("thirteen programs") != std::string::npos, "presets.md counts thirteen programs");
+        int heard = 0;
+        for (std::size_t pos = 0; (pos = text.find ("With no Hold press", pos)) != std::string::npos; pos += 1)
+            ++heard;
+        check (heard == 6, "each self-mod line says what is heard with no Hold press");
+        doc = MS50_PROCESSOR_SOURCE;
+        doc.replace (source, std::string::npos, "/Source/UI/PatchBayView.cpp");
+        const std::string view = readFile (doc.c_str());
+        check (view.find ("\"FILTER LOOP\"") != std::string::npos, "the preset screen has FILTER LOOP");
+        check (view.find ("\"MG FILTER\"") != std::string::npos, "the preset screen has MG FILTER");
+        check (view.find ("\"STEP CUTOFF\"") != std::string::npos, "the preset screen has STEP CUTOFF");
+        check (view.find ("\"RING DRONE\"") != std::string::npos, "the preset screen has RING DRONE");
+        check (view.find ("\"DELAY BOUNCE\"") != std::string::npos, "the preset screen has DELAY BOUNCE");
+        check (view.find ("\"SELF RING\"") != std::string::npos, "the preset screen has SELF RING");
+    }
+    return finish ("testSelfModPresets");
 }

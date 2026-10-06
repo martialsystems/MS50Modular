@@ -1,6 +1,6 @@
 # Factory presets
 
-The host list has seven programs. Opening the plugin leaves the eight Voice cables in place and leaves Effect off, so the dry left and right cables pass until Effect is turned on or a program is chosen. Choosing a program replaces the cables.
+The host list has thirteen programs. Opening the plugin leaves the eight Voice cables in place and leaves Effect off, so the dry left and right cables pass until Effect is turned on or a program is chosen. Choosing a program replaces the cables.
 
 1. Dry: Effect off. Ext In L to Output L, Ext In R to Output R. Stereo host input passes. No wet cable.
 2. Noise to mixer: Effect on. Noise White to Mixer In 1, Mixer Out to Output Wet, Level 1 at 0.8. Inverted white noise.
@@ -9,3 +9,9 @@ The host list has seven programs. Opening the plugin leaves the eight Voice cabl
 5. S&H: Effect on. Noise White to S&H In, S&H Out to VCF Cutoff, Ext In Mono to VCF SigIn, VCF SigOut to Output Wet. The host input is filtered, and the cutoff steps through held noise.
 6. Feedback: Effect on. VCO Saw to VCF SigIn, VCF SigOut to VCA 1 SigIn, VCA 1 Out to Output Wet, VCF SigOut to VCF Cutoff. The saw passes the filter, and the filter output moves its own cutoff. The cutoff cable is the newest one, and it is the delayed cable. VCA 1 Initial is 0.7, so the saw is audible with no gate.
 7. Hold: Effect on. VCO Saw to VCF SigIn, VCF SigOut to VCA 1 SigIn, VCA 1 Out to Output Wet, Ext In Gate to EG 1 Trig, EG 1 OutA to VCA 1 Env, EG 1 OutA to VCF Cutoff. Button up is silence. Button down fades in the saw and opens the filter, and button up releases it.
+8. Filter loop: Effect on. VCO Saw to VCF SigIn, VCF SigOut to VCA 1 SigIn, VCA 1 Out to Output Wet, VCF SigOut to VCF Cutoff. Cutoff is 0.4 and Peak is 0.7. VCA 1 Initial is 0.7. With no Hold press the saw is heard, and the filter output moves its own cutoff. The cutoff cable is the newest one, and it is the delayed cable.
+9. MG into filter: Effect on. VCO Saw to VCF SigIn, VCF SigOut to VCA 1 SigIn, VCA 1 Out to Output Wet, MG Tri to VCF Cutoff. MG Rate is 0.3. VCA 1 Initial is 0.7. With no Hold press the saw is heard, and the triangle slowly sweeps the cutoff.
+10. Stepped cutoff: Effect on. VCO Saw to VCF SigIn, VCF SigOut to VCA 1 SigIn, VCA 1 Out to Output Wet, Noise White to S&H In, S&H Out to VCF Cutoff. S&H Rate is 0.4. VCA 1 Initial is 0.7. With no Hold press the saw is heard, and the cutoff jumps between held noise samples.
+11. Ring drone: Effect on. VCO Saw to Ring A, MG Tri to Ring B, Ring Out to VCF SigIn, VCF SigOut to VCA 1 SigIn, VCA 1 Out to Output Wet. MG Rate is 0.25. VCA 1 Initial is 0.7. With no Hold press the tone is metallic, and the triangle keeps it moving.
+12. Delayed bounce: Effect on. Noise White to Integrator In, Integrator Out to VCF Cutoff, VCO Saw to VCF SigIn, VCF SigOut to VCA 1 SigIn, VCA 1 Out to Output Wet. Integrator Time is 0.6. VCA 1 Initial is 0.7. With no Hold press the saw is heard, and the cutoff lags the noise.
+13. Self ring: Effect on. VCO Saw to Ring A, Ring Out to Ring B, Ring Out to VCF SigIn, VCF SigOut to VCA 1 SigIn, VCA 1 Out to Output Wet. Ring Out to Ring B is the delayed cable, and the cycle stays patched. VCA 1 Initial is 0.7. With no Hold press the wet path stays quiet: the ring output is the saw times its own previous sample, and that product starts at 0.

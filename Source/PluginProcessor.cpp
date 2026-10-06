@@ -453,7 +453,7 @@ void MS50ModularAudioProcessor::applyProgramParameters (int index)
     restore (eg1Decay_, knobs.eg1Decay);
     restore (eg1Sustain_, knobs.eg1Sustain);
     restore (eg1Release_, knobs.eg1Release);
-    restore (mgRate_, 0.50f);
+    restore (mgRate_, factoryMgRate (index));
     restore (mgPw_, 0.30f);
     restore (vcoRange_, knobs.vcoRange);
     restore (vcoFine_, 0.30f);
@@ -464,11 +464,11 @@ void MS50ModularAudioProcessor::applyProgramParameters (int index)
     restore (eg2Delay_, 0.30f);
     restore (eg2Attack_, 0.68f);
     restore (eg2Release_, 0.42f);
-    restore (integratorTime_, 0.50f);
+    restore (integratorTime_, factoryIntegratorTime (index));
     restore (mixerLevel1_, 0.80f);
     restore (mixerLevel2_, 0.80f);
     restore (mixerLevel3_, 0.80f);
-    restore (sampleHoldRate_, 0.50f);
+    restore (sampleHoldRate_, factorySampleHoldRate (index));
     restore (outputLevel_, 0.70f);
     restore (outputMix_, 1.0f);
 }

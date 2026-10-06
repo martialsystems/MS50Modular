@@ -323,7 +323,7 @@ filtered = onePoleHighpass(SigIn, lowCutHz)
 Out = filtered * envGain * intensity
 ```
 
-No initial gain on the module default. Unpatched Env is 0 V, so the output is 0. The Feedback factory preset adds 0.7 before that clamp, on this VCA only, so the saw is audible with Env unpatched. Every other factory preset leaves the added term at 0. AC coupling stand-in: the low-cut at its minimum (10 Hz) is the only highpass. Do not add a second DC block.
+No initial gain on the module default. Unpatched Env is 0 V, so the output is 0. Feedback, Filter loop, MG into filter, Stepped cutoff, Ring drone, Delayed bounce, and Self ring add 0.7 before that clamp, so a signal with Env unpatched can pass. Dry, Noise to mixer, Voice, Ring, S&H, and Hold leave the added term at 0. AC coupling stand-in: the low-cut at its minimum (10 Hz) is the only highpass. Do not add a second DC block.
 
 Failure modes: treating Intensity as a CV-depth knob. A CV jack on low-cut. Sharing this code path with VCA 2.
 
