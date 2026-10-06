@@ -9,7 +9,7 @@ FP="/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
 FT,FL,LST,LSL=12,11,.8,.4
 fm={s:ImageFont.truetype(FP,s*8) for s in (FT,FL)}
 tw=lambda s,z:fm[z].getlength(s)/8+(LST if z==FT else LSL)*(len(s)-1)
-W,H,SC,M=1600,640,2,14; AVAIL=W-2*M
+W,H,SC,M=1600,564,2,14; AVAIL=W-2*M
 CH_Y=12; TI_Y=50; KT=78; KB=200; MINP=37; MAXP=74   # jack pitch: min fits hole+name+gap, max = 2x min
 KR=13; RING=21; JR=9; PL=10; PITCH=50; KSP=56; INK="#dcd6c2"; GOLD="#c29f4c"
 mods=[
