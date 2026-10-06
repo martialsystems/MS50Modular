@@ -55,6 +55,7 @@ MS50ModularAudioProcessor::MS50ModularAudioProcessor()
     addKnobParameter (faceKnobBinding ("MIX", "LEVEL 2"));
     addKnobParameter (faceKnobBinding ("MIX", "LEVEL 3"));
     addKnobParameter (faceKnobBinding ("S&H", "RATE"));
+    addKnobParameter (faceKnobBinding ("OUTPUT", "LEVEL"));
 
     extModuleIndex_ = graph.addModule (extIn);
     outputModuleIndex_ = graph.addModule (output);
@@ -141,6 +142,8 @@ void MS50ModularAudioProcessor::addKnobParameter (const FaceKnobBinding& binding
         mixerLevel3_ = parameter;
     else if (binding.knob == FaceKnob::SampleHoldRate)
         sampleHoldRate_ = parameter;
+    else if (binding.knob == FaceKnob::OutputLevel)
+        outputLevel_ = parameter;
 }
 
 juce::AudioParameterFloat* MS50ModularAudioProcessor::floatParameter (FaceKnob knob) const noexcept
@@ -193,6 +196,8 @@ juce::AudioParameterFloat* MS50ModularAudioProcessor::floatParameter (FaceKnob k
         return mixerLevel3_;
     if (knob == FaceKnob::SampleHoldRate)
         return sampleHoldRate_;
+    if (knob == FaceKnob::OutputLevel)
+        return outputLevel_;
     return nullptr;
 }
 
@@ -240,6 +245,8 @@ void MS50ModularAudioProcessor::applyHostControls()
     apply (mixerLevel3_, mixer, Mixer::kKnobLevel3);
     apply (sampleHoldRate_, sampleHold, SampleHold::kKnobRate);
     output.setMix (outputMixForEffect (effectIsOn()));
+    if (outputLevel_ != nullptr)
+        output.setOutputLevel (outputLevel_->convertTo0to1 (outputLevel_->get()));
 }
 
 int MS50ModularAudioProcessor::copyPublishedCables (Cable* dest, int capacity) const
@@ -446,6 +453,7 @@ void MS50ModularAudioProcessor::applyProgramParameters (int index)
     restore (mixerLevel2_, 0.80f);
     restore (mixerLevel3_, 0.80f);
     restore (sampleHoldRate_, 0.50f);
+    restore (outputLevel_, 0.70f);
 }
 
 void MS50ModularAudioProcessor::setCurrentProgram (int index)

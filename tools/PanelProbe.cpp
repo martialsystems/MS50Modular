@@ -215,6 +215,116 @@ private:
         expect (factoryCount == 8, "default patch has eight cables");
         expect (bay->visualCount() == factoryCount, "default cables are drawn");
 
+        const int levelKnob = panelKnobIndex ("OUTPUT", "LEVEL");
+        auto* levelParam = processor->parameterForPanelKnob ("OUTPUT", "LEVEL");
+        auto* effect = processor->effectParameter();
+        expect (levelKnob >= 0 && levelParam != nullptr && effect != nullptr, "output level knob is wired");
+        if (levelParam != nullptr && effect != nullptr && levelKnob >= 0)
+        {
+            expect (levelParam->getName (64) == "Output Level", "output level parameter name");
+            expect (near (levelParam->getValue(), 0.7f), "output level starts at 0.7");
+            expect (near (bay->knobValue (levelKnob), 0.7f), "output level cap starts at 0.7");
+            const float dryUnity = hostLeftAfter (*processor, 0.5f, 0.0f);
+            expect (near (dryUnity, 0.5f), "default output level is unity on the dry path");
+
+            dragKnobLocal (*bay, kPanelKnobs[levelKnob].cx, kPanelKnobs[levelKnob].cy, -40.0f, false);
+            const float raised = bay->knobValue (levelKnob);
+            const float dryRaised = hostLeftAfter (*processor, 0.5f, 0.0f);
+            expect (raised > 0.85f, "drag raises output level");
+            expect (dryRaised > dryUnity + 0.2f, "effect off, raising level makes the dry track louder");
+            expect (near (dryRaised, 0.5f * outputLevelGain (raised)), "dry host buffer uses the output level law");
+
+            dragKnobLocal (*bay, kPanelKnobs[levelKnob].cx, kPanelKnobs[levelKnob].cy, 5000.0f, false);
+            expect (near (bay->knobValue (levelKnob), 0.0f), "output level drags to silence");
+            expect (near (hostLeftAfter (*processor, 0.5f, 0.0f), 0.0f), "output level at 0 mutes the dry track");
+
+            levelParam->setValueNotifyingHost (1.0f);
+            expect (near (hostLeftAfter (*processor, 0.5f, 0.0f), 1.0f), "full output level is twice as loud");
+
+            effect->setValueNotifyingHost (1.0f);
+            expect (std::fabs (hostLeftAfter (*processor, 0.02f, 0.02f)) < 1.0e-3f,
+                    "effect on, gate released, full level stays silent");
+
+            auto* attack = processor->parameterForPanelKnob ("EG 1", "ATTACK");
+            auto* cutoff = processor->parameterForPanelKnob ("VCF", "CUTOFF");
+            auto* amount = processor->parameterForPanelKnob ("VCF", "MOD");
+            auto* lowCut = processor->parameterForPanelKnob ("VCA 1", "LOW CUT");
+            expect (attack != nullptr && cutoff != nullptr && amount != nullptr && lowCut != nullptr,
+                    "voice knobs stay parameters");
+            if (attack != nullptr && cutoff != nullptr && amount != nullptr && lowCut != nullptr)
+            {
+                const float attackWas = attack->getValue();
+                const float cutoffWas = cutoff->getValue();
+                const float amountWas = amount->getValue();
+                const float lowCutWas = lowCut->getValue();
+                attack->setValueNotifyingHost (0.0f);
+                cutoff->setValueNotifyingHost (1.0f);
+                amount->setValueNotifyingHost (0.0f);
+                lowCut->setValueNotifyingHost (0.0f);
+                processor->setExtInButtonHeld (true);
+
+                auto voiceRms = [&] (float level) -> float
+                {
+                    levelParam->setValueNotifyingHost (level);
+                    processor->prepareToPlay (48000.0, 128);
+                    juce::AudioBuffer<float> buffer (2, 128);
+                    juce::MidiBuffer midi;
+                    double energy = 0.0;
+                    int count = 0;
+                    for (int block = 0; block < 40; ++block)
+                    {
+                        for (int i = 0; i < 128; ++i)
+                        {
+                            const int t = block * 128 + i;
+                            const float sample = 0.02f * std::sin (2.0f * 3.14159265f * 220.0f
+                                                                   * static_cast<float> (t) / 48000.0f);
+                            buffer.setSample (0, i, sample);
+                            buffer.setSample (1, i, sample);
+                        }
+                        processor->processBlock (buffer, midi);
+                        if (block < 20)
+                            continue;
+                        for (int i = 0; i < 128; ++i)
+                        {
+                            const double x = buffer.getSample (0, i);
+                            energy += x * x;
+                        }
+                        count += 128;
+                    }
+                    return static_cast<float> (std::sqrt (energy / static_cast<double> (count)));
+                };
+
+                const float unityVoice = voiceRms (0.7f);
+                const float fullVoice = voiceRms (1.0f);
+                expect (unityVoice > 1.0e-4f, "effect on, gate held, the voice is audible");
+                expect (fullVoice > unityVoice * 1.9f && fullVoice < unityVoice * 2.1f,
+                        "raising output level makes the held voice louder");
+
+                processor->setExtInButtonHeld (false);
+                attack->setValueNotifyingHost (attackWas);
+                cutoff->setValueNotifyingHost (cutoffWas);
+                amount->setValueNotifyingHost (amountWas);
+                lowCut->setValueNotifyingHost (lowCutWas);
+            }
+
+            processor->setExtInButtonHeld (false);
+            effect->setValueNotifyingHost (0.0f);
+            levelParam->setValueNotifyingHost (0.7f);
+            {
+                auto source = juce::Desktop::getInstance().getMainMouseSource();
+                const juce::ModifierKeys mods (juce::ModifierKeys::leftButtonModifier);
+                const auto time = juce::Time::getCurrentTime();
+                const auto at = bay->designToLocal (kPanelKnobs[levelKnob].cx, kPanelKnobs[levelKnob].cy);
+                juce::MouseEvent click (source, at, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                        bay, bay, time, at, time, 2, false);
+                bay->mouseDoubleClick (click);
+            }
+            expect (near (bay->knobValue (levelKnob), 0.7f), "double-click resets output level");
+            expect (! processor->effectIsOn(), "effect is off after the output level check");
+            expect (near (hostLeftAfter (*processor, 0.5f, 0.0f), 0.5f), "restored output level is unity");
+            expect (publishedCount (*processor) == factoryCount, "output level does not change the eight cables");
+        }
+
         const auto there = bay->designToLocal (100.0f, 80.0f);
         const auto back = bay->localToDesign (there);
         expect (std::fabs (back.x - 100.0f) < 0.6f && std::fabs (back.y - 80.0f) < 0.6f, "design mapping at 1280x512");
@@ -521,6 +631,8 @@ private:
         expect (processor->getCurrentProgram() == 0, "the first preset is Dry");
         expect (bay->outputMix() == 0.0f, "dry preset turns the effect off");
         expect (publishedCount (*processor) == 2, "dry replaces the cables");
+        if (auto* restoredLevel = processor->parameterForPanelKnob ("OUTPUT", "LEVEL"))
+            expect (near (restoredLevel->getValue(), 0.7f), "preset restore puts output level back at 0.7");
 
         finish();
     }

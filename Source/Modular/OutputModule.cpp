@@ -57,6 +57,12 @@ void OutputModule::setLevel (float zeroToOne)
     level_ = clamp01 (zeroToOne);
 }
 
+void OutputModule::setOutputLevel (float zeroToOne)
+{
+    outputLevel_ = clamp01 (zeroToOne);
+    ampGain_ = outputLevelGain (outputLevel_);
+}
+
 void OutputModule::prepare (double rate)
 {
     sampleRate = rate;
@@ -66,6 +72,7 @@ void OutputModule::processSample()
 {
     const float wet = portValue[2];
     const float dry = 1.0f - mix_;
-    hostLeft_ = (portValue[0] * dry + wet * mix_) * level_ * kVoltsToHost;
-    hostRight_ = (portValue[1] * dry + wet * mix_) * level_ * kVoltsToHost;
+    const float gain = level_ * ampGain_ * kVoltsToHost;
+    hostLeft_ = (portValue[0] * dry + wet * mix_) * gain;
+    hostRight_ = (portValue[1] * dry + wet * mix_) * gain;
 }
