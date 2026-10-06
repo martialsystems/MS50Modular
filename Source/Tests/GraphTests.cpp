@@ -268,11 +268,11 @@ int testConnectStatusStrings()
     const int iRight = cycle.addModule (right);
     check (cycle.attemptConnect (iLeft, 1, iRight, 0) == PatchGraph::ConnectResult::Ok, "cycle setup");
     const auto closed = cycle.attemptConnect (iRight, 1, iLeft, 0);
-    check (closed == PatchGraph::ConnectResult::Cycle, "cycle result");
-    check (std::strcmp (PatchGraph::connectResultText (closed), "feedback is not available until step 19") == 0,
-           "cycle string");
-    check (cycle.cableCount() == 1, "cycle connect added nothing");
-    check (cycle.attemptConnect (iLeft, 1, iLeft, 0) == PatchGraph::ConnectResult::Cycle, "module into itself");
+    check (closed == PatchGraph::ConnectResult::Ok, "cycle connects");
+    check (PatchGraph::connectResultText (closed)[0] == '\0', "cycle clears the status");
+    check (cycle.cableCount() == 2, "cycle connect appended");
+    check (cycle.attemptConnect (iLeft, 1, iLeft, 0) == PatchGraph::ConnectResult::Ok, "module into itself");
+    check (PatchGraph::connectResultText (PatchGraph::ConnectResult::Cycle)[0] == '\0', "cycle result has no status");
 
     PatchGraph types;
     ConstantModule audio (1.0f, PortType::Audio);
@@ -295,10 +295,9 @@ int testConnectStatusStrings()
     check (both.attemptConnect (iSrc, 1, iMid, 0) == PatchGraph::ConnectResult::Ok, "path for both");
     check (both.attemptConnect (iOther, 1, iSrc, 0) == PatchGraph::ConnectResult::Ok, "src input cabled");
     const auto takenAndCycle = both.attemptConnect (iMid, 1, iSrc, 0);
-    check (takenAndCycle == PatchGraph::ConnectResult::Cycle, "cycle still refused on a patched input");
-    check (std::strcmp (PatchGraph::connectResultText (takenAndCycle), "feedback is not available until step 19") == 0,
-           "cycle string on a patched input");
-    check (both.cableCount() == 2, "cycle added nothing");
+    check (takenAndCycle == PatchGraph::ConnectResult::Ok, "cycle stacks on a patched input");
+    check (PatchGraph::connectResultText (takenAndCycle)[0] == '\0', "cycle on a patched input clears the status");
+    check (both.cableCount() == 3, "cycle appended on a patched input");
 
     check (graph.attemptConnect (-1, 0, 0, 0) == PatchGraph::ConnectResult::Rejected, "missing module");
     check (PatchGraph::connectResultText (PatchGraph::ConnectResult::Rejected)[0] == '\0', "rejected has no string");
@@ -314,11 +313,11 @@ int testRejectCycle()
     const int ib = graph.addModule (b);
 
     check (graph.connect (ia, 1, ib, 0), "A to B");
-    const int cables = graph.cableCount();
-    check (! graph.connect (ib, 1, ia, 0), "B to A closes a cycle");
-    check (graph.cableCount() == cables, "cycle reject changed nothing");
+    check (graph.connect (ib, 1, ia, 0), "B to A stays patched");
+    check (graph.cableCount() == 2, "cycle appended a cable");
     check (! graph.connect (ia, 1, ia, 1), "a port connected to itself");
-    check (! graph.connect (ia, 1, ia, 0), "module output into its own input");
+    check (graph.connect (ia, 1, ia, 0), "module output into its own input");
+    check (graph.cableCount() == 3, "self input appended");
     return finish ("testRejectCycle");
 }
 
@@ -392,6 +391,26 @@ int testSnapshotSwapDoesNotAllocate()
     return finish ("testSnapshotSwapDoesNotAllocate");
 }
 
+int testNoAllocInProcess()
+{
+    check (processSourceIsFixed(), "process source has no new or push_back");
+
+    PatchGraph graph;
+    ConstantModule a (0.5f, PortType::Audio);
+    GainModule b;
+    const int ia = graph.addModule (a);
+    const int ib = graph.addModule (b);
+    check (graph.connect (ia, 1, ib, 0), "forward cable");
+    check (graph.connect (ib, 1, ib, 0), "feedback cable");
+    graph.prepare (48000.0);
+
+    gAllocations.store (0, std::memory_order_relaxed);
+    for (int sample = 0; sample < 1000; ++sample)
+        graph.process();
+    check (gAllocations.load (std::memory_order_relaxed) == 0, "allocation counter stayed 0");
+    return finish ("testNoAllocInProcess");
+}
+
 int testDisconnectMissingIsNoop()
 {
     PatchGraph graph;
@@ -456,6 +475,9 @@ int testVcfPeakIncreasesResonance();
 int testVcfPositiveCvRaisesCutoff();
 int testVcfWetPathQuieterAtLowCutoff();
 int testVcfPanelJacks();
+int testVcfHasNoHighpassSwitch();
+int testVcfStaysFiniteWhenDrivenHard();
+int testVcfHotInputMovesSpectrum();
 int testVca1SilentWithoutEnv();
 int testVca1IntensityScalesOutput();
 int testVca1LowCutDarkens();
@@ -473,6 +495,46 @@ int testEg1ThreeJacks();
 int testEg1UnpatchedTrigIsIdle();
 int testEg1PromotedGate();
 int testEg1FactoryPatch();
+int testExtInGateFiresAboveThreshold();
+int testExtInButtonForcesGate();
+int testExtInButtonOpensVoice();
+int testExtInFollowerOpensEgWithoutButton();
+int testMgPulseIsUnipolar();
+int testMgTriangleIsBipolar2V5();
+int testMgFreqEndpoints();
+int testMgPwAffectsPulseAndTriangle();
+int testMgSawJacksOpposite();
+int testMgPanelJacks();
+int testScaleDoesNotChangeOctJack();
+int testOctIsOneVoltPerOctave();
+int testHzPerVoltIsLinear();
+int testThreeOutputsAlwaysRun();
+int testPwmMovesDutyNotPitch();
+int testVcoPanelJacks();
+int testEg2HasNoSustainKnob();
+int testEg2ReturnsToZeroWithoutAPlateau();
+int testEg2DelayTrigAfterHold();
+int testEg2NegIsNegation();
+int testEg2Restart();
+int testEg2PanelJacks();
+int testRingFourQuadrant();
+int testRingZeroKills();
+int testRingPassesDcProduct();
+int testRingHasNoKnobs();
+int testRingPanelJacks();
+int testDividerOnlyTwoAndFour();
+int testDividerSquareCounts();
+int testDividerIgnoresTinySignal();
+int testInverterNegatesDc();
+int testInverterNegatesAudio();
+int testInverterHasNoKnobs();
+int testIntegratorSettlesToInput();
+int testIntegratorSameSign();
+int testIntegratorSlowIsSlower();
+int testIntegratorIsItsOwnModule();
+int testPresetRoundTrip();
+int testPresetRejectsBadVersion();
+int testFeedbackIsOneSample();
 
 int main()
 {
@@ -484,6 +546,7 @@ int main()
     failed += testRejectCycle();
     failed += testConnectStatusStrings();
     failed += testSnapshotSwapDoesNotAllocate();
+    failed += testNoAllocInProcess();
     failed += testDisconnectMissingIsNoop();
     failed += testPublishedSnapshotCopy();
     failed += testDryMixPassesStereo();
@@ -506,6 +569,9 @@ int main()
     failed += testVcfPositiveCvRaisesCutoff();
     failed += testVcfWetPathQuieterAtLowCutoff();
     failed += testVcfPanelJacks();
+    failed += testVcfHasNoHighpassSwitch();
+    failed += testVcfStaysFiniteWhenDrivenHard();
+    failed += testVcfHotInputMovesSpectrum();
     failed += testVca1SilentWithoutEnv();
     failed += testVca1IntensityScalesOutput();
     failed += testVca1LowCutDarkens();
@@ -523,5 +589,45 @@ int main()
     failed += testEg1UnpatchedTrigIsIdle();
     failed += testEg1PromotedGate();
     failed += testEg1FactoryPatch();
+    failed += testExtInGateFiresAboveThreshold();
+    failed += testExtInButtonForcesGate();
+    failed += testExtInButtonOpensVoice();
+    failed += testExtInFollowerOpensEgWithoutButton();
+    failed += testMgPulseIsUnipolar();
+    failed += testMgTriangleIsBipolar2V5();
+    failed += testMgFreqEndpoints();
+    failed += testMgPwAffectsPulseAndTriangle();
+    failed += testMgSawJacksOpposite();
+    failed += testMgPanelJacks();
+    failed += testScaleDoesNotChangeOctJack();
+    failed += testOctIsOneVoltPerOctave();
+    failed += testHzPerVoltIsLinear();
+    failed += testThreeOutputsAlwaysRun();
+    failed += testPwmMovesDutyNotPitch();
+    failed += testVcoPanelJacks();
+    failed += testEg2HasNoSustainKnob();
+    failed += testEg2ReturnsToZeroWithoutAPlateau();
+    failed += testEg2DelayTrigAfterHold();
+    failed += testEg2NegIsNegation();
+    failed += testEg2Restart();
+    failed += testEg2PanelJacks();
+    failed += testRingFourQuadrant();
+    failed += testRingZeroKills();
+    failed += testRingPassesDcProduct();
+    failed += testRingHasNoKnobs();
+    failed += testRingPanelJacks();
+    failed += testDividerOnlyTwoAndFour();
+    failed += testDividerSquareCounts();
+    failed += testDividerIgnoresTinySignal();
+    failed += testInverterNegatesDc();
+    failed += testInverterNegatesAudio();
+    failed += testInverterHasNoKnobs();
+    failed += testIntegratorSettlesToInput();
+    failed += testIntegratorSameSign();
+    failed += testIntegratorSlowIsSlower();
+    failed += testIntegratorIsItsOwnModule();
+    failed += testPresetRoundTrip();
+    failed += testPresetRejectsBadVersion();
+    failed += testFeedbackIsOneSample();
     return failed == 0 ? 0 : 1;
 }

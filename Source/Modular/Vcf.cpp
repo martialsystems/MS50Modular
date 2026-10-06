@@ -1,5 +1,8 @@
-// STAND-IN step 8, replaced in step 20
+// step 20, S-10
 // Copyright (c) 2026 Martial Systems LLC. All rights reserved.
+//
+// PAPER-SUBSTITUTE: Is = 2.52e-9, n = 1.752. Those are the DAFx 1N4148 fit, not a CA3019 measurement.
+// D5 to D12: tanh on the feedback state. S-10b: 5 Hz one-pole highpass on the output.
 
 #include "Vcf.h"
 
@@ -8,11 +11,41 @@
 namespace {
 
 constexpr double kPi = 3.14159265358979323846;
+constexpr double kIs = 2.52e-9;
+constexpr double kN = 1.752;
+constexpr double kVt = 0.02585;
+constexpr double kBridgeC = 22.0e-9;
+constexpr double kInputPull = 0.012;
+constexpr double kDiodeVolts = 5.0;
 
 void flushState (double& state)
 {
     if (! std::isfinite (state) || (state < 1.0e-15 && state > -1.0e-15))
         state = 0.0;
+}
+
+double biasForHz (double hz)
+{
+    const double nVt = kN * kVt;
+    const double ib = hz * (2.0 * kPi * nVt * kBridgeC);
+    if (ib <= 0.0)
+        return 0.0;
+    return nVt * std::log (ib / kIs + 1.0);
+}
+
+double hzFromBias (double vBias)
+{
+    const double nVt = kN * kVt;
+    if (vBias < 1.0e-4)
+        vBias = 1.0e-4;
+    const double ib = kIs * (std::exp (vBias / nVt) - 1.0);
+    if (ib <= 0.0)
+        return 15.0;
+    // Symmetric linearized bridge: both arms are rd = n*VT/Ib.
+    const double rd = nVt / ib;
+    const double r1 = rd;
+    const double r2 = rd;
+    return 1.0 / (2.0 * kPi * std::sqrt (r1 * r2) * kBridgeC);
 }
 
 }
@@ -56,11 +89,30 @@ void Vcf::setKnob (int knob, float zeroToOne)
         amount01_ = value;
 }
 
+int Vcf::presetKnobCount() const
+{
+    return 3;
+}
+
+float Vcf::presetKnob (int knob) const
+{
+    if (knob == kKnobCutoff)
+        return cutoff01_;
+    if (knob == kKnobPeak)
+        return peak01_;
+    if (knob == kKnobAmount)
+        return amount01_;
+    return 0.0f;
+}
+
 void Vcf::prepare (double rate)
 {
     sampleRate = rate;
     z1_ = 0.0;
     z2_ = 0.0;
+    env_ = 0.0;
+    hpX_ = 0.0;
+    hpY_ = 0.0;
 }
 
 float Vcf::knobHz() const
@@ -96,35 +148,52 @@ float Vcf::resonance() const
 
 void Vcf::processSample()
 {
-    const float input = portValue[kSigIn];
-    const float hz = cutoffHz();
+    float input = portValue[kSigIn];
+    if (! std::isfinite (input))
+        input = 0.0f;
+
     const float q = resonance();
     const double rate = sampleRate > 1.0 ? sampleRate : 48000.0;
+    const double envA = 1.0 - std::exp (-1.0 / (0.03 * rate));
+    env_ += (std::fabs (static_cast<double> (input)) - env_) * envA;
+    flushState (env_);
 
-    double omega = 2.0 * kPi * static_cast<double> (hz) / rate;
-    if (omega < 1.0e-4)
-        omega = 1.0e-4;
-    if (omega > kPi * 0.99)
-        omega = kPi * 0.99;
+    // S-07 and S-08 set the unpulled bias. S-10 turns that bias into bridge current.
+    const double target = static_cast<double> (cutoffHz());
+    double vBias = biasForHz (target) - kInputPull * env_;
+    double hz = hzFromBias (vBias);
+    if (! std::isfinite (hz) || hz < 15.0)
+        hz = 15.0;
+    if (hz > 20000.0)
+        hz = 20000.0;
+    if (hz > rate * 0.45)
+        hz = rate * 0.45;
 
-    const double cosine = std::cos (omega);
-    const double sine = std::sin (omega);
-    const double alpha = sine / (2.0 * static_cast<double> (q));
-    const double a0 = 1.0 + alpha;
-    const double b0 = ((1.0 - cosine) * 0.5) / a0;
-    const double b1 = (1.0 - cosine) / a0;
-    const double b2 = b0;
-    const double a1 = (-2.0 * cosine) / a0;
-    const double a2 = (1.0 - alpha) / a0;
+    const double g = std::tan (kPi * hz / rate);
+    const double k = 1.0 / static_cast<double> (q);
+    const double a1 = 1.0 / (1.0 + g * (g + k));
+    const double a2 = g * a1;
+    const double a3 = g * a2;
 
-    const double x = static_cast<double> (input);
-    const double y = b0 * x + z1_;
-    z1_ = b1 * x - a1 * y + z2_;
-    z2_ = b2 * x - a2 * y;
+    // D5 to D12. In the linear region tanh returns the feedback state unchanged.
+    const double feedback = kDiodeVolts * std::tanh (z2_ / kDiodeVolts);
+    const double v3 = static_cast<double> (input) - feedback;
+    const double v1 = a1 * z1_ + a2 * v3;
+    const double v2 = feedback + a2 * z1_ + a3 * v3;
+    z1_ = 2.0 * v1 - z1_;
+    z2_ = 2.0 * v2 - feedback;
     flushState (z1_);
     flushState (z2_);
 
-    float output = static_cast<float> (y);
+    // S-10b. Output coupling, one pole at 5 Hz.
+    const double hpA = std::exp (-2.0 * kPi * 5.0 / rate);
+    const double hp = hpA * (hpY_ + v2 - hpX_);
+    hpX_ = v2;
+    hpY_ = hp;
+    flushState (hpX_);
+    flushState (hpY_);
+
+    float output = static_cast<float> (hp);
     if (! std::isfinite (output))
         output = 0.0f;
     portValue[kSigOut] = output;

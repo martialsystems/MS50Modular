@@ -137,7 +137,7 @@ Gestures on the panel:
 *   Escape cancels a drag that has not been published.
 *   Right-click a cable away from a jack to unplug it.
 
-An illegal pair is refused and does not stay on the panel. The status strings stay "that jack does not take this cable" and "feedback is not available until step 19". A jack whose module is not in the graph yet uses the first of those strings.
+An illegal pair is refused and does not stay on the panel. The refusal status is "that jack does not take this cable". A cycle stays patched: the newest cable in the cycle is delayed by one sample, and the other cables stay at zero delay. A jack whose module is not in the graph yet uses the refusal status.
 
 A move disconnects the old link before connecting the new one. If the new link is refused, the old link is connected again and becomes the newest published cable.
 

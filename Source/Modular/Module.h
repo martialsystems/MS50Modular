@@ -13,6 +13,14 @@ public:
     virtual void prepare (double sampleRate) = 0;
     virtual void processSample() = 0;
 
+    // Sample-rate-independent knob positions. Filter memory and the noise seed stay out.
+    virtual int presetKnobCount() const { return 0; }
+    virtual float presetKnob (int) const { return 0.0f; }
+    // VCO footage is 0..3. Every other module returns -1.
+    virtual int presetScaleIndex() const { return -1; }
+
     float portValue[8] {};
+    // Set by the graph each sample for input ports. Output slots stay false.
+    bool inputConnected[8] {};
     double sampleRate = 48000.0;
 };

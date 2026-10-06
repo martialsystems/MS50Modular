@@ -41,6 +41,13 @@ target_sources(MS50Modular PRIVATE
   Source/Modular/Vca1.cpp
   Source/Modular/Vca2.cpp
   Source/Modular/Eg1.cpp
+  Source/Modular/Mg.cpp
+  Source/Modular/Vco.cpp
+  Source/Modular/Eg2.cpp
+  Source/Modular/Ring.cpp
+  Source/Modular/Divider.cpp
+  Source/Modular/Inverter.cpp
+  Source/Modular/Integrator.cpp
   Source/UI/PatchBayLogic.cpp
   Source/UI/PatchBayView.cpp)
 
@@ -66,6 +73,16 @@ add_executable(MS50ModularTests
   Source/Tests/VcfTests.cpp
   Source/Tests/VcaTests.cpp
   Source/Tests/Eg1Tests.cpp
+  Source/Tests/ExtInTests.cpp
+  Source/Tests/MgTests.cpp
+  Source/Tests/VcoTests.cpp
+  Source/Tests/Eg2Tests.cpp
+  Source/Tests/RingTests.cpp
+  Source/Tests/DividerTests.cpp
+  Source/Tests/InverterTests.cpp
+  Source/Tests/IntegratorTests.cpp
+  Source/Tests/PresetTests.cpp
+  Source/Tests/FeedbackTests.cpp
   Source/Modular/Module.cpp
   Source/Modular/PatchGraph.cpp
   Source/Modular/ExtIn.cpp
@@ -75,6 +92,13 @@ add_executable(MS50ModularTests
   Source/Modular/Vca1.cpp
   Source/Modular/Vca2.cpp
   Source/Modular/Eg1.cpp
+  Source/Modular/Mg.cpp
+  Source/Modular/Vco.cpp
+  Source/Modular/Eg2.cpp
+  Source/Modular/Ring.cpp
+  Source/Modular/Divider.cpp
+  Source/Modular/Inverter.cpp
+  Source/Modular/Integrator.cpp
   Source/UI/PatchBayLogic.cpp)
 
 juce_add_gui_app(MS50PanelProbe PRODUCT_NAME "MS50PanelProbe")
@@ -92,6 +116,13 @@ target_sources(MS50PanelProbe PRIVATE
   Source/Modular/Vca1.cpp
   Source/Modular/Vca2.cpp
   Source/Modular/Eg1.cpp
+  Source/Modular/Mg.cpp
+  Source/Modular/Vco.cpp
+  Source/Modular/Eg2.cpp
+  Source/Modular/Ring.cpp
+  Source/Modular/Divider.cpp
+  Source/Modular/Inverter.cpp
+  Source/Modular/Integrator.cpp
   Source/UI/PatchBayLogic.cpp
   Source/UI/PatchBayView.cpp)
 
@@ -112,6 +143,7 @@ target_include_directories(MS50ModularTests PRIVATE Source)
 target_compile_features(MS50ModularTests PRIVATE cxx_std_20)
 
 target_compile_definitions(MS50ModularTests PRIVATE
-  MS50_PATCH_GRAPH_SOURCE="${CMAKE_SOURCE_DIR}/Source/Modular/PatchGraph.cpp")
+  MS50_PATCH_GRAPH_SOURCE="${CMAKE_SOURCE_DIR}/Source/Modular/PatchGraph.cpp"
+  MS50_PROCESSOR_SOURCE="${CMAKE_SOURCE_DIR}/Source/PluginProcessor.cpp")
 
 target_compile_options(MS50ModularTests PRIVATE -Wall -Wextra -Wpedantic)

@@ -96,7 +96,7 @@ Step 6 on the tile rack. The panel in Panel patch bay (2026-10-05) lets either j
 
 *   A drag starts on an output jack. Mouse-up on a legal input connects and publishes. Mouse-up on empty space, an output, or an illegal jack does not connect.
 *   A drag that starts on a drawn cable unpatches that cable when it ends on empty space. A right-click on a drawn cable disconnects and publishes. A right-click on empty space does nothing. Disconnect of a missing cable does nothing.
-*   Status text on the message thread, cleared after a successful change: "that jack does not take this cable", "feedback is not available until step 19". A legal second cable clears the status.
+*   Status text on the message thread, cleared after a successful change: "that jack does not take this cable". A cycle connects. A legal second cable clears the status.
 
 ## Stackable inputs (2026-09-29)
 
@@ -106,7 +106,7 @@ Step 6 on the tile rack. The panel in Panel patch bay (2026-10-05) lets either j
 
 `testSineDryStereoPasses` and the other `SINE_*` lines still pass on the default graph: Ext In L to Output L, Ext In R to Output R, mix 0. `SINE_DRY` remains the agent check.
 
-`testRejectCycle` still passes. `testFanOutAllowed` and `testRejectSignalIntoGate` stay.
+`testRejectCycle` still passes: a jack into itself is refused, and a cycle stays patched. `testFanOutAllowed` and `testRejectSignalIntoGate` stay.
 
 Unpatch: drag a drawn cable onto empty space, or right-click it. A 1978 MS-50 jack took one plug. This plugin stacks. See Panel patch bay (2026-10-05).
 

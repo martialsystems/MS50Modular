@@ -22,7 +22,8 @@ int panelJackIndex (const char* section, const char* label)
 namespace {
 
 int moduleIndex (const PanelJackRec& jack, int extIndex, int outputIndex, int noiseIndex,
-                 int vcfIndex, int vca1Index, int vca2Index, int eg1Index)
+                 int vcfIndex, int vca1Index, int vca2Index, int eg1Index, int mgIndex, int vcoIndex,
+                 int eg2Index, int ringIndex, int dividerIndex, int inverterIndex, int integratorIndex)
 {
     if (jack.module == 1 && extIndex >= 0)
         return extIndex;
@@ -38,6 +39,20 @@ int moduleIndex (const PanelJackRec& jack, int extIndex, int outputIndex, int no
         return vca2Index;
     if (jack.module == 7 && eg1Index >= 0)
         return eg1Index;
+    if (jack.module == 8 && mgIndex >= 0)
+        return mgIndex;
+    if (jack.module == 9 && vcoIndex >= 0)
+        return vcoIndex;
+    if (jack.module == 10 && eg2Index >= 0)
+        return eg2Index;
+    if (jack.module == 11 && ringIndex >= 0)
+        return ringIndex;
+    if (jack.module == 12 && dividerIndex >= 0)
+        return dividerIndex;
+    if (jack.module == 13 && inverterIndex >= 0)
+        return inverterIndex;
+    if (jack.module == 14 && integratorIndex >= 0)
+        return integratorIndex;
     return -1;
 }
 
@@ -66,7 +81,8 @@ bool samePlugSet (const int* slots, int n, const int* listed)
 }
 
 int jackForGraphPort (int module, int port, int extIndex, int outputIndex, int noiseIndex,
-                      int vcfIndex, int vca1Index, int vca2Index, int eg1Index)
+                      int vcfIndex, int vca1Index, int vca2Index, int eg1Index, int mgIndex, int vcoIndex,
+                      int eg2Index, int ringIndex, int dividerIndex, int inverterIndex, int integratorIndex)
 {
     int which = 0;
     if (extIndex >= 0 && module == extIndex)
@@ -83,6 +99,20 @@ int jackForGraphPort (int module, int port, int extIndex, int outputIndex, int n
         which = 6;
     else if (eg1Index >= 0 && module == eg1Index)
         which = 7;
+    else if (mgIndex >= 0 && module == mgIndex)
+        which = 8;
+    else if (vcoIndex >= 0 && module == vcoIndex)
+        which = 9;
+    else if (eg2Index >= 0 && module == eg2Index)
+        which = 10;
+    else if (ringIndex >= 0 && module == ringIndex)
+        which = 11;
+    else if (dividerIndex >= 0 && module == dividerIndex)
+        which = 12;
+    else if (inverterIndex >= 0 && module == inverterIndex)
+        which = 13;
+    else if (integratorIndex >= 0 && module == integratorIndex)
+        which = 14;
     else
         return -1;
 
@@ -97,7 +127,7 @@ int jackForGraphPort (int module, int port, int extIndex, int outputIndex, int n
 PanelLinkResult orientPanelJacks (int jackA, int jackB,
                                   int extIndex, int outputIndex, int noiseIndex,
                                   PanelLink& link,
-                                  int vcfIndex, int vca1Index, int vca2Index, int eg1Index)
+                                  int vcfIndex, int vca1Index, int vca2Index, int eg1Index, int mgIndex, int vcoIndex, int eg2Index, int ringIndex, int dividerIndex, int inverterIndex, int integratorIndex)
 {
     link = {};
     if (jackA < 0 || jackB < 0 || jackA >= kPanelJackCount || jackB >= kPanelJackCount || jackA == jackB)
@@ -108,8 +138,8 @@ PanelLinkResult orientPanelJacks (int jackA, int jackB,
     if (a.module == 0 || b.module == 0 || a.dir < 0 || b.dir < 0)
         return PanelLinkResult::Unmapped;
 
-    const int moduleA = moduleIndex (a, extIndex, outputIndex, noiseIndex, vcfIndex, vca1Index, vca2Index, eg1Index);
-    const int moduleB = moduleIndex (b, extIndex, outputIndex, noiseIndex, vcfIndex, vca1Index, vca2Index, eg1Index);
+    const int moduleA = moduleIndex (a, extIndex, outputIndex, noiseIndex, vcfIndex, vca1Index, vca2Index, eg1Index, mgIndex, vcoIndex, eg2Index, ringIndex, dividerIndex, inverterIndex, integratorIndex);
+    const int moduleB = moduleIndex (b, extIndex, outputIndex, noiseIndex, vcfIndex, vca1Index, vca2Index, eg1Index, mgIndex, vcoIndex, eg2Index, ringIndex, dividerIndex, inverterIndex, integratorIndex);
     if (moduleA < 0 || moduleB < 0)
         return PanelLinkResult::Unmapped;
     if (a.dir == b.dir)
@@ -162,7 +192,7 @@ bool reorderJackStack (VisualCable* cables, int count, int jack, const int* bott
 int loadPublishedCables (VisualCable* dest, int capacity,
                          const Cable* published, int publishedCount,
                          int extIndex, int outputIndex, int noiseIndex,
-                         int vcfIndex, int vca1Index, int vca2Index, int eg1Index)
+                         int vcfIndex, int vca1Index, int vca2Index, int eg1Index, int mgIndex, int vcoIndex, int eg2Index, int ringIndex, int dividerIndex, int inverterIndex, int integratorIndex)
 {
     if (dest == nullptr || published == nullptr || capacity <= 0 || publishedCount <= 0)
         return 0;
@@ -173,10 +203,10 @@ int loadPublishedCables (VisualCable* dest, int capacity,
     {
         const int jackA = jackForGraphPort (published[i].sourceModule, published[i].sourcePort,
                                              extIndex, outputIndex, noiseIndex,
-                                             vcfIndex, vca1Index, vca2Index, eg1Index);
+                                             vcfIndex, vca1Index, vca2Index, eg1Index, mgIndex, vcoIndex, eg2Index, ringIndex, dividerIndex, inverterIndex, integratorIndex);
         const int jackB = jackForGraphPort (published[i].destModule, published[i].destPort,
                                              extIndex, outputIndex, noiseIndex,
-                                             vcfIndex, vca1Index, vca2Index, eg1Index);
+                                             vcfIndex, vca1Index, vca2Index, eg1Index, mgIndex, vcoIndex, eg2Index, ringIndex, dividerIndex, inverterIndex, integratorIndex);
         if (jackA < 0 || jackB < 0)
             continue;
 

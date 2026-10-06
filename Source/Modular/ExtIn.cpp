@@ -2,6 +2,46 @@
 
 #include "ExtIn.h"
 
+#include <cmath>
+
+namespace {
+
+constexpr float kAttackSeconds = 0.005f;
+
+float knobForRatio (float ratio, float span)
+{
+    if (ratio < 1.0f)
+        ratio = 1.0f;
+    return std::log (ratio) / std::log (span);
+}
+
+}
+
+ExtIn::ExtIn()
+{
+    threshold01_ = knobForRatio (0.2f / 0.05f, 40.0f);
+    release01_ = knobForRatio (0.080f / 0.010f, 50.0f);
+}
+
+float ExtIn::clamp01 (float value)
+{
+    if (value < 0.0f)
+        return 0.0f;
+    if (value > 1.0f)
+        return 1.0f;
+    return value;
+}
+
+float ExtIn::thresholdVolts() const
+{
+    return 0.05f * std::pow (40.0f, clamp01 (threshold01_));
+}
+
+float ExtIn::releaseSeconds() const
+{
+    return 0.010f * std::pow (50.0f, clamp01 (release01_));
+}
+
 int ExtIn::numPorts() const
 {
     return 4;
@@ -18,13 +58,33 @@ PortDesc ExtIn::port (int index) const
     return { "Gate", PortType::Gate, PortDir::Out };
 }
 
-void ExtIn::setKnob (int, float)
+void ExtIn::setKnob (int knob, float zeroToOne)
 {
+    const float value = clamp01 (zeroToOne);
+    if (knob == kKnobThreshold)
+        threshold01_ = value;
+    else if (knob == kKnobRelease)
+        release01_ = value;
+}
+
+int ExtIn::presetKnobCount() const
+{
+    return 2;
+}
+
+float ExtIn::presetKnob (int knob) const
+{
+    if (knob == kKnobThreshold)
+        return threshold01_;
+    if (knob == kKnobRelease)
+        return release01_;
+    return 0.0f;
 }
 
 void ExtIn::prepare (double rate)
 {
     sampleRate = rate;
+    env_ = 0.0f;
 }
 
 void ExtIn::setHostSample (float leftUnit, float rightUnit)
@@ -33,10 +93,31 @@ void ExtIn::setHostSample (float leftUnit, float rightUnit)
     inRVolts_ = rightUnit * kHostToVolts;
 }
 
+void ExtIn::setButtonHeld (bool held)
+{
+    buttonHeld_.store (held, std::memory_order_release);
+}
+
+bool ExtIn::buttonHeld() const
+{
+    return buttonHeld_.load (std::memory_order_acquire);
+}
+
 void ExtIn::processSample()
 {
     portValue[0] = inLVolts_;
     portValue[1] = inRVolts_;
-    portValue[2] = 0.5f * (inLVolts_ + inRVolts_);
-    portValue[3] = 0.0f;
+    const float mono = 0.5f * (inLVolts_ + inRVolts_);
+    portValue[2] = mono;
+
+    const float level = std::fabs (mono);
+    const float rate = static_cast<float> (sampleRate > 1.0 ? sampleRate : 48000.0);
+    const float tau = level > env_ ? kAttackSeconds : releaseSeconds();
+    const float coeff = 1.0f - std::exp (-1.0f / (tau * rate));
+    env_ += (level - env_) * coeff;
+    if (! std::isfinite (env_) || (env_ < 1.0e-15f && env_ > -1.0e-15f))
+        env_ = 0.0f;
+
+    const bool open = buttonHeld() || env_ > thresholdVolts();
+    portValue[3] = open ? 1.0f : 0.0f;
 }

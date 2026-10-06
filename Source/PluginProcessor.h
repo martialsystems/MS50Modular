@@ -2,14 +2,21 @@
 
 #pragma once
 
+#include "Modular/Divider.h"
 #include "Modular/Eg1.h"
+#include "Modular/Eg2.h"
 #include "Modular/ExtIn.h"
+#include "Modular/Integrator.h"
+#include "Modular/Inverter.h"
+#include "Modular/Mg.h"
 #include "Modular/Noise.h"
 #include "Modular/OutputModule.h"
+#include "Modular/Ring.h"
 #include "Modular/PatchGraph.h"
 #include "Modular/Vca1.h"
 #include "Modular/Vca2.h"
 #include "Modular/Vcf.h"
+#include "Modular/Vco.h"
 #include "UI/FaceKnobs.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -45,6 +52,7 @@ public:
 
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
+    const juce::String& presetError() const noexcept { return presetError_; }
 
     // Graph indices from addModule. Panel jack ids live in PanelGeometry.inc.
     int extInGraphIndex() const noexcept { return extModuleIndex_; }
@@ -54,6 +62,13 @@ public:
     int vca1GraphIndex() const noexcept { return vca1ModuleIndex_; }
     int vca2GraphIndex() const noexcept { return vca2ModuleIndex_; }
     int eg1GraphIndex() const noexcept { return eg1ModuleIndex_; }
+    int mgGraphIndex() const noexcept { return mgModuleIndex_; }
+    int vcoGraphIndex() const noexcept { return vcoModuleIndex_; }
+    int eg2GraphIndex() const noexcept { return eg2ModuleIndex_; }
+    int ringGraphIndex() const noexcept { return ringModuleIndex_; }
+    int dividerGraphIndex() const noexcept { return dividerModuleIndex_; }
+    int inverterGraphIndex() const noexcept { return inverterModuleIndex_; }
+    int integratorGraphIndex() const noexcept { return integratorModuleIndex_; }
 
     // Null when that column is still a picture.
     juce::AudioProcessorParameter* parameterForPanelKnob (const char* section, const char* label) const;
@@ -67,6 +82,7 @@ public:
     PatchGraph::ConnectResult connectJacks (int sourceModule, int sourcePort, int destModule, int destPort);
     void disconnectJacks (int sourceModule, int sourcePort, int destModule, int destPort);
     void setOutputMix (float zeroToOne);
+    void setExtInButtonHeld (bool held);
 
 private:
     void addKnobParameter (const FaceKnobBinding& binding);
@@ -81,6 +97,13 @@ private:
     Vca1 vca1;
     Vca2 vca2;
     Eg1 eg1;
+    MgModule mg;
+    Vco vco;
+    Eg2 eg2;
+    Ring ring;
+    Divider divider;
+    Inverter inverter;
+    Integrator integrator;
     int extModuleIndex_ = -1;
     int outputModuleIndex_ = -1;
     int noiseModuleIndex_ = -1;
@@ -88,6 +111,13 @@ private:
     int vca1ModuleIndex_ = -1;
     int vca2ModuleIndex_ = -1;
     int eg1ModuleIndex_ = -1;
+    int mgModuleIndex_ = -1;
+    int vcoModuleIndex_ = -1;
+    int eg2ModuleIndex_ = -1;
+    int ringModuleIndex_ = -1;
+    int dividerModuleIndex_ = -1;
+    int inverterModuleIndex_ = -1;
+    int integratorModuleIndex_ = -1;
 
     juce::AudioParameterBool* effectOn_ = nullptr;
     juce::AudioParameterFloat* vcfCutoff_ = nullptr;
@@ -98,6 +128,19 @@ private:
     juce::AudioParameterFloat* eg1Decay_ = nullptr;
     juce::AudioParameterFloat* eg1Sustain_ = nullptr;
     juce::AudioParameterFloat* eg1Release_ = nullptr;
+    juce::AudioParameterFloat* mgRate_ = nullptr;
+    juce::AudioParameterFloat* mgPw_ = nullptr;
+    juce::AudioParameterFloat* vcoRange_ = nullptr;
+    juce::AudioParameterFloat* vcoFine_ = nullptr;
+    juce::AudioParameterFloat* vcoPw_ = nullptr;
+    juce::AudioParameterFloat* vcoFm1_ = nullptr;
+    juce::AudioParameterFloat* vcoFm2_ = nullptr;
+    juce::AudioParameterFloat* eg2Hold_ = nullptr;
+    juce::AudioParameterFloat* eg2Delay_ = nullptr;
+    juce::AudioParameterFloat* eg2Attack_ = nullptr;
+    juce::AudioParameterFloat* eg2Release_ = nullptr;
+    juce::AudioParameterFloat* integratorTime_ = nullptr;
+    juce::String presetError_;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MS50ModularAudioProcessor)
 };

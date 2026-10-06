@@ -4,19 +4,19 @@
 
 #include "Module.h"
 
-// S-13, S-14, S-15. ADSR with three outputs. Separate from EG 2.
-class Eg1 : public Module {
+// S-26. Hold, delay, attack, release. No decay and no sustain. Not EG 1.
+class Eg2 : public Module {
 public:
     static constexpr int kTrig = 0;
-    static constexpr int kOutA = 1;
-    static constexpr int kOutB = 2;
-    static constexpr int kOutC = 3;
-    static constexpr int kKnobAttack = 0;
-    static constexpr int kKnobDecay = 1;
-    static constexpr int kKnobSustain = 2;
+    static constexpr int kOutPos = 1;
+    static constexpr int kOutNeg = 2;
+    static constexpr int kDelayTrig = 3;
+    static constexpr int kKnobHold = 0;
+    static constexpr int kKnobDelay = 1;
+    static constexpr int kKnobAttack = 2;
     static constexpr int kKnobRelease = 3;
 
-    Eg1();
+    Eg2();
 
     int numPorts() const override;
     PortDesc port (int index) const override;
@@ -28,19 +28,20 @@ public:
     void processSample() override;
 
 private:
-    enum class Stage { Idle, Attack, Decay, Sustain, Release };
+    enum class Stage { Idle, Wait, Attack, Release };
 
     static float clamp01 (float value);
-    static float knobForSeconds (float seconds);
     float secondsFor (float knob01) const;
     void follow (float target, float seconds);
 
-    // Schematic defaults: attack 0.01 s, decay 0.25 s, sustain 0.6, release 0.30 s.
-    float attack01_ = 0.25f;
-    float decay01_ = 0.59948425f;
-    float sustain01_ = 0.6f;
-    float release01_ = 0.61928095f;
-    float outA_ = 0.0f;
+    float hold01_ = 0.0f;
+    float delay01_ = 0.0f;
+    float attack01_ = 0.0f;
+    float release01_ = 0.0f;
+    float out_ = 0.0f;
+    double elapsed_ = 0.0;
+    int delayLeft_ = 0;
+    bool delayArmed_ = false;
     bool wasHeld_ = false;
     Stage stage_ = Stage::Idle;
 };

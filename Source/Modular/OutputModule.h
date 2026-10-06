@@ -15,6 +15,8 @@ public:
     int numPorts() const override;
     PortDesc port (int index) const override;
     void setKnob (int knob, float zeroToOne) override;
+    int presetKnobCount() const override;
+    float presetKnob (int knob) const override;
     void prepare (double sampleRate) override;
     void processSample() override;
 

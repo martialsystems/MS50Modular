@@ -80,6 +80,24 @@ void Eg1::setKnob (int knob, float zeroToOne)
         release01_ = value;
 }
 
+int Eg1::presetKnobCount() const
+{
+    return 4;
+}
+
+float Eg1::presetKnob (int knob) const
+{
+    if (knob == kKnobAttack)
+        return attack01_;
+    if (knob == kKnobDecay)
+        return decay01_;
+    if (knob == kKnobSustain)
+        return sustain01_;
+    if (knob == kKnobRelease)
+        return release01_;
+    return 0.0f;
+}
+
 void Eg1::prepare (double rate)
 {
     sampleRate = rate;

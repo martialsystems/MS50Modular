@@ -2,6 +2,10 @@
 
 #include "PatchGraph.h"
 
+#include <cmath>
+#include <cstdint>
+#include <cstring>
+
 namespace {
 
 // Rows are the source type (Audio, CV, Gate). Columns are the destination type.
@@ -26,6 +30,68 @@ bool typesAllowed (PortType from, PortType to)
 {
     return kAllowed[typeIndex (from)][typeIndex (to)];
 }
+
+constexpr char kMagic[4] = { 'M', 'S', '5', '0' };
+
+struct ByteCursor {
+    const std::uint8_t* cursor = nullptr;
+    const std::uint8_t* end = nullptr;
+    bool ok = true;
+
+    std::int32_t readI32()
+    {
+        if (! ok || cursor == nullptr || end - cursor < 4)
+        {
+            ok = false;
+            return 0;
+        }
+        std::int32_t value = 0;
+        std::memcpy (&value, cursor, 4);
+        cursor += 4;
+        return value;
+    }
+
+    float readF32()
+    {
+        if (! ok || cursor == nullptr || end - cursor < 4)
+        {
+            ok = false;
+            return 0.0f;
+        }
+        float value = 0.0f;
+        std::memcpy (&value, cursor, 4);
+        cursor += 4;
+        return value;
+    }
+};
+
+struct ByteWriter {
+    std::uint8_t* cursor = nullptr;
+    std::uint8_t* end = nullptr;
+    bool ok = true;
+
+    void writeI32 (std::int32_t value)
+    {
+        if (! ok || cursor == nullptr || end - cursor < 4)
+        {
+            ok = false;
+            return;
+        }
+        std::memcpy (cursor, &value, 4);
+        cursor += 4;
+    }
+
+    void writeF32 (float value)
+    {
+        if (! ok || cursor == nullptr || end - cursor < 4)
+        {
+            ok = false;
+            return;
+        }
+        std::memcpy (cursor, &value, 4);
+        cursor += 4;
+    }
+};
 
 }
 
@@ -61,33 +127,35 @@ bool PatchGraph::indicesLegal (int sourceModule, int sourcePort, int destModule,
     return typesAllowed (sourceDesc.type, destDesc.type);
 }
 
-bool PatchGraph::closesCycle (int sourceModule, int destModule) const
+bool PatchGraph::keptReaches (int from, int target, const Snapshot& snapshot, const bool* kept) const
 {
-    if (sourceModule == destModule)
-        return true;
+    if (from < 0 || target < 0 || from >= moduleCount_ || target >= moduleCount_ || kept == nullptr)
+        return false;
 
     bool seen[kMaxModules] {};
     int queue[kMaxModules] {};
     int head = 0;
     int tail = 0;
-    queue[tail++] = destModule;
-    seen[destModule] = true;
+    queue[tail] = from;
+    ++tail;
+    seen[from] = true;
 
     while (head < tail)
     {
-        const int module = queue[head++];
-        for (int i = 0; i < editCableCount_; ++i)
+        const int module = queue[head];
+        ++head;
+        for (int i = 0; i < snapshot.cableCount; ++i)
         {
-            if (editCables_[i].sourceModule != module)
+            if (! kept[i] || snapshot.cables[i].sourceModule != module)
                 continue;
-            const int next = editCables_[i].destModule;
-            if (next == sourceModule)
+            const int next = snapshot.cables[i].destModule;
+            if (next == target)
                 return true;
-            if (! seen[next])
-            {
-                seen[next] = true;
-                queue[tail++] = next;
-            }
+            if (next < 0 || next >= moduleCount_ || seen[next])
+                continue;
+            seen[next] = true;
+            queue[tail] = next;
+            ++tail;
         }
     }
     return false;
@@ -98,8 +166,6 @@ bool PatchGraph::connect (int sourceModule, int sourcePort, int destModule, int 
     if (sourceModule == destModule && sourcePort == destPort)
         return false;
     if (! indicesLegal (sourceModule, sourcePort, destModule, destPort))
-        return false;
-    if (closesCycle (sourceModule, destModule))
         return false;
     if (editCableCount_ >= kMaxCables)
         return false;
@@ -121,7 +187,7 @@ const char* PatchGraph::connectResultText (ConnectResult result) noexcept
         case ConnectResult::BadType:
             return "that jack does not take this cable";
         case ConnectResult::Cycle:
-            return "feedback is not available until step 19";
+            return "";
         case ConnectResult::Ok:
         case ConnectResult::Rejected:
             return "";
@@ -150,8 +216,6 @@ PatchGraph::ConnectResult PatchGraph::attemptConnect (int sourceModule, int sour
     if (! typesAllowed (sourceDesc.type, destDesc.type))
         return ConnectResult::BadType;
 
-    if (closesCycle (sourceModule, destModule))
-        return ConnectResult::Cycle;
     if (editCableCount_ >= kMaxCables)
         return ConnectResult::Rejected;
     if (! connect (sourceModule, sourcePort, destModule, destPort))
@@ -179,6 +243,7 @@ void PatchGraph::disconnect (int sourceModule, int sourcePort, int destModule, i
 
 void PatchGraph::prepare (double sampleRate)
 {
+    preparedRate_ = sampleRate;
     for (int i = 0; i < moduleCount_; ++i)
     {
         modules_[i]->sampleRate = sampleRate;
@@ -195,6 +260,8 @@ void PatchGraph::fillOrder (Snapshot& snapshot) const
 
     for (int i = 0; i < snapshot.cableCount; ++i)
     {
+        if (snapshot.feedback[i])
+            continue;
         const int source = snapshot.cables[i].sourceModule;
         const int dest = snapshot.cables[i].destModule;
         if (source == dest)
@@ -245,15 +312,78 @@ void PatchGraph::fillOrder (Snapshot& snapshot) const
             }
         }
     }
+
+    if (snapshot.orderCount >= moduleCount_)
+        return;
+
+    bool placed[kMaxModules] {};
+    for (int i = 0; i < snapshot.orderCount; ++i)
+        placed[snapshot.order[i]] = true;
+    for (int module = 0; module < moduleCount_; ++module)
+    {
+        if (placed[module])
+            continue;
+        snapshot.order[snapshot.orderCount] = module;
+        ++snapshot.orderCount;
+    }
 }
 
 void PatchGraph::publish()
 {
-    const int back = 1 - published_.load (std::memory_order_relaxed);
+    const int front = published_.load (std::memory_order_relaxed);
+    const int frontIndex = (front == 1) ? 1 : 0;
+    const int back = 1 - frontIndex;
     Snapshot& snapshot = snapshots_[back];
+    const Snapshot& previous = snapshots_[frontIndex];
+
     snapshot.cableCount = editCableCount_;
     for (int i = 0; i < editCableCount_; ++i)
         snapshot.cables[i] = editCables_[i];
+
+    // Walk oldest to newest. An edge is feedback when it closes on the edges kept so far.
+    // Only the newest feedback edge is delayed. The kept edges stay a DAG.
+    bool kept[kMaxCables] {};
+    int newestFeedback = -1;
+    for (int i = 0; i < snapshot.cableCount; ++i)
+    {
+        const int source = snapshot.cables[i].sourceModule;
+        const int dest = snapshot.cables[i].destModule;
+        const bool closes = source == dest || keptReaches (dest, source, snapshot, kept);
+        snapshot.feedback[i] = closes;
+        snapshot.delayed[i] = false;
+        kept[i] = ! closes;
+        if (closes)
+            newestFeedback = i;
+    }
+    for (int i = snapshot.cableCount; i < kMaxCables; ++i)
+    {
+        snapshot.feedback[i] = false;
+        snapshot.delayed[i] = false;
+        snapshot.held[i] = 0.0f;
+    }
+    if (newestFeedback >= 0)
+        snapshot.delayed[newestFeedback] = true;
+
+    for (int i = 0; i < snapshot.cableCount; ++i)
+    {
+        snapshot.held[i] = 0.0f;
+        if (! snapshot.delayed[i])
+            continue;
+        const Cable& cable = snapshot.cables[i];
+        for (int j = 0; j < previous.cableCount; ++j)
+        {
+            if (! previous.delayed[j])
+                continue;
+            const Cable& old = previous.cables[j];
+            if (old.sourceModule != cable.sourceModule || old.sourcePort != cable.sourcePort)
+                continue;
+            if (old.destModule != cable.destModule || old.destPort != cable.destPort)
+                continue;
+            snapshot.held[i] = previous.held[j];
+            break;
+        }
+    }
+
     fillOrder (snapshot);
     published_.store (back, std::memory_order_release);
 }
@@ -278,9 +408,82 @@ int PatchGraph::copyPublishedCables (Cable* dest, int capacity) const
     return count;
 }
 
+void PatchGraph::clearModuleInputs (int moduleIndex, const bool patched[kMaxModules][kMaxPorts]) const
+{
+    Module* module = modules_[moduleIndex];
+    const int ports = module->numPorts();
+    for (int portIndex = 0; portIndex < 8; ++portIndex)
+        module->inputConnected[portIndex] = false;
+    for (int portIndex = 0; portIndex < ports; ++portIndex)
+    {
+        const PortDesc desc = module->port (portIndex);
+        if (desc.dir != PortDir::In)
+            continue;
+        module->inputConnected[portIndex] = patched[moduleIndex][portIndex];
+        if (! patched[moduleIndex][portIndex])
+        {
+            if (desc.type == PortType::Gate)
+                continue;
+            module->portValue[portIndex] = desc.rest;
+            continue;
+        }
+        module->portValue[portIndex] = 0.0f;
+    }
+}
+
+void PatchGraph::contributeCables (int moduleIndex, const Snapshot& snapshot, bool includeZeroDelayFeedback) const
+{
+    Module* module = modules_[moduleIndex];
+    for (int i = 0; i < snapshot.cableCount; ++i)
+    {
+        const Cable& cable = snapshot.cables[i];
+        if (cable.destModule != moduleIndex)
+            continue;
+        const bool zeroDelayFeedback = snapshot.feedback[i] && ! snapshot.delayed[i];
+        if (zeroDelayFeedback && ! includeZeroDelayFeedback)
+            continue;
+
+        const Module* source = modules_[cable.sourceModule];
+        float contributed = snapshot.delayed[i] ? snapshot.held[i] : source->portValue[cable.sourcePort];
+        const PortDesc sourceDesc = source->port (cable.sourcePort);
+        const PortDesc destDesc = module->port (cable.destPort);
+        // S-15: a held gate contributes 0 V, a released gate contributes +5 V.
+        // Gate-to-gate stays the raw 0 or 1 level.
+        if (sourceDesc.type == PortType::Gate && destDesc.type != PortType::Gate)
+            contributed = contributed >= 0.5f ? 0.0f : 5.0f;
+        module->portValue[cable.destPort] += contributed;
+    }
+}
+
+int PatchGraph::delayedCableCount() const
+{
+    const int published = published_.load (std::memory_order_acquire);
+    const int index = (published == 1) ? 1 : 0;
+    const Snapshot& snapshot = snapshots_[index];
+    int count = 0;
+    for (int i = 0; i < snapshot.cableCount; ++i)
+    {
+        if (snapshot.delayed[i])
+            ++count;
+    }
+    return count;
+}
+
+bool PatchGraph::cableIsDelayed (int index) const
+{
+    const int published = published_.load (std::memory_order_acquire);
+    const int slot = (published == 1) ? 1 : 0;
+    const Snapshot& snapshot = snapshots_[slot];
+    if (index < 0 || index >= snapshot.cableCount)
+        return false;
+    return snapshot.delayed[index];
+}
+
 void PatchGraph::process()
 {
-    const Snapshot& snapshot = snapshots_[published_.load (std::memory_order_acquire)];
+    const int published = published_.load (std::memory_order_acquire);
+    const int index = (published == 1) ? 1 : 0;
+    Snapshot& snapshot = snapshots_[index];
 
     bool patched[kMaxModules][kMaxPorts] {};
     for (int i = 0; i < snapshot.cableCount; ++i)
@@ -290,46 +493,193 @@ void PatchGraph::process()
     }
 
     for (int moduleIndex = 0; moduleIndex < moduleCount_; ++moduleIndex)
+        clearModuleInputs (moduleIndex, patched);
+
+    // Destinations of an older feedback cable run once more so that cable stays zero-delay.
+    bool again[kMaxModules] {};
+    for (int i = 0; i < snapshot.cableCount; ++i)
     {
-        Module* module = modules_[moduleIndex];
-        const int ports = module->numPorts();
-        for (int portIndex = 0; portIndex < ports; ++portIndex)
-        {
-            const PortDesc desc = module->port (portIndex);
-            if (desc.dir != PortDir::In)
-                continue;
-            if (! patched[moduleIndex][portIndex])
-            {
-                if (desc.type == PortType::Gate)
-                    continue;
-                module->portValue[portIndex] = desc.rest;
-                continue;
-            }
-            module->portValue[portIndex] = 0.0f;
-        }
+        if (snapshot.feedback[i] && ! snapshot.delayed[i])
+            again[snapshot.cables[i].destModule] = true;
     }
 
     for (int orderIndex = 0; orderIndex < snapshot.orderCount; ++orderIndex)
     {
         const int moduleIndex = snapshot.order[orderIndex];
-        Module* module = modules_[moduleIndex];
-
-        for (int i = 0; i < snapshot.cableCount; ++i)
-        {
-            const Cable& cable = snapshot.cables[i];
-            if (cable.destModule != moduleIndex)
-                continue;
-            const Module* source = modules_[cable.sourceModule];
-            float contributed = source->portValue[cable.sourcePort];
-            const PortDesc sourceDesc = source->port (cable.sourcePort);
-            const PortDesc destDesc = module->port (cable.destPort);
-            // S-15: a held gate contributes 0 V, a released gate contributes +5 V.
-            // Gate-to-gate stays the raw 0 or 1 level.
-            if (sourceDesc.type == PortType::Gate && destDesc.type != PortType::Gate)
-                contributed = contributed >= 0.5f ? 0.0f : 5.0f;
-            module->portValue[cable.destPort] += contributed;
-        }
-
-        module->processSample();
+        contributeCables (moduleIndex, snapshot, false);
+        modules_[moduleIndex]->processSample();
     }
+
+    for (int orderIndex = 0; orderIndex < snapshot.orderCount; ++orderIndex)
+    {
+        const int moduleIndex = snapshot.order[orderIndex];
+        if (! again[moduleIndex])
+            continue;
+        clearModuleInputs (moduleIndex, patched);
+        contributeCables (moduleIndex, snapshot, true);
+        modules_[moduleIndex]->processSample();
+    }
+
+    for (int i = 0; i < snapshot.cableCount; ++i)
+    {
+        if (! snapshot.delayed[i])
+            continue;
+        const Cable& cable = snapshot.cables[i];
+        snapshot.held[i] = modules_[cable.sourceModule]->portValue[cable.sourcePort];
+    }
+}
+
+int PatchGraph::getState (void* dest, int capacity) const
+{
+    if (dest == nullptr || capacity <= 0)
+        return 0;
+
+    int size = 16;
+    for (int module = 0; module < moduleCount_; ++module)
+    {
+        const int knobs = modules_[module]->presetKnobCount();
+        if (knobs < 0 || knobs > kMaxPresetKnobs)
+            return 0;
+        size += 8 + knobs * 4;
+    }
+    size += editCableCount_ * 16;
+    if (capacity < size)
+        return 0;
+
+    auto* bytes = static_cast<std::uint8_t*> (dest);
+    ByteWriter writer { bytes, bytes + capacity, true };
+    writer.cursor[0] = static_cast<std::uint8_t> (kMagic[0]);
+    writer.cursor[1] = static_cast<std::uint8_t> (kMagic[1]);
+    writer.cursor[2] = static_cast<std::uint8_t> (kMagic[2]);
+    writer.cursor[3] = static_cast<std::uint8_t> (kMagic[3]);
+    writer.cursor += 4;
+    writer.writeI32 (kStateVersion);
+    writer.writeI32 (moduleCount_);
+    writer.writeI32 (editCableCount_);
+
+    for (int module = 0; module < moduleCount_; ++module)
+    {
+        const Module* item = modules_[module];
+        const int knobs = item->presetKnobCount();
+        writer.writeI32 (knobs);
+        for (int knob = 0; knob < knobs; ++knob)
+            writer.writeF32 (item->presetKnob (knob));
+        writer.writeI32 (item->presetScaleIndex());
+    }
+
+    for (int cable = 0; cable < editCableCount_; ++cable)
+    {
+        writer.writeI32 (editCables_[cable].sourceModule);
+        writer.writeI32 (editCables_[cable].sourcePort);
+        writer.writeI32 (editCables_[cable].destModule);
+        writer.writeI32 (editCables_[cable].destPort);
+    }
+
+    if (! writer.ok || writer.cursor != bytes + size)
+        return 0;
+    return size;
+}
+
+bool PatchGraph::setState (const void* data, int size)
+{
+    auto fail = [this] (const char* message)
+    {
+        stateError_ = message;
+        return false;
+    };
+
+    if (data == nullptr || size < 16)
+        return fail ("preset state is corrupt");
+
+    const auto* bytes = static_cast<const std::uint8_t*> (data);
+    if (std::memcmp (bytes, kMagic, 4) != 0)
+        return fail ("preset state is corrupt");
+
+    ByteCursor reader { bytes + 4, bytes + size, true };
+    const std::int32_t version = reader.readI32();
+    const std::int32_t modules = reader.readI32();
+    const std::int32_t cables = reader.readI32();
+    if (! reader.ok)
+        return fail ("preset state is corrupt");
+    if (version != kStateVersion)
+        return fail ("preset version is not supported");
+    if (modules != moduleCount_ || cables < 0 || cables > kMaxCables)
+        return fail ("preset state is corrupt");
+
+    float knobs[kMaxModules][kMaxPresetKnobs] {};
+    int knobCount[kMaxModules] {};
+    int scaleIndex[kMaxModules] {};
+    Cable loaded[kMaxCables] {};
+
+    for (int module = 0; module < modules; ++module)
+    {
+        const int count = reader.readI32();
+        if (! reader.ok || count != modules_[module]->presetKnobCount() || count < 0 || count > kMaxPresetKnobs)
+            return fail ("preset state is corrupt");
+        knobCount[module] = count;
+        for (int knob = 0; knob < count; ++knob)
+        {
+            const float value = reader.readF32();
+            if (! reader.ok || ! std::isfinite (value) || value < 0.0f || value > 1.0f)
+                return fail ("preset state is corrupt");
+            knobs[module][knob] = value;
+        }
+        const int scale = reader.readI32();
+        if (! reader.ok)
+            return fail ("preset state is corrupt");
+        const int liveScale = modules_[module]->presetScaleIndex();
+        if (liveScale < 0)
+        {
+            if (scale != -1)
+                return fail ("preset state is corrupt");
+        }
+        else if (scale < 0 || scale > 3)
+        {
+            return fail ("preset state is corrupt");
+        }
+        scaleIndex[module] = scale;
+    }
+
+    for (int cable = 0; cable < cables; ++cable)
+    {
+        loaded[cable].sourceModule = reader.readI32();
+        loaded[cable].sourcePort = reader.readI32();
+        loaded[cable].destModule = reader.readI32();
+        loaded[cable].destPort = reader.readI32();
+        if (! reader.ok || ! indicesLegal (loaded[cable].sourceModule, loaded[cable].sourcePort,
+                                            loaded[cable].destModule, loaded[cable].destPort))
+            return fail ("preset state is corrupt");
+    }
+
+    if (! reader.ok || reader.cursor != reader.end)
+        return fail ("preset state is corrupt");
+
+    float previous[kMaxModules][kMaxPresetKnobs] {};
+    for (int module = 0; module < moduleCount_; ++module)
+    {
+        for (int knob = 0; knob < knobCount[module]; ++knob)
+            previous[module][knob] = modules_[module]->presetKnob (knob);
+        for (int knob = 0; knob < knobCount[module]; ++knob)
+            modules_[module]->setKnob (knob, knobs[module][knob]);
+    }
+
+    for (int module = 0; module < moduleCount_; ++module)
+    {
+        if (modules_[module]->presetScaleIndex() == scaleIndex[module])
+            continue;
+        for (int restore = 0; restore < moduleCount_; ++restore)
+        {
+            for (int knob = 0; knob < knobCount[restore]; ++knob)
+                modules_[restore]->setKnob (knob, previous[restore][knob]);
+        }
+        return fail ("preset state is corrupt");
+    }
+
+    editCableCount_ = cables;
+    for (int cable = 0; cable < cables; ++cable)
+        editCables_[cable] = loaded[cable];
+
+    prepare (preparedRate_ > 0.0 ? preparedRate_ : 48000.0);
+    stateError_ = "";
+    return true;
 }

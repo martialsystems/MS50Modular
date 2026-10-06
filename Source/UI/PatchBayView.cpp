@@ -299,12 +299,21 @@ PatchBayView::PatchBayView (MS50ModularAudioProcessor& processor)
                                   audioProcessor.vcfGraphIndex(),
                                   audioProcessor.vca1GraphIndex(),
                                   audioProcessor.vca2GraphIndex(),
-                                  audioProcessor.eg1GraphIndex());
+                                  audioProcessor.eg1GraphIndex(),
+                                  audioProcessor.mgGraphIndex(),
+                                  audioProcessor.vcoGraphIndex(),
+                                  audioProcessor.eg2GraphIndex(),
+                                  audioProcessor.ringGraphIndex(),
+                                  audioProcessor.dividerGraphIndex(),
+                                  audioProcessor.inverterGraphIndex(),
+                                  audioProcessor.integratorGraphIndex());
     startTimerHz (60);
 }
 
 PatchBayView::~PatchBayView()
 {
+    if (extInPress_)
+        audioProcessor.setExtInButtonHeld (false);
     stopTimer();
 }
 
@@ -651,6 +660,12 @@ bool PatchBayView::switchAt (float x, float y) const
            && y >= 8.0f && y <= 36.0f;
 }
 
+bool PatchBayView::extInButtonAt (float x, float y) const
+{
+    return x >= kExtInButtonX && x <= kExtInButtonX + kExtInButtonW
+           && y >= kExtInButtonY && y <= kExtInButtonY + kExtInButtonH;
+}
+
 juce::AudioProcessorParameter* PatchBayView::parameterForKnob (int index) const
 {
     if (index < 0 || index >= kPanelKnobCount)
@@ -840,7 +855,14 @@ void PatchBayView::dropAt (int targetJack)
                                                         audioProcessor.vcfGraphIndex(),
                                                         audioProcessor.vca1GraphIndex(),
                                                         audioProcessor.vca2GraphIndex(),
-                                                        audioProcessor.eg1GraphIndex());
+                                                        audioProcessor.eg1GraphIndex(),
+                                                        audioProcessor.mgGraphIndex(),
+                                                        audioProcessor.vcoGraphIndex(),
+                                                        audioProcessor.eg2GraphIndex(),
+                                                        audioProcessor.ringGraphIndex(),
+                                                        audioProcessor.dividerGraphIndex(),
+                                                        audioProcessor.inverterGraphIndex(),
+                                                        audioProcessor.integratorGraphIndex());
     if (oriented != PanelLinkResult::Ok)
     {
         if (isNew)
@@ -1046,10 +1068,21 @@ void PatchBayView::paint (juce::Graphics& g)
     g.setColour (effectOn ? juce::Colour (0xffc29f4c) : juce::Colour (0xff2a2a2c));
     g.fillRoundedRectangle (thumb, 6.0f * scale);
 
+    const auto holdOrigin = screenPoint (kExtInButtonX, kExtInButtonY);
+    const juce::Rectangle<float> hold (holdOrigin.x, holdOrigin.y, kExtInButtonW * scale, kExtInButtonH * scale);
+    g.setColour (extInPress_ ? juce::Colour (0xffc29f4c) : juce::Colour (0xff2a2a2c));
+    g.fillRoundedRectangle (hold, 4.0f * scale);
+    g.setColour (juce::Colour (0xffd8d2bd));
+    g.setFont (juce::Font (juce::FontOptions (9.0f * scale)));
+    g.drawText ("HOLD", hold, juce::Justification::centred, false);
+
     juce::String line = status_;
+    const bool presetAlert = line.isEmpty() && ! grabActive_ && audioProcessor.presetError().isNotEmpty();
     if (line.isEmpty())
     {
-        if (grabActive_)
+        if (presetAlert)
+            line = audioProcessor.presetError();
+        else if (grabActive_)
             line = "Drop on a jack to plug in. Empty space unplugs. Esc cancels.";
         else if (hoverJack_ >= 0)
             line = juce::String (kPanelJacks[hoverJack_].section) + ": " + kPanelJacks[hoverJack_].label;
@@ -1058,7 +1091,7 @@ void PatchBayView::paint (juce::Graphics& g)
     }
     if (line.isNotEmpty())
     {
-        g.setColour (status_.isNotEmpty() ? juce::Colour (0xffffe08a) : juce::Colour (0xffd8d2bd));
+        g.setColour (status_.isNotEmpty() || presetAlert ? juce::Colour (0xffffe08a) : juce::Colour (0xffd8d2bd));
         g.setFont (juce::Font (juce::FontOptions (13.0f * scale)));
         const auto textOrigin = screenPoint (300.0f, 10.0f);
         g.drawText (line, juce::Rectangle<float> (textOrigin.x, textOrigin.y, 900.0f * scale, 20.0f * scale),
@@ -1114,6 +1147,8 @@ void PatchBayView::mouseDown (const juce::MouseEvent& event)
 
     if (event.mods.isRightButtonDown())
     {
+        if (extInButtonAt (design.x, design.y))
+            return;
         if (knobAt (design.x, design.y) < 0 && jackAt (design.x, design.y) < 0)
             unplugIndex (cableNear (design.x, design.y));
         return;
@@ -1137,6 +1172,14 @@ void PatchBayView::mouseDown (const juce::MouseEvent& event)
             parameter->beginChangeGesture();
             parameter->setValueNotifyingHost (parameter->getValue() < 0.5f ? 1.0f : 0.0f);
         }
+        repaint();
+        return;
+    }
+
+    if (extInButtonAt (design.x, design.y))
+    {
+        extInPress_ = true;
+        audioProcessor.setExtInButtonHeld (true);
         repaint();
         return;
     }
@@ -1192,7 +1235,7 @@ void PatchBayView::mouseDrag (const juce::MouseEvent& event)
     hoverJack_ = jackAt (design.x, design.y);
     hoverLabel_ = labelAt (design.x, design.y);
 
-    if (effectPress_)
+    if (effectPress_ || extInPress_)
         return;
 
     if (downActive_ && ! grabActive_ && std::hypot (design.x - downX_, design.y - downY_) > 6.0f)
@@ -1246,6 +1289,14 @@ void PatchBayView::mouseUp (const juce::MouseEvent& event)
     {
         effectPress_ = false;
         endGesture();
+        return;
+    }
+
+    if (extInPress_)
+    {
+        extInPress_ = false;
+        audioProcessor.setExtInButtonHeld (false);
+        repaint();
         return;
     }
 

@@ -211,7 +211,7 @@ int testEg1ThreeJacks()
     check (std::strcmp (sustain.parameterName, "EG 1 Sustain") == 0 && sustain.fallback == 0.68f, "sustain name");
     check (std::strcmp (release.parameterName, "EG 1 Release") == 0 && release.fallback == 0.42f, "release name");
     check (attack.minimum == 0.0f && attack.maximum == 1.0f, "attack range");
-    check (faceKnobBinding ("EG 2", "ATTACK").knob == FaceKnob::None, "eg 2 stays a picture");
+    check (faceKnobBinding ("EG 2", "ATTACK").knob == FaceKnob::Eg2Attack, "eg 2 attack is a parameter");
     return finish ("testEg1ThreeJacks");
 }
 
@@ -303,15 +303,16 @@ int testEg1FactoryPatch()
     output.setLevel (1.0f);
     output.setMix (outputMixForEffect (true));
     graph.prepare (kRate);
-    ext.setHostSample (0.8f, 0.8f);
+    // 0.02 host is 0.1 V of mono, under the 0.2 V follower threshold.
+    ext.setHostSample (0.02f, 0.02f);
     double sum = 0.0;
     for (int i = 0; i < 4800; ++i)
     {
         graph.process();
         sum += static_cast<double> (output.hostLeft()) * static_cast<double> (output.hostLeft());
     }
-    check (std::fabs (eg.portValue[Eg1::kTrig] - 5.0f) < 1.0e-4f, "ext in gate rests released");
-    check (std::fabs (eg.portValue[Eg1::kOutA]) < 1.0e-3f, "resting gate does not open eg 1");
+    check (std::fabs (eg.portValue[Eg1::kTrig] - 5.0f) < 1.0e-4f, "a quiet input leaves the gate released");
+    check (std::fabs (eg.portValue[Eg1::kOutA]) < 1.0e-3f, "a quiet input does not open eg 1");
     check (std::sqrt (sum / 4800.0) < 1.0e-4, "effect on stays silent until the gate is held");
 
     output.setMix (outputMixForEffect (false));

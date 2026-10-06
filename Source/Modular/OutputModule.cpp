@@ -33,6 +33,20 @@ void OutputModule::setKnob (int knob, float zeroToOne)
         setLevel (zeroToOne);
 }
 
+int OutputModule::presetKnobCount() const
+{
+    return 2;
+}
+
+float OutputModule::presetKnob (int knob) const
+{
+    if (knob == 0)
+        return mix_;
+    if (knob == 1)
+        return level_;
+    return 0.0f;
+}
+
 void OutputModule::setMix (float zeroToOne)
 {
     mix_ = clamp01 (zeroToOne);

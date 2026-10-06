@@ -72,6 +72,7 @@ private:
     int labelAt (float x, float y) const;
     int cableNear (float x, float y) const;
     bool switchAt (float x, float y) const;
+    bool extInButtonAt (float x, float y) const;
     int swatchAt (float x, float y) const;
     juce::AudioProcessorParameter* parameterForKnob (int index) const;
     void endGesture();
@@ -111,6 +112,7 @@ private:
     bool downMoved_ = false;
     bool downShift_ = false;
     bool effectPress_ = false;
+    bool extInPress_ = false;
     bool knobDrag_ = false;
     bool knobDragMoved_ = false;
     bool knobSuppressSwitchStep_ = false;

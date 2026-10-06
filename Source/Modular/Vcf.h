@@ -4,10 +4,10 @@
 
 #include "Module.h"
 
-// Step 8 low-pass. Step 20 replaces the cutoff law and the feedback clip.
+// Step 20 diode-bridge stand-in. Knob ids stay on Cutoff, Peak, and Amount.
 class Vcf : public Module {
 public:
-    static constexpr const char* kStandIn = "STAND-IN step 8, replaced in step 20";
+    static constexpr const char* kStandIn = "step 20, S-10";
     static constexpr int kSigIn = 0;
     static constexpr int kCutoff = 1;
     static constexpr int kSigOut = 2;
@@ -19,6 +19,8 @@ public:
     PortDesc port (int index) const override;
     int numKnobs() const;
     void setKnob (int knob, float zeroToOne) override;
+    int presetKnobCount() const override;
+    float presetKnob (int knob) const override;
     void prepare (double sampleRate) override;
     void processSample() override;
 
@@ -34,4 +36,7 @@ private:
     float amount01_ = 0.4f;
     double z1_ = 0.0;
     double z2_ = 0.0;
+    double env_ = 0.0;
+    double hpX_ = 0.0;
+    double hpY_ = 0.0;
 };

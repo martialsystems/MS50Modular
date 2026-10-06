@@ -39,6 +39,18 @@ MS50ModularAudioProcessor::MS50ModularAudioProcessor()
     addKnobParameter (faceKnobBinding ("EG 1", "DECAY"));
     addKnobParameter (faceKnobBinding ("EG 1", "SUSTAIN"));
     addKnobParameter (faceKnobBinding ("EG 1", "RELEASE"));
+    addKnobParameter (faceKnobBinding ("MG", "RATE"));
+    addKnobParameter (faceKnobBinding ("MG", "PW"));
+    addKnobParameter (faceKnobBinding ("VCO", "RANGE"));
+    addKnobParameter (faceKnobBinding ("VCO", "FINE"));
+    addKnobParameter (faceKnobBinding ("VCO", "PW"));
+    addKnobParameter (faceKnobBinding ("VCO", "FM 1"));
+    addKnobParameter (faceKnobBinding ("VCO", "FM 2"));
+    addKnobParameter (faceKnobBinding ("EG 2", "HOLD"));
+    addKnobParameter (faceKnobBinding ("EG 2", "DELAY"));
+    addKnobParameter (faceKnobBinding ("EG 2", "ATTACK"));
+    addKnobParameter (faceKnobBinding ("EG 2", "RELEASE"));
+    addKnobParameter (faceKnobBinding ("INT", "TIME"));
 
     extModuleIndex_ = graph.addModule (extIn);
     outputModuleIndex_ = graph.addModule (output);
@@ -47,6 +59,13 @@ MS50ModularAudioProcessor::MS50ModularAudioProcessor()
     vca1ModuleIndex_ = graph.addModule (vca1);
     vca2ModuleIndex_ = graph.addModule (vca2);
     eg1ModuleIndex_ = graph.addModule (eg1);
+    mgModuleIndex_ = graph.addModule (mg);
+    vcoModuleIndex_ = graph.addModule (vco);
+    eg2ModuleIndex_ = graph.addModule (eg2);
+    ringModuleIndex_ = graph.addModule (ring);
+    dividerModuleIndex_ = graph.addModule (divider);
+    inverterModuleIndex_ = graph.addModule (inverter);
+    integratorModuleIndex_ = graph.addModule (integrator);
     connectFactoryCables (graph, extModuleIndex_, outputModuleIndex_, vcfModuleIndex_, vca1ModuleIndex_,
                           eg1ModuleIndex_);
     applyHostControls();
@@ -84,6 +103,30 @@ void MS50ModularAudioProcessor::addKnobParameter (const FaceKnobBinding& binding
         eg1Sustain_ = parameter;
     else if (binding.knob == FaceKnob::Eg1Release)
         eg1Release_ = parameter;
+    else if (binding.knob == FaceKnob::MgRate)
+        mgRate_ = parameter;
+    else if (binding.knob == FaceKnob::MgPw)
+        mgPw_ = parameter;
+    else if (binding.knob == FaceKnob::VcoRange)
+        vcoRange_ = parameter;
+    else if (binding.knob == FaceKnob::VcoFine)
+        vcoFine_ = parameter;
+    else if (binding.knob == FaceKnob::VcoPw)
+        vcoPw_ = parameter;
+    else if (binding.knob == FaceKnob::VcoFm1)
+        vcoFm1_ = parameter;
+    else if (binding.knob == FaceKnob::VcoFm2)
+        vcoFm2_ = parameter;
+    else if (binding.knob == FaceKnob::Eg2Hold)
+        eg2Hold_ = parameter;
+    else if (binding.knob == FaceKnob::Eg2Delay)
+        eg2Delay_ = parameter;
+    else if (binding.knob == FaceKnob::Eg2Attack)
+        eg2Attack_ = parameter;
+    else if (binding.knob == FaceKnob::Eg2Release)
+        eg2Release_ = parameter;
+    else if (binding.knob == FaceKnob::IntegratorTime)
+        integratorTime_ = parameter;
 }
 
 juce::AudioParameterFloat* MS50ModularAudioProcessor::floatParameter (FaceKnob knob) const noexcept
@@ -104,6 +147,30 @@ juce::AudioParameterFloat* MS50ModularAudioProcessor::floatParameter (FaceKnob k
         return eg1Sustain_;
     if (knob == FaceKnob::Eg1Release)
         return eg1Release_;
+    if (knob == FaceKnob::MgRate)
+        return mgRate_;
+    if (knob == FaceKnob::MgPw)
+        return mgPw_;
+    if (knob == FaceKnob::VcoRange)
+        return vcoRange_;
+    if (knob == FaceKnob::VcoFine)
+        return vcoFine_;
+    if (knob == FaceKnob::VcoPw)
+        return vcoPw_;
+    if (knob == FaceKnob::VcoFm1)
+        return vcoFm1_;
+    if (knob == FaceKnob::VcoFm2)
+        return vcoFm2_;
+    if (knob == FaceKnob::Eg2Hold)
+        return eg2Hold_;
+    if (knob == FaceKnob::Eg2Delay)
+        return eg2Delay_;
+    if (knob == FaceKnob::Eg2Attack)
+        return eg2Attack_;
+    if (knob == FaceKnob::Eg2Release)
+        return eg2Release_;
+    if (knob == FaceKnob::IntegratorTime)
+        return integratorTime_;
     return nullptr;
 }
 
@@ -134,6 +201,18 @@ void MS50ModularAudioProcessor::applyHostControls()
     apply (eg1Decay_, eg1, Eg1::kKnobDecay);
     apply (eg1Sustain_, eg1, Eg1::kKnobSustain);
     apply (eg1Release_, eg1, Eg1::kKnobRelease);
+    apply (mgRate_, mg, MgModule::kKnobFrequency);
+    apply (mgPw_, mg, MgModule::kKnobPw);
+    apply (vcoRange_, vco, Vco::kKnobScale);
+    apply (vcoFine_, vco, Vco::kKnobFine);
+    apply (vcoPw_, vco, Vco::kKnobPw);
+    apply (vcoFm1_, vco, Vco::kKnobAmountA);
+    apply (vcoFm2_, vco, Vco::kKnobAmountB);
+    apply (eg2Hold_, eg2, Eg2::kKnobHold);
+    apply (eg2Delay_, eg2, Eg2::kKnobDelay);
+    apply (eg2Attack_, eg2, Eg2::kKnobAttack);
+    apply (eg2Release_, eg2, Eg2::kKnobRelease);
+    apply (integratorTime_, integrator, Integrator::kKnobTime);
     output.setMix (outputMixForEffect (effectIsOn()));
 }
 
@@ -177,6 +256,11 @@ void MS50ModularAudioProcessor::setOutputMix (float zeroToOne)
     output.setMix (zeroToOne);
 }
 
+void MS50ModularAudioProcessor::setExtInButtonHeld (bool held)
+{
+    extIn.setButtonHeld (held);
+}
+
 MS50ModularAudioProcessor::~MS50ModularAudioProcessor() = default;
 
 void MS50ModularAudioProcessor::prepareToPlay (double sampleRate, int)
@@ -189,6 +273,13 @@ void MS50ModularAudioProcessor::prepareToPlay (double sampleRate, int)
     vca1.prepare (sampleRate);
     vca2.prepare (sampleRate);
     eg1.prepare (sampleRate);
+    mg.prepare (sampleRate);
+    vco.prepare (sampleRate);
+    eg2.prepare (sampleRate);
+    ring.prepare (sampleRate);
+    divider.prepare (sampleRate);
+    inverter.prepare (sampleRate);
+    integrator.prepare (sampleRate);
     applyHostControls();
     setLatencySamples (0);
 }
@@ -302,6 +393,11 @@ void MS50ModularAudioProcessor::getStateInformation (juce::MemoryBlock& destData
         if (auto* ranged = dynamic_cast<juce::RangedAudioParameter*> (parameter))
             xml.setAttribute (ranged->getParameterID(), static_cast<double> (parameter->getValue()));
     }
+
+    unsigned char blob[4096];
+    const int bytes = graph.getState (blob, static_cast<int> (sizeof blob));
+    if (bytes > 0)
+        xml.setAttribute ("graph", juce::String::toHexString (blob, bytes));
     copyXmlToBinary (xml, destData);
 }
 
@@ -310,6 +406,18 @@ void MS50ModularAudioProcessor::setStateInformation (const void* data, int sizeI
     auto xml = getXmlFromBinary (data, sizeInBytes);
     if (xml == nullptr || ! xml->hasTagName ("MS50"))
         return;
+
+    if (xml->hasAttribute ("graph"))
+    {
+        juce::MemoryBlock block;
+        block.loadFromHexString (xml->getStringAttribute ("graph"));
+        if (! graph.setState (block.getData(), static_cast<int> (block.getSize())))
+        {
+            presetError_ = graph.stateError();
+            return;
+        }
+        presetError_.clear();
+    }
 
     for (auto* parameter : getParameters())
     {

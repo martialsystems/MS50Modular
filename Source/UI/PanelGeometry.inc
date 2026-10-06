@@ -14,7 +14,7 @@ struct PanelJackRec {
     const char* label;
     float x;
     float y;
-    int module; // 0 none, 1 Ext In, 2 Output, 3 Noise, 4 VCF, 5 VCA 1, 6 VCA 2, 7 EG 1
+    int module; // 0 none, 1 Ext In, 2 Output, 3 Noise, 4 VCF, 5 VCA 1, 6 VCA 2, 7 EG 1, 8 MG, 9 VCO, 10 EG 2, 11 Ring, 12 Divider, 13 Inverter, 14 Integrator
     int port;
     int dir; // 0 in, 1 out, -1 when the jack is not on the graph
 };
@@ -39,6 +39,12 @@ inline constexpr float kEffectSwitchX = 1524.0f;
 inline constexpr float kEffectSwitchY = 16.0f;
 inline constexpr float kEffectSwitchW = 48.0f;
 inline constexpr float kEffectSwitchH = 16.0f;
+
+// Momentary gate under the EXT IN GATE jack. Painted by the view, not panel art.
+inline constexpr float kExtInButtonX = 1412.0f;
+inline constexpr float kExtInButtonY = 348.0f;
+inline constexpr float kExtInButtonW = 64.0f;
+inline constexpr float kExtInButtonH = 22.0f;
 
 inline constexpr int kPanelLabelCount = 109;
 inline constexpr PanelLabelRec kPanelLabels[] = {
@@ -155,14 +161,14 @@ inline constexpr PanelLabelRec kPanelLabels[] = {
 
 inline constexpr int kPanelJackCount = 58;
 inline constexpr PanelJackRec kPanelJacks[] = {
-    { "VCO", "HZ/V", 85.4f, 246.5f, 0, -1, -1 },
-    { "VCO", "V/OCT", 85.4f, 283.5f, 0, -1, -1 },
-    { "VCO", "FM 1", 85.4f, 320.5f, 0, -1, -1 },
-    { "VCO", "FM 2", 85.4f, 357.5f, 0, -1, -1 },
-    { "VCO", "PWM", 85.4f, 394.5f, 0, -1, -1 },
-    { "VCO", "TRI", 85.4f, 431.5f, 0, -1, -1 },
-    { "VCO", "SAW", 85.4f, 468.5f, 0, -1, -1 },
-    { "VCO", "PULSE", 85.4f, 505.5f, 0, -1, -1 },
+    { "VCO", "HZ/V", 85.4f, 246.5f, 9, 0, 0 },
+    { "VCO", "V/OCT", 85.4f, 283.5f, 9, 1, 0 },
+    { "VCO", "FM 1", 85.4f, 320.5f, 9, 2, 0 },
+    { "VCO", "FM 2", 85.4f, 357.5f, 9, 3, 0 },
+    { "VCO", "PWM", 85.4f, 394.5f, 9, 4, 0 },
+    { "VCO", "TRI", 85.4f, 431.5f, 9, 6, 1 },
+    { "VCO", "SAW", 85.4f, 468.5f, 9, 5, 1 },
+    { "VCO", "PULSE", 85.4f, 505.5f, 9, 7, 1 },
     { "VCF", "IN", 203.4f, 246.5f, 4, 0, 0 },
     { "VCF", "CUTOFF", 203.4f, 320.5f, 4, 1, 0 },
     { "VCF", "OUT", 203.4f, 394.5f, 4, 2, 1 },
@@ -172,36 +178,36 @@ inline constexpr PanelJackRec kPanelJacks[] = {
     { "VCA 2", "IN", 391.9f, 196.5f, 6, 0, 0 },
     { "VCA 2", "CV", 391.9f, 270.5f, 6, 1, 0 },
     { "VCA 2", "OUT", 391.9f, 344.5f, 6, 2, 1 },
-    { "MG", "FM", 483.1f, 196.5f, 0, -1, -1 },
-    { "MG", "PWM", 483.1f, 254.2f, 0, -1, -1 },
-    { "MG", "TRI", 483.1f, 311.8f, 0, -1, -1 },
-    { "MG", "SAW", 483.1f, 369.5f, 0, -1, -1 },
-    { "MG", "INV SAW", 483.1f, 427.2f, 0, -1, -1 },
-    { "MG", "PULSE", 483.1f, 484.8f, 0, -1, -1 },
+    { "MG", "FM", 483.1f, 196.5f, 8, 0, 0 },
+    { "MG", "PWM", 483.1f, 254.2f, 8, 1, 0 },
+    { "MG", "TRI", 483.1f, 311.8f, 8, 2, 1 },
+    { "MG", "SAW", 483.1f, 369.5f, 8, 3, 1 },
+    { "MG", "INV SAW", 483.1f, 427.2f, 8, 4, 1 },
+    { "MG", "PULSE", 483.1f, 484.8f, 8, 5, 1 },
     { "EG 1", "TRIG", 580.5f, 296.5f, 7, 0, 0 },
     { "EG 1", "OUT A", 580.5f, 358.0f, 7, 1, 1 },
     { "EG 1", "OUT B", 580.5f, 419.5f, 7, 2, 1 },
     { "EG 1", "OUT C", 580.5f, 481.0f, 7, 3, 1 },
-    { "EG 2", "TRIG", 679.7f, 296.5f, 0, -1, -1 },
-    { "EG 2", "OUT +", 679.7f, 358.0f, 0, -1, -1 },
-    { "EG 2", "OUT −", 679.7f, 419.5f, 0, -1, -1 },
-    { "EG 2", "DELAY", 679.7f, 481.0f, 0, -1, -1 },
+    { "EG 2", "TRIG", 679.7f, 296.5f, 10, 0, 0 },
+    { "EG 2", "OUT +", 679.7f, 358.0f, 10, 1, 1 },
+    { "EG 2", "OUT −", 679.7f, 419.5f, 10, 2, 1 },
+    { "EG 2", "DELAY", 679.7f, 481.0f, 10, 3, 1 },
     { "NOISE", "WHITE", 771.9f, 88.5f, 3, 0, 1 },
     { "NOISE", "PINK", 771.9f, 162.5f, 3, 1, 1 },
     { "S&H", "IN", 858.4f, 146.5f, 0, -1, -1 },
     { "S&H", "OUT", 858.4f, 220.5f, 0, -1, -1 },
     { "S&H", "CLOCK", 858.4f, 294.5f, 0, -1, -1 },
-    { "RING", "A", 940.7f, 88.5f, 0, -1, -1 },
-    { "RING", "B", 940.7f, 162.5f, 0, -1, -1 },
-    { "RING", "OUT", 940.7f, 236.5f, 0, -1, -1 },
-    { "DIV", "IN", 1024.1f, 139.5f, 0, -1, -1 },
-    { "DIV", "/2", 1024.1f, 213.5f, 0, -1, -1 },
-    { "DIV", "/4", 1024.1f, 287.5f, 0, -1, -1 },
+    { "RING", "A", 940.7f, 88.5f, 11, 0, 0 },
+    { "RING", "B", 940.7f, 162.5f, 11, 1, 0 },
+    { "RING", "OUT", 940.7f, 236.5f, 11, 2, 1 },
+    { "DIV", "IN", 1024.1f, 139.5f, 12, 0, 0 },
+    { "DIV", "/2", 1024.1f, 213.5f, 12, 1, 1 },
+    { "DIV", "/4", 1024.1f, 287.5f, 12, 2, 1 },
     { "DIV", "/16", 1024.1f, 361.5f, 0, -1, -1 },
-    { "INV", "IN", 1104.3f, 88.5f, 0, -1, -1 },
-    { "INV", "OUT", 1104.3f, 162.5f, 0, -1, -1 },
-    { "INT", "IN", 1183.1f, 146.5f, 0, -1, -1 },
-    { "INT", "OUT", 1183.1f, 220.5f, 0, -1, -1 },
+    { "INV", "IN", 1104.3f, 88.5f, 13, 0, 0 },
+    { "INV", "OUT", 1104.3f, 162.5f, 13, 1, 1 },
+    { "INT", "IN", 1183.1f, 146.5f, 14, 0, 0 },
+    { "INT", "OUT", 1183.1f, 220.5f, 14, 1, 1 },
     { "MIX", "IN 1", 1272.3f, 246.5f, 0, -1, -1 },
     { "MIX", "IN 2", 1272.3f, 320.5f, 0, -1, -1 },
     { "MIX", "IN 3", 1272.3f, 394.5f, 0, -1, -1 },

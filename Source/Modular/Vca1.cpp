@@ -52,6 +52,20 @@ void Vca1::setKnob (int knob, float zeroToOne)
         intensity_ = clamp01 (zeroToOne);
 }
 
+int Vca1::presetKnobCount() const
+{
+    return 2;
+}
+
+float Vca1::presetKnob (int knob) const
+{
+    if (knob == kKnobLowCut)
+        return lowCut01_;
+    if (knob == kKnobIntensity)
+        return intensity_;
+    return 0.0f;
+}
+
 void Vca1::prepare (double rate)
 {
     sampleRate = rate;

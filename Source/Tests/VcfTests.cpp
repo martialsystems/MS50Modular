@@ -63,7 +63,7 @@ float measureRms (Vcf& vcf, float hz, int settle, int measure)
 
 int testVcfPassesDcOrLow()
 {
-    check (std::strcmp (Vcf::kStandIn, "STAND-IN step 8, replaced in step 20") == 0, "stand-in marker");
+    check (std::strcmp (Vcf::kStandIn, "step 20, S-10") == 0, "stand-in marker");
 
     Vcf dc;
     dc.prepare (kRate);
@@ -71,7 +71,7 @@ int testVcfPassesDcOrLow()
     dc.setKnob (Vcf::kKnobPeak, 0.0f);
     dc.setKnob (Vcf::kKnobAmount, 0.0f);
     float last = 0.0f;
-    for (int i = 0; i < 2000; ++i)
+    for (int i = 0; i < 16000; ++i)
     {
         dc.portValue[Vcf::kSigIn] = 1.0f;
         dc.portValue[Vcf::kCutoff] = 0.0f;
@@ -79,7 +79,7 @@ int testVcfPassesDcOrLow()
         last = dc.portValue[Vcf::kSigOut];
         check (finiteSample (last), "dc sample finite");
     }
-    check (std::fabs (last - 1.0f) < 0.02f, "high cutoff passes DC");
+    check (std::fabs (last) < 0.05f, "output coupling rejects settled DC");
 
     Vcf low;
     low.prepare (kRate);
@@ -252,7 +252,7 @@ int testVcfPanelJacks()
     check (vcfIn >= 0 && vcfOut >= 0 && vco >= 0, "jacks exist");
     check (kPanelJacks[vcfIn].module == 4 && kPanelJacks[vcfIn].port == 0 && kPanelJacks[vcfIn].dir == 0, "vcf in");
     check (kPanelJacks[vcfOut].module == 4 && kPanelJacks[vcfOut].dir == 1, "vcf out");
-    check (kPanelJacks[vco].module == 0, "vco stays unmapped");
+    check (kPanelJacks[vco].module == 9 && kPanelJacks[vco].port == 0 && kPanelJacks[vco].dir == 0, "vco hz/v is mapped");
 
     PanelLink refused;
     check (orientPanelJacks (extMono, vcfIn, 0, 1, 2, refused, -1) == PanelLinkResult::Unmapped,
@@ -279,4 +279,122 @@ int testVcfPanelJacks()
     check (faceKnobBinding ("DIV", "RATIO SWITCH").knob == FaceKnob::None, "divider stays a picture");
     check (outputMixForEffect (false) == 0.0f && outputMixForEffect (true) == 1.0f, "effect switch is on or off");
     return finish ("testVcfPanelJacks");
+}
+
+int testVcfHasNoHighpassSwitch()
+{
+    Vcf vcf;
+    check (vcf.numKnobs() == 3, "cutoff, peak, and amount");
+    check (Vcf::kKnobCutoff == 0 && Vcf::kKnobPeak == 1 && Vcf::kKnobAmount == 2, "knob ids stay put");
+    check (Vcf::kSigIn == 0 && Vcf::kCutoff == 1 && Vcf::kSigOut == 2, "jack ids stay put");
+    return finish ("testVcfHasNoHighpassSwitch");
+}
+
+double bandEnergy (const float* frame, int n, int bin)
+{
+    double re = 0.0;
+    double im = 0.0;
+    for (int i = 0; i < n; ++i)
+    {
+        const double window = 0.5 - 0.5 * std::cos (2.0 * kPi * static_cast<double> (i) / static_cast<double> (n));
+        const double x = static_cast<double> (frame[i]) * window;
+        const double ang = 2.0 * kPi * static_cast<double> (bin) * static_cast<double> (i) / static_cast<double> (n);
+        re += x * std::cos (ang);
+        im -= x * std::sin (ang);
+    }
+    return std::sqrt (re * re + im * im);
+}
+
+float spectralCentroid (float amplitude)
+{
+    Vcf vcf;
+    vcf.prepare (kRate);
+    vcf.setKnob (Vcf::kKnobCutoff, 0.62f);
+    vcf.setKnob (Vcf::kKnobPeak, 1.0f);
+    vcf.setKnob (Vcf::kKnobAmount, 0.0f);
+
+    constexpr int n = 2048;
+    float frame[n];
+    const int settle = 24000;
+    for (int i = 0; i < settle + n; ++i)
+    {
+        const double phase = std::fmod (90.0 * static_cast<double> (i) / kRate, 1.0);
+        const float saw = amplitude * static_cast<float> (2.0 * phase - 1.0);
+        vcf.portValue[Vcf::kSigIn] = saw;
+        vcf.portValue[Vcf::kCutoff] = 0.0f;
+        vcf.processSample();
+        if (i >= settle)
+            frame[i - settle] = vcf.portValue[Vcf::kSigOut];
+    }
+
+    double weighted = 0.0;
+    double total = 0.0;
+    for (int bin = 1; bin < 256; ++bin)
+    {
+        const double mag = bandEnergy (frame, n, bin);
+        const double hz = static_cast<double> (bin) * kRate / static_cast<double> (n);
+        weighted += hz * mag;
+        total += mag;
+    }
+    if (total <= 0.0)
+        return 0.0f;
+    return static_cast<float> (weighted / total);
+}
+
+int testVcfStaysFiniteWhenDrivenHard()
+{
+    Vcf vcf;
+    vcf.prepare (kRate);
+    vcf.setKnob (Vcf::kKnobCutoff, 0.7f);
+    vcf.setKnob (Vcf::kKnobPeak, 1.0f);
+    vcf.setKnob (Vcf::kKnobAmount, 1.0f);
+    bool finite = true;
+    float peak = 0.0f;
+    for (int i = 0; i < 96000; ++i)
+    {
+        const double phase = std::fmod (180.0 * static_cast<double> (i) / kRate, 1.0);
+        const float saw = static_cast<float> (8.0 * (2.0 * phase - 1.0));
+        vcf.portValue[Vcf::kSigIn] = (i == 1000) ? std::nanf ("") : saw;
+        vcf.portValue[Vcf::kCutoff] = 5.0f;
+        vcf.processSample();
+        const float y = vcf.portValue[Vcf::kSigOut];
+        if (! finiteSample (y) || std::fabs (y) > 40.0f)
+            finite = false;
+        if (std::fabs (y) > peak)
+            peak = std::fabs (y);
+    }
+    check (finite, "hard saw stays finite and inside 40 V");
+    check (peak > 0.01f, "hard saw still reaches the output");
+
+    Vcf modest;
+    modest.prepare (kRate);
+    modest.setKnob (Vcf::kKnobCutoff, 1.0f);
+    modest.setKnob (Vcf::kKnobPeak, 0.2f);
+    modest.setKnob (Vcf::kKnobAmount, 0.0f);
+    double sum = 0.0;
+    const int measure = 4800;
+    for (int i = 0; i < 8000 + measure; ++i)
+    {
+        const float sample = static_cast<float> (1.25 * std::sin (2.0 * kPi * 440.0 * static_cast<double> (i) / kRate));
+        modest.portValue[Vcf::kSigIn] = sample;
+        modest.portValue[Vcf::kCutoff] = 0.0f;
+        modest.processSample();
+        if (i >= 8000)
+        {
+            const float y = modest.portValue[Vcf::kSigOut];
+            sum += static_cast<double> (y) * static_cast<double> (y);
+        }
+    }
+    const double rms = std::sqrt (sum / static_cast<double> (measure));
+    check (rms > 0.4, "a -12 dBFS tone at open cutoff is not muted");
+    return finish ("testVcfStaysFiniteWhenDrivenHard");
+}
+
+int testVcfHotInputMovesSpectrum()
+{
+    const float quiet = spectralCentroid (0.1f);
+    const float loud = spectralCentroid (4.0f);
+    check (quiet > 200.0f, "quiet saw still has harmonics above the fundamental");
+    check (loud < quiet * 0.85f, "hot input moves the normalized spectrum down");
+    return finish ("testVcfHotInputMovesSpectrum");
 }

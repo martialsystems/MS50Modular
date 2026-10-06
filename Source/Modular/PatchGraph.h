@@ -40,18 +40,42 @@ public:
     // Copies the published snapshot. The caller supplies storage. No allocation.
     int copyPublishedCables (Cable* dest, int capacity) const;
 
+    // The newest cable that closes a cycle. Other cables stay zero-delay.
+    int delayedCableCount() const;
+    bool cableIsDelayed (int index) const;
+
+    static constexpr int kStateVersion = 1;
+    static constexpr int kMaxPresetKnobs = 8;
+
+    // Little-endian MS50 blob: magic, version, module count, cable count,
+    // then each module's knob floats and scale index, then each cable's four ids.
+    // No color, no stack order, no filter memory, no noise seed.
+    // Returns the bytes written, or 0 when the buffer is too small.
+    int getState (void* dest, int capacity) const;
+
+    // False leaves knobs, cables, and module memory as they were.
+    // An accepted load calls prepare so filter and envelope memory restart.
+    bool setState (const void* data, int size);
+    const char* stateError() const noexcept { return stateError_; }
+
 private:
     struct Snapshot {
         Cable cables[kMaxCables] {};
         int cableCount = 0;
+        bool feedback[kMaxCables] {};
+        bool delayed[kMaxCables] {};
+        float held[kMaxCables] {};
         int order[kMaxModules] {};
         int orderCount = 0;
     };
 
     bool indicesLegal (int sourceModule, int sourcePort, int destModule, int destPort) const;
-    bool closesCycle (int sourceModule, int destModule) const;
+    // True when `from` can walk to `target` along cables already kept out of the feedback set.
+    bool keptReaches (int from, int target, const Snapshot& snapshot, const bool* kept) const;
     void publish();
     void fillOrder (Snapshot& snapshot) const;
+    void clearModuleInputs (int moduleIndex, const bool patched[kMaxModules][kMaxPorts]) const;
+    void contributeCables (int moduleIndex, const Snapshot& snapshot, bool includeZeroDelayFeedback) const;
 
     Module* modules_[kMaxModules] {};
     int moduleCount_ = 0;
@@ -61,4 +85,6 @@ private:
 
     Snapshot snapshots_[2] {};
     std::atomic<int> published_ { 0 };
+    double preparedRate_ = 0.0;
+    const char* stateError_ = "";
 };

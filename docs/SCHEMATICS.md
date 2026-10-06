@@ -84,7 +84,7 @@ A 1978 MS-50 jack took one plug. This plugin stacks.
 
 The panel cable is undirected. The graph orients it from output to input. A drag may start on either jack. Dropping on empty space, or a right-click away from a jack, removes that cable. Shift-drag adds another cable on an occupied jack. Clicking an occupied jack opens the stack chooser. Escape cancels a drag that has not been published.
 
-An illegal pair is removed. The status strings are "that jack does not take this cable" and "feedback is not available until step 19". A jack with no graph module uses the first string and does not stay patched.
+An illegal pair is removed. The status string for that refusal is "that jack does not take this cable". A cycle stays patched. The newest cable in the cycle is delayed by one sample, and the other cables in that snapshot stay at zero delay. A jack with no graph module uses the refusal string and does not stay patched.
 
 The default dry cables are created once, in the processor constructor. A later publish does not put a removed dry cable back.
 
