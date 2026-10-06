@@ -101,7 +101,7 @@ Rules:
 | S-19 | Inverter offset | Offset forced to 0. The sheet's trim exists and is not a panel control | A unit with a large residual offset |
 | S-20 | Integrator time | One-pole lag, tau 1 ms to 2 s, same sign as the input. A held input settles at that voltage | Measured glide time, and a check that a held DC input does not ramp away |
 | S-21 | Ring scale | `outVolts = (aVolts * bVolts) / 5`. Bleed constant 0 | Measured full-scale product and residual feedthrough |
-| S-22 | Ext In gate | Envelope of `abs(mono)` with an attack/release follower. Fires above a threshold knob. Manual button ORs in a held gate | Phase 2 ESP trigger and TRIG SW replace this. The button is not a separate module |
+| S-22 | Ext In gate | Envelope of `abs(mono)` with an attack/release follower. The jack writes 0 V while the button is down or the follower is above threshold, and +5 V while released | Phase 2 ESP trigger and TRIG SW replace this. The button is not a separate module |
 | S-23 | Output mix law | `y = dry * (1 - mix) + wet * mix`, wet mono copied to L and R, then `* level * 0.2` | Only if the headphone amp is ever modeled, which is phase 2 |
 | S-24 | Feedback edge | In a cycle, the newest cable is the back-edge and delays one sample | A different deterministic rule, if documented in the same change as the tests |
 | S-25 | Control rate | Knobs and CV are read every audio sample. There is no slower CV block | A profiled need for a coarser rate. Do not add one for style |

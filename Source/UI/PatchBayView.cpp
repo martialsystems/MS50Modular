@@ -1017,9 +1017,8 @@ void PatchBayView::choosePreset (int index)
         return;
     }
 
-    for (int i = 0; i < kPanelKnobCount; ++i)
-        knobValue_[i] = kPanelKnobs[i].valueDefault;
-    syncHostKnobs();
+    shownProgram_ = index;
+    showProgramKnobs();
     reloadPublishedCables();
     prepareRopes (true);
     repaint();
@@ -1052,6 +1051,22 @@ void PatchBayView::syncHostKnobs()
         if (parameter == nullptr || parameter == gestureParam_)
             continue;
         knobValue_[i] = parameter->getValue();
+    }
+}
+
+void PatchBayView::showProgramKnobs()
+{
+    for (int i = 0; i < kPanelKnobCount; ++i)
+        knobValue_[i] = kPanelKnobs[i].valueDefault;
+    syncHostKnobs();
+    const float initial = factoryVca1Initial (audioProcessor.getCurrentProgram());
+    if (initial <= 0.0f)
+        return;
+    for (int i = 0; i < kPanelKnobCount; ++i)
+    {
+        const PanelKnobRec& knob = kPanelKnobs[i];
+        if (std::strcmp (knob.section, "VCA 1") == 0 && std::strcmp (knob.label, "INITIAL") == 0)
+            knobValue_[i] = initial;
     }
 }
 
@@ -1323,6 +1338,11 @@ void PatchBayView::selectMeter (int jack)
 
 void PatchBayView::timerCallback()
 {
+    if (! knobDrag_ && audioProcessor.getCurrentProgram() != shownProgram_)
+    {
+        shownProgram_ = audioProcessor.getCurrentProgram();
+        showProgramKnobs();
+    }
     syncHostKnobs();
     prepareRopes (true);
     stepRopes();

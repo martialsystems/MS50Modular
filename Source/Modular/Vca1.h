@@ -12,6 +12,8 @@ public:
     static constexpr int kOut = 2;
     static constexpr int kKnobLowCut = 0;
     static constexpr int kKnobIntensity = 1;
+    // Not stored in the graph blob. Feedback sets it. Every other factory preset clears it.
+    static constexpr int kKnobInitial = 2;
 
     int numPorts() const override;
     PortDesc port (int index) const override;
@@ -19,6 +21,8 @@ public:
     void setKnob (int knob, float zeroToOne) override;
     int presetKnobCount() const override;
     float presetKnob (int knob) const override;
+    void applyFactoryPreset (int index) override;
+    float initial() const noexcept { return initial01_; }
     void prepare (double sampleRate) override;
     void processSample() override;
 
@@ -27,7 +31,9 @@ private:
     float lowCutHz() const;
 
     // Knob 0 is 10 Hz. Intensity is the schematic 0.85 until a test moves it.
+    // Initial stays 0 so an unpatched Env is silence, except the Feedback preset.
     float lowCut01_ = 0.0f;
     float intensity_ = 0.85f;
+    float initial01_ = 0.0f;
     float low_ = 0.0f;
 };

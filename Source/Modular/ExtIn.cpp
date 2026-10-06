@@ -55,7 +55,7 @@ PortDesc ExtIn::port (int index) const
         return { "R", PortType::Audio, PortDir::Out };
     if (index == 2)
         return { "Mono", PortType::Audio, PortDir::Out };
-    return { "Gate", PortType::Gate, PortDir::Out };
+    return { "Gate", PortType::Gate, PortDir::Out, 5.0f, true };
 }
 
 void ExtIn::setKnob (int knob, float zeroToOne)
@@ -118,6 +118,7 @@ void ExtIn::processSample()
     if (! std::isfinite (env_) || (env_ < 1.0e-15f && env_ > -1.0e-15f))
         env_ = 0.0f;
 
+    // S-trig. Held is 0 V. Released rests at +5 V. EG 1 treats below 1.5 V as held.
     const bool open = buttonHeld() || env_ > thresholdVolts();
-    portValue[3] = open ? 1.0f : 0.0f;
+    portValue[3] = open ? 0.0f : 5.0f;
 }

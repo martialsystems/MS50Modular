@@ -69,9 +69,9 @@ Phase 2 columns are drawn on the panel and have no ports in the graph. The divid
 *   Port types: `Audio`, `CV`, `Gate`.
 *   Allowed: Audio to Audio, Audio to CV, CV to CV, CV to Audio, Gate to Gate, Gate to CV, Gate to Audio.
 *   Rejected: Audio or CV into a Gate-only input. A cable from a port to itself with no module in between.
-*   Gate promotion into a CV or Audio input uses S-15: held gate writes 0 V, released gate writes +5 V. That matches an active-low S-trig electrical picture. Logical "held" inside an EG still means the trigger condition is true.
-*   EG `Trig` jacks are type CV, not Gate-only, because the hardware detector accepts a voltage. Ext In `Gate` is type Gate and may be patched into `Trig` through the promotion above. MG pulse is type CV (0 V to +5 V) and may be patched into `Trig` directly. Divider outputs are type CV.
-*   Gate-only inputs in phase 1: none on the modules. Ext In's gate output is the Gate source. EG 2 `DelayTrig` is type Gate. Output has no gate jack.
+*   A logic Gate into a CV or Audio input uses S-15: a level at or above 0.5 writes 0 V, and a level below 0.5 writes +5 V. Gate-to-gate stays the raw level. Logical "held" inside an EG still means the trigger volts are below 1.5.
+*   EG `Trig` jacks are type CV, not Gate-only, because the hardware detector accepts a voltage. Ext In `Gate` is type Gate and already writes S-trig volts: 0 V while held, +5 V while released. Those volts are added to `Trig` as written. EG 2 `DelayTrig` is a logic Gate and still promotes. MG pulse is type CV (0 V to +5 V) and may be patched into `Trig` directly. Divider outputs are type CV.
+*   Gate-only inputs in phase 1: none on the modules. Ext In `Gate` and EG 2 `DelayTrig` are the Gate outputs. Output has no gate jack.
 *   Sample rate lives on the graph. `prepare(sampleRate)` runs on the message thread before audio starts, and again if the host changes rate. It may allocate. `processSample` may not.
 
 ## Input summing (2026-10-05)
@@ -171,7 +171,7 @@ Jacks:
 | L | out | Audio | Host left, in volts: sample * 5, so a full-scale host sample is ±5 V (S-01 inverse at the input). STAND-IN input sensitivity |
 | R | out | Audio | Host right, same scale |
 | Mono | out | Audio | (L + R) / 2 |
-| Gate | out | Gate | 1 while the button is down or the follower is above threshold |
+| Gate | out | Gate | 0 V while the button is down or the follower is above threshold. +5 V while released |
 
 Signal flow: host float to volts, mono sum, absolute value into a one-pole follower (attack 5 ms stand-in, release from the knob), compare to threshold.
 
@@ -323,7 +323,7 @@ filtered = onePoleHighpass(SigIn, lowCutHz)
 Out = filtered * envGain * intensity
 ```
 
-No initial gain. Unpatched Env is 0 V, so the output is 0. AC coupling stand-in: the low-cut at its minimum (10 Hz) is the only highpass. Do not add a second DC block.
+No initial gain on the module default. Unpatched Env is 0 V, so the output is 0. The Feedback factory preset adds 0.7 before that clamp, on this VCA only, so the saw is audible with Env unpatched. Every other factory preset leaves the added term at 0. AC coupling stand-in: the low-cut at its minimum (10 Hz) is the only highpass. Do not add a second DC block.
 
 Failure modes: treating Intensity as a CV-depth knob. A CV jack on low-cut. Sharing this code path with VCA 2.
 
@@ -392,7 +392,7 @@ Knobs: Attack, Decay, Sustain, Release. Times S-13, 1 ms to 10 s exponential. Su
 
 Jacks: `Trig` CV in, `OutA` CV out, `OutB` CV out, `OutC` CV out.
 
-Trigger: held while `Trig volts < 1.5` (S-15). Unpatched, the graph writes +5 V and the envelope stays idle. A promoted Gate writes 0 V when held, so Ext In Gate opens the EG, and writes +5 V when released. Rising edge (released to held) restarts attack. While held after decay, output sits at sustain. Release starts when the input goes above 1.5 V. Retrigger from a new edge during release restarts attack from the current level (no forced drop to 0). That edge rule is part of S-15.
+Trigger: held while `Trig volts < 1.5` (S-15). Unpatched, the graph writes +5 V and the envelope stays idle. Ext In Gate writes 0 V while held, which is below 1.5 V, so the envelope opens, and writes +5 V while released. A logic Gate such as EG 2 DelayTrig still promotes: held writes 0 V and released writes +5 V. Rising edge (released to held) restarts attack. While held after decay, output sits at sustain. Release starts when the input goes above 1.5 V. Retrigger from a new edge during release restarts attack from the current level (no forced drop to 0). That edge rule is part of S-15.
 
 Shapes, exponential segments toward the target (RC stand-in, S-13):
 

@@ -508,6 +508,7 @@ void MS50ModularAudioProcessor::getStateInformation (juce::MemoryBlock& destData
     const int bytes = graph.getState (blob, static_cast<int> (sizeof blob));
     if (bytes > 0)
         xml.setAttribute ("graph", juce::String::toHexString (blob, bytes));
+    xml.setAttribute ("vca1Initial", static_cast<double> (vca1.initial()));
     copyXmlToBinary (xml, destData);
 }
 
@@ -528,6 +529,12 @@ void MS50ModularAudioProcessor::setStateInformation (const void* data, int sizeI
         }
         presetError_.clear();
     }
+
+    // Absent on saves from before this attribute. Those sessions keep Initial at 0.
+    if (xml->hasAttribute ("vca1Initial"))
+        vca1.setKnob (Vca1::kKnobInitial, static_cast<float> (xml->getDoubleAttribute ("vca1Initial")));
+    else
+        vca1.setKnob (Vca1::kKnobInitial, 0.0f);
 
     for (auto* parameter : getParameters())
     {

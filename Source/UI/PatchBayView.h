@@ -82,6 +82,7 @@ private:
     juce::AudioProcessorParameter* parameterForKnob (int index) const;
     void endGesture();
     void syncHostKnobs();
+    void showProgramKnobs();
     void selectMeter (int jack);
     void removeCable (int index);
     void restoreGrabbedEnd();
@@ -135,6 +136,7 @@ private:
     bool pointerIn_ = false;
     int hoverJack_ = -1;
     int hoverLabel_ = -1;
+    int shownProgram_ = kDefaultFactoryPreset;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PatchBayView)
 };

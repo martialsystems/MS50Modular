@@ -2,6 +2,8 @@
 
 #include "Vca1.h"
 
+#include "FactoryPresets.h"
+
 #include <cmath>
 
 namespace {
@@ -50,6 +52,8 @@ void Vca1::setKnob (int knob, float zeroToOne)
         lowCut01_ = clamp01 (zeroToOne);
     else if (knob == kKnobIntensity)
         intensity_ = clamp01 (zeroToOne);
+    else if (knob == kKnobInitial)
+        initial01_ = clamp01 (zeroToOne);
 }
 
 int Vca1::presetKnobCount() const
@@ -64,6 +68,11 @@ float Vca1::presetKnob (int knob) const
     if (knob == kKnobIntensity)
         return intensity_;
     return 0.0f;
+}
+
+void Vca1::applyFactoryPreset (int index)
+{
+    setKnob (kKnobInitial, factoryVca1Initial (index));
 }
 
 void Vca1::prepare (double rate)
@@ -88,7 +97,7 @@ void Vca1::processSample()
     low_ += (input - low_) * coeff;
     flushState (low_);
 
-    float envGain = portValue[kEnv] / 5.0f;
+    float envGain = portValue[kEnv] / 5.0f + initial01_;
     envGain = clamp01 (envGain);
     float output = (input - low_) * envGain * intensity_;
     if (! std::isfinite (output))

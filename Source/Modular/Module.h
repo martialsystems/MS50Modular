@@ -16,6 +16,8 @@ public:
     // Sample-rate-independent knob positions. Filter memory and the noise seed stay out.
     virtual int presetKnobCount() const { return 0; }
     virtual float presetKnob (int) const { return 0.0f; }
+    // Factory preset load. The graph blob does not grow for a knob handled here.
+    virtual void applyFactoryPreset (int) {}
     // VCO footage is 0..3. Every other module returns -1.
     virtual int presetScaleIndex() const { return -1; }
 

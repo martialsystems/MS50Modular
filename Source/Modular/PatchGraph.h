@@ -35,6 +35,7 @@ public:
     void process();
 
     int moduleCount() const { return moduleCount_; }
+    Module* moduleAt (int index) noexcept;
     int cableCount() const { return editCableCount_; }
 
     // Live jack voltage for the meter. Not used by process().

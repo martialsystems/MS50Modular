@@ -63,16 +63,16 @@ int testExtInGateFiresAboveThreshold()
     check (extIndex == 0, "ext in is in the graph");
 
     run (graph, ext, 0.01f, 0.01f, static_cast<int> (0.1 * kRate));
-    check (ext.portValue[3] == 0.0f, "0.05 V mono stays under the 0.2 V threshold");
+    check (ext.portValue[3] == 5.0f, "a quiet tone leaves the gate at +5 V");
 
     run (graph, ext, 0.2f, 0.2f, static_cast<int> (0.03 * kRate));
-    check (ext.portValue[3] == 1.0f, "1 V mono opens the gate");
+    check (ext.portValue[3] == 0.0f, "1 V mono drives the gate to 0 V");
 
     ext.setHostSample (0.0f, 0.0f);
     graph.process();
-    check (ext.portValue[3] == 1.0f, "release holds the gate just after the tone stops");
+    check (ext.portValue[3] == 0.0f, "release holds 0 V just after the tone stops");
     run (graph, ext, 0.0f, 0.0f, static_cast<int> (0.25 * kRate));
-    check (ext.portValue[3] == 0.0f, "release lets the gate fall");
+    check (ext.portValue[3] == 5.0f, "release returns the gate to +5 V");
     check (std::fabs (ext.portValue[2]) < 1.0e-6f, "silence stays on the mono jack");
     return finish ("testExtInGateFiresAboveThreshold");
 }
@@ -87,12 +87,12 @@ int testExtInButtonForcesGate()
     ext.setButtonHeld (true);
     run (graph, ext, 0.0f, 0.0f, 1);
     check (ext.buttonHeld(), "button stays held");
-    check (ext.portValue[3] == 1.0f, "a held button opens the gate on silence");
+    check (ext.portValue[3] == 0.0f, "a held button drives the gate to 0 V");
 
     ext.setButtonHeld (false);
     run (graph, ext, 0.0f, 0.0f, 4);
     check (! ext.buttonHeld(), "button is up");
-    check (ext.portValue[3] == 0.0f, "button up on silence releases the gate");
+    check (ext.portValue[3] == 5.0f, "button up drives the gate to +5 V");
     return finish ("testExtInButtonForcesGate");
 }
 
@@ -128,7 +128,8 @@ int testExtInButtonOpensVoice()
         quiet += static_cast<double> (output.hostLeft()) * static_cast<double> (output.hostLeft());
     }
     check (std::sqrt (quiet / 2400.0) < 1.0e-4, "button up, a quiet tone stays silent");
-    check (std::fabs (eg.portValue[Eg1::kTrig] - 5.0f) < 1.0e-3f, "released gate promotes to +5 V");
+    check (std::fabs (ext.portValue[3] - 5.0f) < 1.0e-3f, "released gate jack is +5 V");
+    check (std::fabs (eg.portValue[Eg1::kTrig] - 5.0f) < 1.0e-3f, "released gate reaches EG 1 at +5 V");
     check (std::fabs (eg.portValue[Eg1::kOutA]) < 1.0e-3f, "eg 1 stays idle");
 
     ext.setButtonHeld (true);
@@ -145,7 +146,8 @@ int testExtInButtonOpensVoice()
         if (i >= 2400)
             late += energy;
     }
-    check (std::fabs (eg.portValue[Eg1::kTrig]) < 1.0e-3f, "held gate promotes to 0 V");
+    check (std::fabs (ext.portValue[3]) < 1.0e-3f, "held gate jack is 0 V");
+    check (std::fabs (eg.portValue[Eg1::kTrig]) < 1.0e-3f, "held gate reaches EG 1 at 0 V");
     check (eg.portValue[Eg1::kOutA] > 4.0f, "held gate reaches the sustain level");
     check (late / 2400.0 > (early / 64.0) * 4.0, "the tone rises through the attack");
     check (std::sqrt (late / 2400.0) > 0.004, "effect on, button held, the tone is audible");
@@ -167,6 +169,7 @@ int testExtInButtonOpensVoice()
     check (tail / 64.0 > dead / 2400.0 * 4.0, "button up, the tone falls through the release");
     check (std::sqrt (dead / 2400.0) < 1.0e-4, "button up, the tone dies");
     check (std::fabs (eg.portValue[Eg1::kOutA]) < 0.05f, "eg 1 returns to idle");
+    check (std::fabs (ext.portValue[3] - 5.0f) < 1.0e-3f, "button up returns the gate jack to +5 V");
     return finish ("testExtInButtonOpensVoice");
 }
 
@@ -183,8 +186,8 @@ int testExtInFollowerOpensEgWithoutButton()
 
     run (graph, ext, 0.4f, 0.4f, static_cast<int> (0.05 * kRate));
     check (! ext.buttonHeld(), "the button is up");
-    check (ext.portValue[3] == 1.0f, "the follower holds the gate");
-    check (std::fabs (eg.portValue[Eg1::kTrig]) < 1.0e-3f, "a followed gate promotes to 0 V");
+    check (ext.portValue[3] == 0.0f, "the follower drives the gate to 0 V");
+    check (std::fabs (eg.portValue[Eg1::kTrig]) < 1.0e-3f, "a followed gate reaches EG 1 at 0 V");
     check (eg.portValue[Eg1::kOutA] > 1.0f, "the follower opens eg 1");
 
     PatchGraph bare;

@@ -19,6 +19,7 @@
 #include "Modular/Vcf.h"
 #include "Modular/Vco.h"
 
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <fstream>
@@ -141,6 +142,25 @@ std::string functionBody (const std::string& text, const std::string& marker)
     return text.substr (start, end - start + 1);
 }
 
+double vcaOutRms (Rack& rack, int samples)
+{
+    double sum = 0.0;
+    const int skip = samples / 2;
+    int used = 0;
+    for (int i = 0; i < samples; ++i)
+    {
+        rack.graph.process();
+        if (i < skip)
+            continue;
+        const double y = static_cast<double> (rack.vca1.portValue[Vca1::kOut]);
+        sum += y * y;
+        ++used;
+    }
+    if (used <= 0)
+        return 0.0;
+    return std::sqrt (sum / static_cast<double> (used));
+}
+
 }
 
 int testFactoryPresetCount()
@@ -178,6 +198,17 @@ int testFactoryPresetCount()
     check (! loaded.graph.cableIsDelayed (0) && ! loaded.graph.cableIsDelayed (1) && ! loaded.graph.cableIsDelayed (2),
            "the older feedback cables stay zero-delay");
     check (loaded.graph.cableIsDelayed (3), "VCF SigOut to VCF Cutoff is the delayed cable");
+    check (std::fabs (loaded.vca1.initial() - kFeedbackVca1Initial) < 1.0e-6f, "Feedback sets VCA 1 Initial to 0.7");
+    check (factoryVca1Initial (kDefaultFactoryPreset) == 0.0f, "Voice does not set VCA 1 Initial");
+    loaded.graph.prepare (48000.0);
+    check (vcaOutRms (loaded, 4800) > 0.02, "Feedback saw is audible with no gate");
+    loaded.vca1.setKnob (Vca1::kKnobInitial, 0.0f);
+    check (vcaOutRms (loaded, 4800) < 1.0e-6, "Initial 0 closes the Feedback VCA");
+
+    check (loadFactoryPreset (loaded.graph, kDefaultFactoryPreset), "Voice loads after Feedback");
+    check (std::fabs (loaded.vca1.initial()) < 1.0e-6f, "Voice clears VCA 1 Initial");
+    check (cablesMatch (loaded.graph, kPresetVoice, 8), "Voice cables stay the eight");
+    check (loaded.graph.delayedCableCount() == 0, "Voice still adds no delay");
 
     check (loadFactoryPreset (loaded.graph, 0), "Dry loads");
     check (cablesMatch (loaded.graph, kPresetDry, 2), "Dry keeps only the left and right cables");
@@ -191,6 +222,10 @@ int testFactoryPresetCount()
     check (ctor.find ("connectFactoryCables") != std::string::npos, "the opening patch is the factory cables");
     check (ctor.find ("loadFactoryPreset") == std::string::npos, "construction does not swap in another preset");
     check (choose.find ("loadFactoryPreset") != std::string::npos, "choosing a program loads that preset");
+    check (processor.find ("vca1Initial") != std::string::npos, "session state keeps VCA 1 Initial");
+    const std::string restore = functionBody (processor, "void MS50ModularAudioProcessor::setStateInformation");
+    check (restore.find ("vca1Initial") != std::string::npos, "session restore reads VCA 1 Initial");
+    check (restore.find ("kKnobInitial, 0.0f") != std::string::npos, "an old session leaves VCA 1 Initial at 0");
 
     std::string header = MS50_PROCESSOR_SOURCE;
     const auto dot = header.rfind ('.');

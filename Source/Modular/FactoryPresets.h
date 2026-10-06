@@ -30,6 +30,13 @@ inline constexpr int SampleHold = 15;
 
 inline constexpr int kFactoryPresetCount = 6;
 inline constexpr int kDefaultFactoryPreset = 2;
+inline constexpr int kFeedbackPreset = 5;
+inline constexpr float kFeedbackVca1Initial = 0.70f;
+
+inline float factoryVca1Initial (int index) noexcept
+{
+    return index == kFeedbackPreset ? kFeedbackVca1Initial : 0.0f;
+}
 
 struct FactoryCable {
     int sourceModule;
@@ -110,6 +117,7 @@ inline bool factoryPresetEffect (int index)
 }
 
 // Replaces cables. Mixer levels return to 0.8 and the sample-and-hold rate to 0.5 when those modules are present.
+// Feedback sets VCA 1 Initial to 0.7. Every other preset clears it. The graph blob does not store that knob.
 inline bool loadFactoryPreset (PatchGraph& graph, int index)
 {
     if (index < 0 || index >= kFactoryPresetCount)
@@ -140,5 +148,9 @@ inline bool loadFactoryPreset (PatchGraph& graph, int index)
 
     if (graph.moduleCount() > FactoryModule::SampleHold)
         graph.writePresetKnob (FactoryModule::SampleHold, SampleHold::kKnobRate, 0.50f);
+
+    for (int module = 0; module < graph.moduleCount(); ++module)
+        if (Module* item = graph.moduleAt (module))
+            item->applyFactoryPreset (index);
     return true;
 }

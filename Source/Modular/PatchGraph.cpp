@@ -447,9 +447,9 @@ void PatchGraph::contributeCables (int moduleIndex, const Snapshot& snapshot, bo
         float contributed = snapshot.delayed[i] ? snapshot.held[i] : source->portValue[cable.sourcePort];
         const PortDesc sourceDesc = source->port (cable.sourcePort);
         const PortDesc destDesc = module->port (cable.destPort);
-        // S-15: a held gate contributes 0 V, a released gate contributes +5 V.
-        // Gate-to-gate stays the raw 0 or 1 level.
-        if (sourceDesc.type == PortType::Gate && destDesc.type != PortType::Gate)
+        // S-15: logic 1 is held and contributes 0 V. Logic 0 is released and contributes +5 V.
+        // Gate-to-gate stays the raw level. Ext In Gate is already 0 V held and +5 V released.
+        if (sourceDesc.type == PortType::Gate && destDesc.type != PortType::Gate && ! sourceDesc.strigVolts)
             contributed = contributed >= 0.5f ? 0.0f : 5.0f;
         module->portValue[cable.destPort] += contributed;
     }
@@ -711,6 +711,13 @@ bool PatchGraph::setCables (const Cable* cables, int count)
     publish();
     stateError_ = "";
     return true;
+}
+
+Module* PatchGraph::moduleAt (int index) noexcept
+{
+    if (index < 0 || index >= moduleCount_)
+        return nullptr;
+    return modules_[index];
 }
 
 bool PatchGraph::writePresetKnob (int module, int knob, float value)
