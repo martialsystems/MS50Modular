@@ -45,7 +45,9 @@ int testDividerOnlyTwoAndFour()
     check (std::strcmp (divider.port (Divider::kIn).name, "In") == 0, "input name");
     check (std::strcmp (divider.port (Divider::kDiv2).name, "Div2") == 0, "div2 name");
     check (std::strcmp (divider.port (Divider::kDiv4).name, "Div4") == 0, "div4 name");
-    check (faceKnobBinding ("DIV", "RATIO SWITCH").knob == FaceKnob::None, "ratio switch stays a picture");
+    const FaceKnobBinding ratio = faceKnobBinding ("DIV", "RATIO SWITCH");
+    check (ratio.knob == FaceKnob::DividerRatio && ratio.index < 0, "ratio switch is a host setting, not a module knob");
+    check (ratio.fallback == 0.0f && std::strcmp (ratio.parameterId, "dividerRatio") == 0, "ratio switch starts on /2");
 
     const int in = panelJackIndex ("DIV", "IN");
     const int div2 = panelJackIndex ("DIV", "/2");

@@ -411,6 +411,36 @@ int testNoAllocInProcess()
     return finish ("testNoAllocInProcess");
 }
 
+// Two loops through B. Each closing cable is the newest when it lands, so the graph delays
+// only the newest (D Out to B In). The older loop keeps its zero-delay timing. Processing allocates nothing.
+int testTwoLoopsDoNotAllocate()
+{
+    PatchGraph graph;
+    ConstantModule c (0.25f, PortType::Audio);
+    GainModule a;
+    GainModule b;
+    GainModule d;
+    const int ic = graph.addModule (c);
+    const int ia = graph.addModule (a);
+    const int ib = graph.addModule (b);
+    const int id = graph.addModule (d);
+    check (graph.connect (ic, 1, ia, 0), "constant into A");
+    check (graph.connect (ia, 1, ib, 0), "A into B");
+    check (graph.connect (ib, 1, ia, 0), "B back into A closes the first loop");
+    check (graph.connect (ib, 1, id, 0), "B into D");
+    check (graph.connect (id, 1, ib, 0), "D back into B closes the second loop");
+    check (graph.cableCount() == 5, "five cables");
+    check (graph.delayedCableCount() == 1, "one delayed cable");
+    check (graph.cableIsDelayed (4), "the newest loop cable is the delayed one");
+    graph.prepare (48000.0);
+
+    gAllocations.store (0, std::memory_order_relaxed);
+    for (int sample = 0; sample < 1000; ++sample)
+        graph.process();
+    check (gAllocations.load (std::memory_order_relaxed) == 0, "two loops: allocation counter stayed 0");
+    return finish ("testTwoLoopsDoNotAllocate");
+}
+
 int testDisconnectMissingIsNoop()
 {
     PatchGraph graph;
@@ -547,6 +577,7 @@ int testPresetNoiseToMixerRoundTrip();
 int testPresetBadVersionStillRejected();
 int testHoldPreset();
 int testSelfModPresets();
+int testOneDefaultTable();
 int testPresetRoundTrip();
 int testPresetRejectsBadVersion();
 int testFeedbackIsOneSample();
@@ -562,6 +593,7 @@ int main()
     failed += testConnectStatusStrings();
     failed += testSnapshotSwapDoesNotAllocate();
     failed += testNoAllocInProcess();
+    failed += testTwoLoopsDoNotAllocate();
     failed += testDisconnectMissingIsNoop();
     failed += testPublishedSnapshotCopy();
     failed += testDryMixPassesStereo();
@@ -656,6 +688,7 @@ int main()
     failed += testPresetBadVersionStillRejected();
     failed += testHoldPreset();
     failed += testSelfModPresets();
+    failed += testOneDefaultTable();
     failed += testPresetRoundTrip();
     failed += testPresetRejectsBadVersion();
     failed += testFeedbackIsOneSample();

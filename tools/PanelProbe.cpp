@@ -235,6 +235,17 @@ private:
         const int factoryCount = publishedCount (*processor);
         expect (factoryCount == 8, "default patch has eight cables");
         expect (bay->visualCount() == factoryCount, "default cables are drawn");
+        // Startup is the Voice program: every face knob starts on the default table, cap and parameter alike.
+        for (int i = 0; i < kPanelKnobCount; ++i)
+        {
+            auto* parameter = processor->parameterForPanelKnob (kPanelKnobs[i].section, kPanelKnobs[i].label);
+            if (parameter == nullptr || ! near (parameter->getValue(), kPanelKnobs[i].valueDefault)
+                || ! near (bay->knobValue (i), kPanelKnobs[i].valueDefault))
+            {
+                std::printf ("FAIL %s %s does not start on the default table\n", kPanelKnobs[i].section, kPanelKnobs[i].label);
+                ++gFails;
+            }
+        }
 
         const int levelKnob = panelKnobIndex ("OUTPUT", "LEVEL");
         auto* levelParam = processor->parameterForPanelKnob ("OUTPUT", "LEVEL");
@@ -245,6 +256,10 @@ private:
             expect (levelParam->getName (64) == "Output Level", "output level parameter name");
             expect (near (levelParam->getValue(), 0.7f), "output level starts at 0.7");
             expect (near (bay->knobValue (levelKnob), 0.7f), "output level cap starts at 0.7");
+            // A fresh instance is the Voice program, so Effect starts on. The dry checks below turn it off.
+            expect (processor->effectIsOn(), "a fresh instance starts with Effect on");
+            expect (processor->getCurrentProgram() == kDefaultFactoryPreset, "a fresh instance is Voice");
+            effect->setValueNotifyingHost (0.0f);
             const float dryUnity = hostLeftAfter (*processor, 0.5f, 0.0f);
             expect (near (dryUnity, 0.5f), "default output level is unity on the dry path");
 
@@ -405,7 +420,7 @@ private:
 
         const int cutoff = panelKnobIndex ("VCF", "CUTOFF");
         const int ratio = panelKnobIndex ("DIV", "RATIO SWITCH");
-        expect (bay->knobCount() == 31 && cutoff >= 0 && ratio >= 0, "live knob table");
+        expect (bay->knobCount() == 33 && cutoff >= 0 && ratio >= 0, "live knob table");
         const float cutoffDefault = bay->knobValue (cutoff);
         const float mixBefore = bay->outputMix();
         const int cablesBefore = publishedCount (*processor);
@@ -472,18 +487,18 @@ private:
             };
             writeCrop (lowPaint, "/tmp/ms50_knob_low.png");
             dragKnobLocal (*bay, kPanelKnobs[cutoff].cx, kPanelKnobs[cutoff].cy, -100.0f, false);
-            expect (near (bay->knobValue (cutoff), cutoffDefault), "cutoff returns to its default");
+            expect (near (bay->knobValue (cutoff), 0.5f), "drag up 100px from 0 is half travel");
             writeCrop (paintBay (*bay), "/tmp/ms50_knob_mid.png");
         }
         clickAt (*bay, kPanelKnobs[ratio].cx, kPanelKnobs[ratio].cy);
         expect (bay->knobValue (ratio) == 1.0f, "divider click steps from /2 to /4");
         expect (bay->knobReadout().contains ("4") && ! bay->knobReadout().contains ("16"), "switch readout shows 4");
-        clickAt (*bay, kPanelKnobs[ratio].cx, kPanelKnobs[ratio].cy);
-        expect (bay->knobValue (ratio) == 0.0f, "divider click steps from /4 back to /2");
-        dragKnobLocal (*bay, kPanelKnobs[ratio].cx, kPanelKnobs[ratio].cy, -120.0f, false);
-        expect (bay->knobValue (ratio) == 1.0f, "divider drag up snaps to /4");
+        if (auto* ratioParam = processor->parameterForPanelKnob ("DIV", "RATIO SWITCH"))
+            expect (near (ratioParam->getValue(), 1.0f), "the switch is saved as a host setting");
+        else
+            expect (false, "the switch is saved as a host setting");
         dragKnobLocal (*bay, kPanelKnobs[ratio].cx, kPanelKnobs[ratio].cy, 120.0f, false);
-        expect (bay->knobValue (ratio) == 0.0f, "divider drag down snaps to /2");
+        expect (bay->knobValue (ratio) == 0.0f, "divider drag snaps back to /2");
         expect (publishedCount (*processor) == cablesBefore, "turning knobs does not publish");
         expect (std::fabs (bay->outputMix() - mixBefore) < 1.0e-6f, "column knobs leave Output mix alone");
         expect (! bay->menuOpen(), "turning knobs does not open the chooser");

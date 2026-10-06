@@ -147,7 +147,7 @@ int testPanelStackRule()
 
 int testPanelKnobs()
 {
-    check (kPanelKnobCount == 31, "panel knob count");
+    check (kPanelKnobCount == 33, "panel knob count");
 
     const int vco = panelJackIndex ("VCO", "HZ/V");
     const int extL = panelJackIndex ("EXT IN", "L");

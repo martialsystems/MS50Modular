@@ -235,7 +235,7 @@ int testVcaPanelJacks()
 
     const FaceKnobBinding lowCut = faceKnobBinding ("VCA 1", "LOW CUT");
     check (lowCut.knob == FaceKnob::Vca1LowCut && std::strcmp (lowCut.parameterName, "VCA 1 Low Cut") == 0, "low cut name");
-    check (lowCut.minimum == 0.0f && lowCut.maximum == 1.0f && lowCut.fallback == 0.68f, "low cut range");
+    check (lowCut.minimum == 0.0f && lowCut.maximum == 1.0f && lowCut.fallback == 0.0f, "low cut range");
     const FaceKnobBinding initial = faceKnobBinding ("VCA 1", "INITIAL");
     const FaceKnobBinding mod = faceKnobBinding ("VCA 1", "MOD");
     const FaceKnobBinding initial2 = faceKnobBinding ("VCA 2", "INITIAL");

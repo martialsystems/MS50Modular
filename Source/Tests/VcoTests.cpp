@@ -280,9 +280,9 @@ int testVcoPanelJacks()
     const FaceKnobBinding fm2 = faceKnobBinding ("VCO", "FM 2");
     check (range.knob == FaceKnob::VcoRange && std::strcmp (range.parameterName, "VCO Range") == 0, "range name");
     check (range.fallback == 0.50f, "range faceplate");
-    check (fine.knob == FaceKnob::VcoFine && fine.fallback == 0.30f, "fine faceplate");
-    check (pw.knob == FaceKnob::VcoPw && pw.fallback == 0.68f, "pw faceplate");
-    check (fm1.knob == FaceKnob::VcoFm1 && fm1.fallback == 0.42f, "fm 1 faceplate");
-    check (fm2.knob == FaceKnob::VcoFm2 && fm2.fallback == 0.78f, "fm 2 faceplate");
+    check (fine.knob == FaceKnob::VcoFine && fine.fallback == 0.50f, "fine faceplate");
+    check (pw.knob == FaceKnob::VcoPw && pw.fallback == 0.50f, "pw faceplate");
+    check (fm1.knob == FaceKnob::VcoFm1 && fm1.fallback == 0.0f, "fm 1 faceplate");
+    check (fm2.knob == FaceKnob::VcoFm2 && fm2.fallback == 0.0f, "fm 2 faceplate");
     return finish ("testVcoPanelJacks");
 }

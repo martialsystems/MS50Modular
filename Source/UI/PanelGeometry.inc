@@ -36,7 +36,7 @@ struct PanelKnobRec {
 inline constexpr float kPanelW = 1600.0f;
 inline constexpr float kPanelH = 640.0f;
 
-// Power rocker. Left half is off, right half is on. The raised end points at that word.
+// EFFECT rocker (layout key "power"). Left half is off (dry), right half is on (wet). The raised end points at that word.
 inline constexpr float kPowerX = 1524.00f;
 inline constexpr float kPowerY = 17.00f;
 inline constexpr float kPowerW = 40.00f;
@@ -78,7 +78,7 @@ inline constexpr float kMeterScale = 1.56f;
 inline constexpr float kMeterMinAngle = -47.00f;
 inline constexpr float kMeterMaxAngle = 47.00f;
 
-inline constexpr int kPanelLabelCount = 108;
+inline constexpr int kPanelLabelCount = 110;
 inline constexpr PanelLabelRec kPanelLabels[] = {
     { "VCO", 69.2f, 56.1f, 27.6f, 11.3f },
     { "RANGE", 34.4f, 117.9f, 41.3f, 10.3f },
@@ -185,6 +185,8 @@ inline constexpr PanelLabelRec kPanelLabels[] = {
     { "L", 1467.1f, 210.4f, 6.7f, 10.3f },
     { "R", 1543.5f, 210.4f, 7.9f, 10.3f },
     { "WET", 1496.4f, 284.4f, 25.2f, 10.3f },
+    { "THRESHOLD", 1260.9f, 229.9f, 71.6f, 10.3f },
+    { "RELEASE", 1359.7f, 229.9f, 54.4f, 10.3f },
     { "HOLD", 1325.6f, 284.4f, 32.4f, 10.3f },
     { "VU METER", 1385.0f, 322.8f, 67.6f, 11.3f },
     { "METER FACE", 1265.6f, 365.2f, 306.4f, 139.3f },
@@ -251,37 +253,39 @@ inline constexpr PanelJackRec kPanelJacks[] = {
     { "OUTPUT", "WET", 1509.0f, 270.5f, 2, 2, 0 },
 };
 
-inline constexpr int kPanelKnobCount = 31;
+inline constexpr int kPanelKnobCount = 33;
 inline constexpr PanelKnobRec kPanelKnobs[] = {
     { "VCO", "RANGE", 55.0f, 101.0f, 13.0f, 0.50f, 34.0f, 80.0f, 42.0f, 42.0f, 0 },
-    { "VCO", "FINE", 111.0f, 101.0f, 13.0f, 0.30f, 90.0f, 80.0f, 42.0f, 42.0f, 0 },
-    { "VCO", "PW", 55.0f, 151.0f, 13.0f, 0.68f, 34.0f, 130.0f, 42.0f, 42.0f, 0 },
-    { "VCO", "FM 1", 111.0f, 151.0f, 13.0f, 0.42f, 90.0f, 130.0f, 42.0f, 42.0f, 0 },
-    { "VCO", "FM 2", 83.0f, 201.0f, 13.0f, 0.78f, 62.0f, 180.0f, 42.0f, 42.0f, 0 },
-    { "VCF", "CUTOFF", 196.3f, 101.0f, 13.0f, 0.50f, 175.3f, 80.0f, 42.0f, 42.0f, 0 },
-    { "VCF", "PEAK", 196.3f, 151.0f, 13.0f, 0.30f, 175.3f, 130.0f, 42.0f, 42.0f, 0 },
-    { "VCF", "MOD", 196.3f, 201.0f, 13.0f, 0.68f, 175.3f, 180.0f, 42.0f, 42.0f, 0 },
+    { "VCO", "FINE", 111.0f, 101.0f, 13.0f, 0.50f, 90.0f, 80.0f, 42.0f, 42.0f, 0 },
+    { "VCO", "PW", 55.0f, 151.0f, 13.0f, 0.50f, 34.0f, 130.0f, 42.0f, 42.0f, 0 },
+    { "VCO", "FM 1", 111.0f, 151.0f, 13.0f, 0.00f, 90.0f, 130.0f, 42.0f, 42.0f, 0 },
+    { "VCO", "FM 2", 83.0f, 201.0f, 13.0f, 0.00f, 62.0f, 180.0f, 42.0f, 42.0f, 0 },
+    { "VCF", "CUTOFF", 196.3f, 101.0f, 13.0f, 0.45f, 175.3f, 80.0f, 42.0f, 42.0f, 0 },
+    { "VCF", "PEAK", 196.3f, 151.0f, 13.0f, 0.20f, 175.3f, 130.0f, 42.0f, 42.0f, 0 },
+    { "VCF", "MOD", 196.3f, 201.0f, 13.0f, 0.40f, 175.3f, 180.0f, 42.0f, 42.0f, 0 },
     { "VCA 1", "INITIAL", 287.4f, 101.0f, 13.0f, 0.00f, 266.4f, 80.0f, 42.0f, 42.0f, 0 },
     { "VCA 1", "MOD", 287.4f, 151.0f, 13.0f, 0.85f, 266.4f, 130.0f, 42.0f, 42.0f, 0 },
-    { "VCA 1", "LOW CUT", 287.4f, 201.0f, 13.0f, 0.68f, 266.4f, 180.0f, 42.0f, 42.0f, 0 },
+    { "VCA 1", "LOW CUT", 287.4f, 201.0f, 13.0f, 0.00f, 266.4f, 180.0f, 42.0f, 42.0f, 0 },
     { "VCA 2", "INITIAL", 375.3f, 101.0f, 13.0f, 0.00f, 354.3f, 80.0f, 42.0f, 42.0f, 0 },
     { "VCA 2", "MOD", 375.3f, 151.0f, 13.0f, 1.00f, 354.3f, 130.0f, 42.0f, 42.0f, 0 },
     { "MG", "RATE", 461.7f, 101.0f, 13.0f, 0.50f, 440.7f, 80.0f, 42.0f, 42.0f, 0 },
-    { "MG", "PW", 461.7f, 151.0f, 13.0f, 0.30f, 440.7f, 130.0f, 42.0f, 42.0f, 0 },
-    { "EG 1", "ATTACK", 554.4f, 101.0f, 13.0f, 0.50f, 533.4f, 80.0f, 42.0f, 42.0f, 0 },
+    { "MG", "PW", 461.7f, 151.0f, 13.0f, 0.50f, 440.7f, 130.0f, 42.0f, 42.0f, 0 },
+    { "EG 1", "ATTACK", 554.4f, 101.0f, 13.0f, 0.05f, 533.4f, 80.0f, 42.0f, 42.0f, 0 },
     { "EG 1", "DECAY", 554.4f, 151.0f, 13.0f, 0.30f, 533.4f, 130.0f, 42.0f, 42.0f, 0 },
-    { "EG 1", "SUSTAIN", 554.4f, 201.0f, 13.0f, 0.68f, 533.4f, 180.0f, 42.0f, 42.0f, 0 },
-    { "EG 1", "RELEASE", 554.4f, 251.0f, 13.0f, 0.42f, 533.4f, 230.0f, 42.0f, 42.0f, 0 },
-    { "EG 2", "HOLD", 648.8f, 101.0f, 13.0f, 0.50f, 627.8f, 80.0f, 42.0f, 42.0f, 0 },
-    { "EG 2", "DELAY", 648.8f, 151.0f, 13.0f, 0.30f, 627.8f, 130.0f, 42.0f, 42.0f, 0 },
-    { "EG 2", "ATTACK", 648.8f, 201.0f, 13.0f, 0.68f, 627.8f, 180.0f, 42.0f, 42.0f, 0 },
-    { "EG 2", "RELEASE", 648.8f, 251.0f, 13.0f, 0.42f, 627.8f, 230.0f, 42.0f, 42.0f, 0 },
+    { "EG 1", "SUSTAIN", 554.4f, 201.0f, 13.0f, 0.60f, 533.4f, 180.0f, 42.0f, 42.0f, 0 },
+    { "EG 1", "RELEASE", 554.4f, 251.0f, 13.0f, 0.30f, 533.4f, 230.0f, 42.0f, 42.0f, 0 },
+    { "EG 2", "HOLD", 648.8f, 101.0f, 13.0f, 0.30f, 627.8f, 80.0f, 42.0f, 42.0f, 0 },
+    { "EG 2", "DELAY", 648.8f, 151.0f, 13.0f, 0.00f, 627.8f, 130.0f, 42.0f, 42.0f, 0 },
+    { "EG 2", "ATTACK", 648.8f, 201.0f, 13.0f, 0.05f, 627.8f, 180.0f, 42.0f, 42.0f, 0 },
+    { "EG 2", "RELEASE", 648.8f, 251.0f, 13.0f, 0.30f, 627.8f, 230.0f, 42.0f, 42.0f, 0 },
     { "S&H", "RATE", 817.9f, 101.0f, 13.0f, 0.50f, 796.9f, 80.0f, 42.0f, 42.0f, 0 },
     { "DIV", "RATIO SWITCH", 974.2f, 105.0f, 11.0f, 0.00f, 952.0f, 83.0f, 44.0f, 44.0f, 1 },
     { "INT", "TIME", 1123.7f, 101.0f, 13.0f, 0.50f, 1102.7f, 80.0f, 42.0f, 42.0f, 0 },
     { "MIX", "LEVEL 1", 1208.1f, 101.0f, 13.0f, 0.80f, 1187.1f, 80.0f, 42.0f, 42.0f, 0 },
     { "MIX", "LEVEL 2", 1208.1f, 151.0f, 13.0f, 0.80f, 1187.1f, 130.0f, 42.0f, 42.0f, 0 },
     { "MIX", "LEVEL 3", 1208.1f, 201.0f, 13.0f, 0.80f, 1187.1f, 180.0f, 42.0f, 42.0f, 0 },
+    { "EXT IN", "THRESHOLD", 1296.7f, 213.0f, 13.0f, 0.3758f, 1275.7f, 192.0f, 42.0f, 42.0f, 0 },
+    { "EXT IN", "RELEASE", 1386.9f, 213.0f, 13.0f, 0.5316f, 1365.9f, 192.0f, 42.0f, 42.0f, 0 },
     { "OUTPUT", "MIX", 1509.0f, 101.0f, 13.0f, 1.00f, 1488.0f, 80.0f, 42.0f, 42.0f, 0 },
     { "OUTPUT", "LEVEL", 1509.0f, 151.0f, 13.0f, 0.70f, 1488.0f, 130.0f, 42.0f, 42.0f, 0 },
 };

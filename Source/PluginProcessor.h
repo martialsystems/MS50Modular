@@ -167,6 +167,9 @@ private:
     juce::AudioParameterFloat* sampleHoldRate_ = nullptr;
     juce::AudioParameterFloat* outputLevel_ = nullptr;
     juce::AudioParameterFloat* outputMix_ = nullptr;
+    juce::AudioParameterFloat* extInThreshold_ = nullptr;
+    juce::AudioParameterFloat* extInRelease_ = nullptr;
+    juce::AudioParameterFloat* dividerRatio_ = nullptr;
     Meter meter_;
     int currentProgram_ = kDefaultFactoryPreset;
     juce::String presetError_;

@@ -258,7 +258,7 @@ int testMgPanelJacks()
     check (rate.knob == FaceKnob::MgRate && std::strcmp (rate.parameterName, "MG Rate") == 0, "rate name");
     check (rate.minimum == 0.0f && rate.maximum == 1.0f && rate.fallback == 0.50f, "rate range");
     check (width.knob == FaceKnob::MgPw && std::strcmp (width.parameterName, "MG PW") == 0, "pw name");
-    check (width.fallback == 0.30f, "pw faceplate default");
+    check (width.fallback == 0.50f, "pw faceplate default");
     check (faceKnobBinding ("VCO", "RANGE").knob == FaceKnob::VcoRange, "vco range is a parameter");
     return finish ("testMgPanelJacks");
 }

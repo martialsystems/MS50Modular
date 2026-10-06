@@ -206,10 +206,10 @@ int testEg1ThreeJacks()
     const FaceKnobBinding decay = faceKnobBinding ("EG 1", "DECAY");
     const FaceKnobBinding sustain = faceKnobBinding ("EG 1", "SUSTAIN");
     const FaceKnobBinding release = faceKnobBinding ("EG 1", "RELEASE");
-    check (std::strcmp (attack.parameterName, "EG 1 Attack") == 0 && attack.fallback == 0.50f, "attack name");
+    check (std::strcmp (attack.parameterName, "EG 1 Attack") == 0 && attack.fallback == 0.05f, "attack name");
     check (std::strcmp (decay.parameterName, "EG 1 Decay") == 0 && decay.fallback == 0.30f, "decay name");
-    check (std::strcmp (sustain.parameterName, "EG 1 Sustain") == 0 && sustain.fallback == 0.68f, "sustain name");
-    check (std::strcmp (release.parameterName, "EG 1 Release") == 0 && release.fallback == 0.42f, "release name");
+    check (std::strcmp (sustain.parameterName, "EG 1 Sustain") == 0 && sustain.fallback == 0.60f, "sustain name");
+    check (std::strcmp (release.parameterName, "EG 1 Release") == 0 && release.fallback == 0.30f, "release name");
     check (attack.minimum == 0.0f && attack.maximum == 1.0f, "attack range");
     check (faceKnobBinding ("EG 2", "ATTACK").knob == FaceKnob::Eg2Attack, "eg 2 attack is a parameter");
     return finish ("testEg1ThreeJacks");

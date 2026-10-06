@@ -73,7 +73,7 @@ void paintExtInHold (juce::Graphics& g, juce::Point<float> origin, float scale, 
     g.fillRoundedRectangle (faceX, faceY, faceW, faceH, 2.5f * scale);
 }
 
-void paintPowerRocker (juce::Graphics& g, juce::Point<float> origin, float scale, bool on)
+void paintEffectRocker (juce::Graphics& g, juce::Point<float> origin, float scale, bool on)
 {
     const float x = origin.x + kPowerX * scale;
     const float y = origin.y + kPowerY * scale;
@@ -82,6 +82,7 @@ void paintPowerRocker (juce::Graphics& g, juce::Point<float> origin, float scale
     const float half = w * 0.5f;
     const auto raised = juce::Colour (0xff3a3a3e);
     const auto pressed = juce::Colour (0xff101012);
+    // EFFECT rocker, not power. Off is dry, on is wet. The graph keeps running either way.
     // Printed OFF is left of the rocker and ON is right of it.
     // The raised end points at the active word. Right half stays the ON click.
     const bool raisedOnRight = on;
@@ -1491,7 +1492,7 @@ void PatchBayView::paint (juce::Graphics& g)
     }
 
     const bool effectOn = audioProcessor.effectIsOn();
-    paintPowerRocker (g, origin, scale, effectOn);
+    paintEffectRocker (g, origin, scale, effectOn);
     {
         const int program = audioProcessor.getCurrentProgram();
         const auto lcd = juce::Rectangle<float> (origin.x + (kPresetLcdX + 2.0f) * scale,
@@ -1499,7 +1500,7 @@ void PatchBayView::paint (juce::Graphics& g)
                                                  (kPresetLcdW - 4.0f) * scale,
                                                  (kPresetLcdH - 2.0f) * scale);
         paintLcdDots (g, lcd, presetScreenLine (program, audioProcessor.getProgramName (program)),
-                      juce::Colour (0xff1e2419), effectOn ? 0.09f : 0.18f);
+                      juce::Colour (0xff1e2419), 0.09f);
     }
 
     juce::String line = status_;
