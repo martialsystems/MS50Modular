@@ -4,6 +4,7 @@
 
 #include "PanelAssets.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 
@@ -27,25 +28,29 @@ CablePaint paintFor (int color)
 }
 
 // Latching square key. The HOLD legend is already drawn on the plate.
-// The lamp is on only while the gate is latched and the effect is on.
-void paintExtInHold (juce::Graphics& g, juce::Point<float> origin, float scale, bool lit)
+// Amber only while latched and the effect is on. Latched with the effect off sinks the cap.
+void paintExtInHold (juce::Graphics& g, juce::Point<float> origin, float scale, bool held, bool powered)
 {
+    const bool lit = held && powered;
+    const float sink = held && ! powered ? 1.6f * scale : 0.0f;
     const float cx = origin.x + kHoldCx * scale;
-    const float cy = origin.y + kHoldCy * scale;
+    const float cy = origin.y + kHoldCy * scale + sink;
     if (lit)
     {
-        juce::ColourGradient glow (juce::Colour (0xffffd27a).withAlpha (0.55f), cx, cy,
-                                   juce::Colour (0xffffd27a).withAlpha (0.0f), cx, cy - 24.0f * scale,
+        const float glowY = origin.y + kHoldCy * scale;
+        juce::ColourGradient glow (juce::Colour (0xffffd27a).withAlpha (0.55f), cx, glowY,
+                                   juce::Colour (0xffffd27a).withAlpha (0.0f), cx, glowY - 24.0f * scale,
                                    true);
         g.setGradientFill (glow);
-        g.fillEllipse (cx - 24.0f * scale, cy - 24.0f * scale, 48.0f * scale, 48.0f * scale);
+        g.fillEllipse (cx - 24.0f * scale, glowY - 24.0f * scale, 48.0f * scale, 48.0f * scale);
     }
 
     const float cap = 26.0f * scale;
     const float x = cx - 13.0f * scale;
     const float y = cy - 13.0f * scale;
-    const juce::Colour shellHi = lit ? juce::Colour (0xfffff6d6) : juce::Colour (0xfff4eedc);
-    const juce::Colour shellLo = lit ? juce::Colour (0xffe2b65a) : juce::Colour (0xffb3ab94);
+    const bool sunk = held && ! powered;
+    const juce::Colour shellHi = lit ? juce::Colour (0xfffff6d6) : (sunk ? juce::Colour (0xffe4dcc8) : juce::Colour (0xfff4eedc));
+    const juce::Colour shellLo = lit ? juce::Colour (0xffe2b65a) : (sunk ? juce::Colour (0xff8d8572) : juce::Colour (0xffb3ab94));
     juce::ColourGradient shell (shellHi, x, y, shellLo, x + cap, y + cap, false);
     g.setGradientFill (shell);
     g.fillRoundedRectangle (x, y, cap, cap, 3.0f * scale);
@@ -59,8 +64,8 @@ void paintExtInHold (juce::Graphics& g, juce::Point<float> origin, float scale, 
     const float faceY = cy - 10.0f * scale;
     const float faceW = 19.0f * scale;
     const float faceH = 17.0f * scale;
-    const juce::Colour faceHi = lit ? juce::Colour (0xfffffbe8) : juce::Colour (0xfff8f3e4);
-    const juce::Colour faceLo = lit ? juce::Colour (0xfff5cf7a) : juce::Colour (0xffd0c8b2);
+    const juce::Colour faceHi = lit ? juce::Colour (0xfffffbe8) : (sunk ? juce::Colour (0xffe7dfcc) : juce::Colour (0xfff8f3e4));
+    const juce::Colour faceLo = lit ? juce::Colour (0xfff5cf7a) : (sunk ? juce::Colour (0xffa39984) : juce::Colour (0xffd0c8b2));
     const float gx = faceX + faceW * 0.45f;
     const float gy = faceY + faceH * 0.40f;
     juce::ColourGradient face (faceHi, gx, gy, faceLo, gx + 0.8f * faceW, gy, true);
@@ -195,9 +200,16 @@ juce::Rectangle<float> presetMenuDesign (int count)
 
 void paintKnobCap (juce::Graphics& g, juce::Point<float> centre, float radius, float scale, bool isSwitch, float value)
 {
-    const float shadow = radius + 4.0f * scale;
+    // Ticks stay on the plate. The cap, its shadow, and the pointer turn as one piece.
+    const float angleDeg = panelKnobAngleDegrees (isSwitch, value);
+    const float angle = juce::degreesToRadians (angleDeg);
+    const auto turn = juce::AffineTransform::rotation (angle, centre.x, centre.y);
+
+    const float shadowR = radius + 4.0f * scale;
+    juce::Point<float> shadowCentre (centre.x + scale, centre.y + 2.0f * scale);
+    shadowCentre.applyTransform (turn);
     g.setColour (juce::Colours::black.withAlpha (0.45f));
-    g.fillEllipse (centre.x + scale - shadow, centre.y + 2.0f * scale - shadow, shadow * 2.0f, shadow * 2.0f);
+    g.fillEllipse (shadowCentre.x - shadowR, shadowCentre.y - shadowR, shadowR * 2.0f, shadowR * 2.0f);
 
     const float skirt = radius + 3.0f * scale;
     g.setColour (juce::Colour (0xff08080a));
@@ -215,8 +227,12 @@ void paintKnobCap (juce::Graphics& g, juce::Point<float> centre, float radius, f
     g.fillPath (dashed);
 
     const float body = radius - 0.3f * scale;
-    juce::ColourGradient metal (juce::Colour (0xff4b4b4e), centre.x - body, centre.y - body,
-                                juce::Colour (0xff060607), centre.x + body, centre.y + body, false);
+    juce::Point<float> metalHi (centre.x - body, centre.y - body);
+    juce::Point<float> metalLo (centre.x + body, centre.y + body);
+    metalHi.applyTransform (turn);
+    metalLo.applyTransform (turn);
+    juce::ColourGradient metal (juce::Colour (0xff4b4b4e), metalHi.x, metalHi.y,
+                                juce::Colour (0xff060607), metalLo.x, metalLo.y, false);
     metal.addColour (0.5, juce::Colour (0xff1a1a1b));
     g.setGradientFill (metal);
     g.fillEllipse (centre.x - body, centre.y - body, body * 2.0f, body * 2.0f);
@@ -224,26 +240,49 @@ void paintKnobCap (juce::Graphics& g, juce::Point<float> centre, float radius, f
     g.drawEllipse (centre.x - body, centre.y - body, body * 2.0f, body * 2.0f, 0.8f * scale);
 
     const float cap = radius * 0.8f;
-    juce::ColourGradient top (juce::Colour (0xff2a2a2c), centre.x - cap, centre.y - cap,
-                              juce::Colour (0xff131314), centre.x + cap, centre.y + cap, false);
+    juce::Point<float> capHi (centre.x - cap, centre.y - cap);
+    juce::Point<float> capLo (centre.x + cap, centre.y + cap);
+    capHi.applyTransform (turn);
+    capLo.applyTransform (turn);
+    juce::ColourGradient top (juce::Colour (0xff2a2a2c), capHi.x, capHi.y,
+                              juce::Colour (0xff131314), capLo.x, capLo.y, false);
     g.setGradientFill (top);
     g.fillEllipse (centre.x - cap, centre.y - cap, cap * 2.0f, cap * 2.0f);
+
+    {
+        juce::Graphics::ScopedSaveState clip (g);
+        juce::Path capDisc;
+        capDisc.addEllipse (centre.x - cap, centre.y - cap, cap * 2.0f, cap * 2.0f);
+        g.reduceClipRegion (capDisc);
+        const float blobR = cap * 0.85f;
+        juce::Point<float> blob (centre.x, centre.y + cap * 0.62f);
+        blob.applyTransform (turn);
+        g.setColour (juce::Colours::black.withAlpha (0.42f));
+        g.fillEllipse (blob.x - blobR, blob.y - blobR, blobR * 2.0f, blobR * 2.0f);
+    }
+
     g.setColour (juce::Colour (0xff050505));
     g.drawEllipse (centre.x - cap, centre.y - cap, cap * 2.0f, cap * 2.0f, 0.8f * scale);
 
     juce::Path shine;
     shine.addEllipse (-radius * 0.45f, -radius * 0.28f, radius * 0.90f, radius * 0.56f);
     shine.applyTransform (juce::AffineTransform::translation (centre.x - radius * 0.28f, centre.y - radius * 0.32f)
-                              .followedBy (juce::AffineTransform::rotation (juce::degreesToRadians (-35.0f),
+                              .followedBy (juce::AffineTransform::rotation (juce::degreesToRadians (-35.0f + angleDeg),
                                                                              centre.x, centre.y)));
     g.setColour (juce::Colours::white.withAlpha (0.16f));
     g.fillPath (shine);
 
+    const auto spin = juce::AffineTransform::rotation (angle, centre.x, centre.y);
+    juce::Line<float> shade (centre.x + 1.3f * scale, centre.y - radius * 0.1f,
+                             centre.x + 1.3f * scale, centre.y - (radius - 1.5f * scale));
+    shade.applyTransform (spin);
+    g.setColour (juce::Colours::black.withAlpha (0.7f));
+    g.drawLine (shade, 3.0f * scale);
+
     g.setColour (juce::Colour (0xfff1ede0));
-    const float angle = juce::degreesToRadians (panelKnobAngleDegrees (isSwitch, value));
     juce::Line<float> pointer (centre.x, centre.y - radius * 0.1f,
                                centre.x, centre.y - (radius - 1.5f * scale));
-    pointer.applyTransform (juce::AffineTransform::rotation (angle, centre.x, centre.y));
+    pointer.applyTransform (spin);
     g.drawLine (pointer, 2.4f * scale);
 }
 
@@ -883,24 +922,39 @@ int PatchBayView::cableNear (float x, float y) const
 
 int PatchBayView::powerHalfAt (float x, float y) const
 {
-    if (x < kPowerX || x > kPowerX + kPowerW || y < kPowerY || y > kPowerY + kPowerH)
+    const float pad = 8.0f;
+    if (x < kPowerX - pad || x > kPowerX + kPowerW + pad || y < kPowerY - pad || y > kPowerY + kPowerH + pad)
         return -1;
     return x < kPowerX + kPowerW * 0.5f ? 0 : 1;
 }
 
 bool PatchBayView::extInButtonAt (float x, float y) const
 {
-    return x >= kHoldHitX && x <= kHoldHitX + kHoldHitW
-           && y >= kHoldHitY && y <= kHoldHitY + kHoldHitH;
+    const bool key = x >= kHoldHitX - 4.0f && x <= kHoldHitX + kHoldHitW + 4.0f
+                     && y >= kHoldHitY - 4.0f && y <= kHoldHitY + kHoldHitH + 4.0f;
+    if (key)
+        return true;
+
+    // The printed HOLD word sits under the key. The EG 2 HOLD label is higher on the plate.
+    for (int i = 0; i < kPanelLabelCount; ++i)
+    {
+        const PanelLabelRec& label = kPanelLabels[i];
+        if (std::strcmp (label.text, "HOLD") != 0 || label.y < kHoldCy)
+            continue;
+        if (x >= label.x - 4.0f && x <= label.x + label.w + 4.0f
+            && y >= label.y - 8.0f && y <= label.y + label.h + 4.0f)
+            return true;
+    }
+    return false;
 }
 
 bool PatchBayView::presetAt (float x, float y) const
 {
-    const bool bezel = x >= kPresetBezelX && x <= kPresetBezelX + kPresetBezelW
-                       && y >= kPresetBezelY && y <= kPresetBezelY + kPresetBezelH;
-    const bool key = x >= kPresetKeyX && x <= kPresetKeyX + kPresetKeyW
-                     && y >= kPresetKeyY && y <= kPresetKeyY + kPresetKeyH;
-    return bezel || key;
+    const float left = std::min (kPresetBezelX, kPresetKeyX) - 6.0f;
+    const float top = std::min (kPresetBezelY, kPresetKeyY) - 6.0f;
+    const float right = std::max (kPresetBezelX + kPresetBezelW, kPresetKeyX + kPresetKeyW) + 6.0f;
+    const float bottom = std::max (kPresetBezelY + kPresetBezelH, kPresetKeyY + kPresetKeyH) + 8.0f;
+    return x >= left && x <= right && y >= top && y <= bottom;
 }
 
 int PatchBayView::presetRowAt (float x, float y) const
@@ -1330,7 +1384,7 @@ void PatchBayView::paint (juce::Graphics& g)
                       knob.kind == 1, knobValue_[i]);
     }
 
-    paintExtInHold (g, origin, scale, audioProcessor.extInButtonHeld() && audioProcessor.effectIsOn());
+    paintExtInHold (g, origin, scale, audioProcessor.extInButtonHeld(), audioProcessor.effectIsOn());
 
     for (int cable = 0; cable < count_; ++cable)
     {
@@ -1415,7 +1469,6 @@ void PatchBayView::paint (juce::Graphics& g)
 
     const bool effectOn = audioProcessor.effectIsOn();
     paintPowerRocker (g, origin, scale, effectOn);
-    if (effectOn)
     {
         const int program = audioProcessor.getCurrentProgram();
         const auto lcd = juce::Rectangle<float> (origin.x + (kPresetLcdX + 2.0f) * scale,
@@ -1423,7 +1476,7 @@ void PatchBayView::paint (juce::Graphics& g)
                                                  (kPresetLcdW - 4.0f) * scale,
                                                  (kPresetLcdH - 2.0f) * scale);
         paintLcdDots (g, lcd, presetScreenLine (program, audioProcessor.getProgramName (program)),
-                      juce::Colour (0xff1e2419), 0.09f);
+                      juce::Colour (0xff1e2419), effectOn ? 0.09f : 0.18f);
     }
 
     juce::String line = status_;
@@ -1448,7 +1501,7 @@ void PatchBayView::paint (juce::Graphics& g)
                     juce::Justification::centredLeft, true);
     }
 
-    if (presetMenu_ && effectOn)
+    if (presetMenu_)
     {
         const int programs = audioProcessor.getNumPrograms();
         const auto box = presetMenuDesign (programs);
@@ -1537,24 +1590,17 @@ void PatchBayView::mouseDown (const juce::MouseEvent& event)
 
     if (presetMenu_)
     {
-        if (! audioProcessor.effectIsOn())
-        {
-            presetMenu_ = false;
-        }
+        if (menuOpen())
+            menu_->setVisible (false);
+        const int row = presetRowAt (design.x, design.y);
+        if (! event.mods.isRightButtonDown() && row >= 0)
+            choosePreset (row);
         else
         {
-            if (menuOpen())
-                menu_->setVisible (false);
-            const int row = presetRowAt (design.x, design.y);
-            if (! event.mods.isRightButtonDown() && row >= 0)
-                choosePreset (row);
-            else
-            {
-                presetMenu_ = false;
-                repaint();
-            }
-            return;
+            presetMenu_ = false;
+            repaint();
         }
+        return;
     }
 
     if (menuOpen())
@@ -1579,12 +1625,9 @@ void PatchBayView::mouseDown (const juce::MouseEvent& event)
 
     if (presetAt (design.x, design.y))
     {
-        if (audioProcessor.effectIsOn())
-        {
-            cancelGrab();
-            presetMenu_ = true;
-            presetHi_ = audioProcessor.getCurrentProgram();
-        }
+        cancelGrab();
+        presetMenu_ = true;
+        presetHi_ = audioProcessor.getCurrentProgram();
         repaint();
         return;
     }
@@ -1827,40 +1870,33 @@ bool PatchBayView::keyPressed (const juce::KeyPress& key)
 {
     if (presetMenu_)
     {
-        if (! audioProcessor.effectIsOn())
+        if (key == juce::KeyPress::escapeKey)
         {
             presetMenu_ = false;
-        }
-        else
-        {
-            if (key == juce::KeyPress::escapeKey)
-            {
-                presetMenu_ = false;
-                repaint();
-                return true;
-            }
-            const int count = audioProcessor.getNumPrograms();
-            if (key == juce::KeyPress::upKey)
-            {
-                if (presetHi_ > 0)
-                    --presetHi_;
-                repaint();
-                return true;
-            }
-            if (key == juce::KeyPress::downKey)
-            {
-                if (presetHi_ + 1 < count)
-                    ++presetHi_;
-                repaint();
-                return true;
-            }
-            if (key == juce::KeyPress::returnKey)
-            {
-                choosePreset (presetHi_);
-                return true;
-            }
+            repaint();
             return true;
         }
+        const int count = audioProcessor.getNumPrograms();
+        if (key == juce::KeyPress::upKey)
+        {
+            if (presetHi_ > 0)
+                --presetHi_;
+            repaint();
+            return true;
+        }
+        if (key == juce::KeyPress::downKey)
+        {
+            if (presetHi_ + 1 < count)
+                ++presetHi_;
+            repaint();
+            return true;
+        }
+        if (key == juce::KeyPress::returnKey)
+        {
+            choosePreset (presetHi_);
+            return true;
+        }
+        return true;
     }
 
     if (key != juce::KeyPress::escapeKey)

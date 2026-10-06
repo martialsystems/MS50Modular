@@ -254,6 +254,43 @@ private:
             bay->mouseDoubleClick (click);
         }
         expect (near (bay->knobValue (cutoff), cutoffDefault), "double-click resets cutoff");
+        {
+            const auto midPaint = paintBay (*bay);
+            dragKnobLocal (*bay, kPanelKnobs[cutoff].cx, kPanelKnobs[cutoff].cy, 100.0f, false);
+            expect (near (bay->knobValue (cutoff), 0.0f), "drag down parks cutoff at 0");
+            const auto lowPaint = paintBay (*bay);
+            const float cx = kPanelKnobs[cutoff].cx;
+            const float cy = kPanelKnobs[cutoff].cy;
+            const float ox = 1.0f;
+            const float oy = 2.0f;
+            const float olen = std::sqrt (ox * ox + oy * oy);
+            const float dist = kPanelKnobs[cutoff].radius + 3.0f + 1.6f;
+            const auto shadowAt = bay->designToLocal (cx + ox / olen * dist, cy + oy / olen * dist);
+            const int sx = juce::jlimit (0, midPaint.getWidth() - 1, static_cast<int> (shadowAt.x));
+            const int sy = juce::jlimit (0, midPaint.getHeight() - 1, static_cast<int> (shadowAt.y));
+            const auto midShadow = midPaint.getPixelAt (sx, sy);
+            const auto lowShadow = lowPaint.getPixelAt (sx, sy);
+            expect (midShadow != lowShadow, "knob shadow moves when the cap turns");
+            const auto highCentre = bay->designToLocal (cx, cy);
+            const int box = 36;
+            const juce::Rectangle<int> knobBox (static_cast<int> (highCentre.x) - box,
+                                                static_cast<int> (highCentre.y) - box,
+                                                box * 2, box * 2);
+            auto writeCrop = [&] (const juce::Image& image, const char* path)
+            {
+                juce::File file (path);
+                file.deleteFile();
+                juce::FileOutputStream stream (file);
+                if (! stream.openedOk())
+                    return;
+                juce::PNGImageFormat format;
+                format.writeImageToStream (image.getClippedImage (knobBox.getIntersection (image.getBounds())), stream);
+            };
+            writeCrop (lowPaint, "/tmp/ms50_knob_low.png");
+            dragKnobLocal (*bay, kPanelKnobs[cutoff].cx, kPanelKnobs[cutoff].cy, -100.0f, false);
+            expect (near (bay->knobValue (cutoff), cutoffDefault), "cutoff returns to its default");
+            writeCrop (paintBay (*bay), "/tmp/ms50_knob_mid.png");
+        }
         clickAt (*bay, kPanelKnobs[ratio].cx, kPanelKnobs[ratio].cy);
         expect (bay->knobValue (ratio) == 1.0f, "divider click steps to 16");
         expect (bay->knobReadout().contains ("16"), "switch readout shows 16");
@@ -338,8 +375,25 @@ private:
         expect (bay->outputMix() == 1.0f, "power rocker on stays on");
         clickAt (*bay, offX, powerY);
         expect (bay->outputMix() == 0.0f, "power rocker turns off");
+        {
+            const auto offPaint = paintBay (*bay);
+            const auto lcd0 = bay->designToLocal (kPresetLcdX, kPresetLcdY);
+            const auto lcd1 = bay->designToLocal (kPresetLcdX + kPresetLcdW, kPresetLcdY + kPresetLcdH);
+            const juce::Rectangle<int> lcdBox (static_cast<int> (lcd0.x), static_cast<int> (lcd0.y),
+                                              static_cast<int> (lcd1.x - lcd0.x), static_cast<int> (lcd1.y - lcd0.y));
+            juce::File lcdFile ("/tmp/ms50_lcd_off.png");
+            lcdFile.deleteFile();
+            juce::FileOutputStream lcdStream (lcdFile);
+            if (lcdStream.openedOk())
+            {
+                juce::PNGImageFormat format;
+                format.writeImageToStream (offPaint.getClippedImage (lcdBox.getIntersection (offPaint.getBounds())), lcdStream);
+            }
+        }
         clickAt (*bay, kPresetBezelX + 12.0f, kPresetBezelY + kPresetBezelH * 0.5f);
-        expect (! bay->presetMenuOpen(), "preset screen stays closed while power is off");
+        expect (bay->presetMenuOpen(), "preset screen opens while power is off");
+        expect (bay->keyPressed (juce::KeyPress (juce::KeyPress::escapeKey)), "escape closes the preset list while power is off");
+        expect (! bay->presetMenuOpen(), "preset list is closed while power is off");
         clickAt (*bay, onX, powerY);
         expect (bay->outputMix() == 1.0f, "power rocker turns back on");
 
@@ -417,6 +471,10 @@ private:
             bay->mouseDown (down);
             expect (! processor->extInButtonHeld(), "a second press releases the hold");
             bay->mouseUp (up);
+            clickAt (*bay, 1325.6f + 10.0f, 284.4f + 4.0f);
+            expect (processor->extInButtonHeld(), "the HOLD legend latches the key");
+            clickAt (*bay, 1325.6f + 10.0f, 284.4f + 4.0f);
+            expect (! processor->extInButtonHeld(), "the HOLD legend releases the key");
         }
 
         bool foundRope = false;
