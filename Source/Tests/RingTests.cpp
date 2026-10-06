@@ -134,12 +134,10 @@ int testRingPanelJacks()
     const int b = panelJackIndex ("RING", "B");
     const int out = panelJackIndex ("RING", "OUT");
     const int wet = panelJackIndex ("OUTPUT", "WET");
-    const int sh = panelJackIndex ("S&H", "IN");
-    check (a >= 0 && b >= 0 && out >= 0 && wet >= 0 && sh >= 0, "ring jacks exist");
+    check (a >= 0 && b >= 0 && out >= 0 && wet >= 0, "ring jacks exist");
     check (kPanelJacks[a].module == 11 && kPanelJacks[a].port == 0 && kPanelJacks[a].dir == 0, "A");
     check (kPanelJacks[b].module == 11 && kPanelJacks[b].port == 1 && kPanelJacks[b].dir == 0, "B");
     check (kPanelJacks[out].module == 11 && kPanelJacks[out].port == 2 && kPanelJacks[out].dir == 1, "out");
-    check (kPanelJacks[sh].module == 0, "sample and hold stays unmapped");
 
     PanelLink refused;
     check (orientPanelJacks (out, wet, 0, 1, 2, refused) == PanelLinkResult::Unmapped,

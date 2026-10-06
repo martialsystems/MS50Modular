@@ -39,9 +39,18 @@ enum class PanelLinkResult {
 
 int panelJackIndex (const char* section, const char* label);
 
+// Graph module and port for a panel jack. False when that hole is not on the graph.
+bool panelJackAddress (int jack,
+                       int extIndex, int outputIndex, int noiseIndex,
+                       int vcfIndex, int vca1Index, int vca2Index, int eg1Index,
+                       int mgIndex, int vcoIndex, int eg2Index, int ringIndex,
+                       int dividerIndex, int inverterIndex, int integratorIndex,
+                       int mixerIndex, int sampleHoldIndex,
+                       int& module, int& port);
+
 int jackForGraphPort (int module, int port, int extIndex, int outputIndex, int noiseIndex,
                       int vcfIndex = -1, int vca1Index = -1, int vca2Index = -1, int eg1Index = -1,
-                      int mgIndex = -1, int vcoIndex = -1, int eg2Index = -1, int ringIndex = -1, int dividerIndex = -1, int inverterIndex = -1, int integratorIndex = -1);
+                      int mgIndex = -1, int vcoIndex = -1, int eg2Index = -1, int ringIndex = -1, int dividerIndex = -1, int inverterIndex = -1, int integratorIndex = -1, int mixerIndex = -1, int sampleHoldIndex = -1);
 
 // Either jack may be the output. The link runs output to input.
 // Same direction, a jack with no graph port, or both ends on one jack: not Ok.
@@ -49,7 +58,7 @@ PanelLinkResult orientPanelJacks (int jackA, int jackB,
                                   int extIndex, int outputIndex, int noiseIndex,
                                   PanelLink& link,
                                   int vcfIndex = -1, int vca1Index = -1, int vca2Index = -1, int eg1Index = -1,
-                                  int mgIndex = -1, int vcoIndex = -1, int eg2Index = -1, int ringIndex = -1, int dividerIndex = -1, int inverterIndex = -1, int integratorIndex = -1);
+                                  int mgIndex = -1, int vcoIndex = -1, int eg2Index = -1, int ringIndex = -1, int dividerIndex = -1, int inverterIndex = -1, int integratorIndex = -1, int mixerIndex = -1, int sampleHoldIndex = -1);
 
 // Plugs on this jack, bottom to top, which is array order.
 int plugsAtJack (const VisualCable* cables, int count, int jack, int* out, int capacity);
@@ -63,7 +72,7 @@ int loadPublishedCables (VisualCable* dest, int capacity,
                          const Cable* published, int publishedCount,
                          int extIndex, int outputIndex, int noiseIndex,
                          int vcfIndex = -1, int vca1Index = -1, int vca2Index = -1, int eg1Index = -1,
-                         int mgIndex = -1, int vcoIndex = -1, int eg2Index = -1, int ringIndex = -1, int dividerIndex = -1, int inverterIndex = -1, int integratorIndex = -1);
+                         int mgIndex = -1, int vcoIndex = -1, int eg2Index = -1, int ringIndex = -1, int dividerIndex = -1, int inverterIndex = -1, int integratorIndex = -1, int mixerIndex = -1, int sampleHoldIndex = -1);
 
 int panelKnobIndex (const char* section, const char* label);
 

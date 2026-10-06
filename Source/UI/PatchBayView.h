@@ -77,6 +77,7 @@ private:
     juce::AudioProcessorParameter* parameterForKnob (int index) const;
     void endGesture();
     void syncHostKnobs();
+    void selectMeter (int jack);
     void removeCable (int index);
     void restoreGrabbedEnd();
     void clearGrab();

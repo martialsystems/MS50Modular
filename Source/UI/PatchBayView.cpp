@@ -306,7 +306,9 @@ PatchBayView::PatchBayView (MS50ModularAudioProcessor& processor)
                                   audioProcessor.ringGraphIndex(),
                                   audioProcessor.dividerGraphIndex(),
                                   audioProcessor.inverterGraphIndex(),
-                                  audioProcessor.integratorGraphIndex());
+                                  audioProcessor.integratorGraphIndex(),
+                                  audioProcessor.mixerGraphIndex(),
+                                  audioProcessor.sampleHoldGraphIndex());
     startTimerHz (60);
 }
 
@@ -862,7 +864,9 @@ void PatchBayView::dropAt (int targetJack)
                                                         audioProcessor.ringGraphIndex(),
                                                         audioProcessor.dividerGraphIndex(),
                                                         audioProcessor.inverterGraphIndex(),
-                                                        audioProcessor.integratorGraphIndex());
+                                                        audioProcessor.integratorGraphIndex(),
+                                                        audioProcessor.mixerGraphIndex(),
+                                                        audioProcessor.sampleHoldGraphIndex());
     if (oriented != PanelLinkResult::Ok)
     {
         if (isNew)
@@ -928,6 +932,33 @@ void PatchBayView::dropAt (int targetJack)
     showStatus ("");
 }
 
+void PatchBayView::selectMeter (int jack)
+{
+    int module = -1;
+    int port = -1;
+    if (! panelJackAddress (jack,
+                            audioProcessor.extInGraphIndex(),
+                            audioProcessor.outputGraphIndex(),
+                            audioProcessor.noiseGraphIndex(),
+                            audioProcessor.vcfGraphIndex(),
+                            audioProcessor.vca1GraphIndex(),
+                            audioProcessor.vca2GraphIndex(),
+                            audioProcessor.eg1GraphIndex(),
+                            audioProcessor.mgGraphIndex(),
+                            audioProcessor.vcoGraphIndex(),
+                            audioProcessor.eg2GraphIndex(),
+                            audioProcessor.ringGraphIndex(),
+                            audioProcessor.dividerGraphIndex(),
+                            audioProcessor.inverterGraphIndex(),
+                            audioProcessor.integratorGraphIndex(),
+                            audioProcessor.mixerGraphIndex(),
+                            audioProcessor.sampleHoldGraphIndex(),
+                            module, port))
+        return;
+
+    audioProcessor.meter().setSource (module, port);
+}
+
 void PatchBayView::timerCallback()
 {
     syncHostKnobs();
@@ -946,6 +977,30 @@ void PatchBayView::paint (juce::Graphics& g)
         panel_->drawWithin (g, area, juce::RectanglePlacement::stretchToFit, 1.0f);
     else
         g.fillAll (juce::Colour (0xff1a1a1c));
+
+    {
+        // Covers the static needle drawn in the panel SVG. Pivot matches that window.
+        constexpr float columnX = 1318.2f;
+        constexpr float columnW = 82.3f;
+        const float cx = columnX + columnW * 0.5f;
+        constexpr float pivotY = 109.0f;
+        const auto window = juce::Rectangle<float> (origin.x + (cx - 19.0f) * scale,
+                                                    origin.y + 85.0f * scale,
+                                                    38.0f * scale,
+                                                    26.0f * scale);
+        g.setColour (juce::Colour (0xff1a1408));
+        g.fillRoundedRectangle (window, 2.0f * scale);
+
+        const float unit = Meter::needle (audioProcessor.meterVolts());
+        const float angle = unit * 0.85f;
+        constexpr float length = 16.0f;
+        const auto pivot = juce::Point<float> (origin.x + cx * scale, origin.y + pivotY * scale);
+        const auto tip = juce::Point<float> (origin.x + (cx + std::sin (angle) * length) * scale,
+                                             origin.y + (pivotY - std::cos (angle) * length) * scale);
+        g.setColour (juce::Colour (0xff111111));
+        g.drawLine (pivot.x, pivot.y, tip.x, tip.y, 1.5f * scale);
+        g.fillEllipse (pivot.x - 2.0f * scale, pivot.y - 2.0f * scale, 4.0f * scale, 4.0f * scale);
+    }
 
     int levelA[kPatchBayMaxCables] {};
     int levelB[kPatchBayMaxCables] {};
@@ -1204,6 +1259,7 @@ void PatchBayView::mouseDown (const juce::MouseEvent& event)
     if (jack < 0)
         return;
 
+    selectMeter (jack);
     downActive_ = true;
     downMoved_ = false;
     downShift_ = event.mods.isShiftDown();

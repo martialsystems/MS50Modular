@@ -479,6 +479,14 @@ bool PatchGraph::cableIsDelayed (int index) const
     return snapshot.delayed[index];
 }
 
+float PatchGraph::portVolts (int module, int port) const noexcept
+{
+    if (module < 0 || module >= moduleCount_ || modules_[module] == nullptr || port < 0 || port >= kMaxPorts)
+        return 0.0f;
+    const float value = modules_[module]->portValue[port];
+    return std::isfinite (value) ? value : 0.0f;
+}
+
 void PatchGraph::process()
 {
     const int published = published_.load (std::memory_order_acquire);
@@ -681,5 +689,36 @@ bool PatchGraph::setState (const void* data, int size)
 
     prepare (preparedRate_ > 0.0 ? preparedRate_ : 48000.0);
     stateError_ = "";
+    return true;
+}
+
+bool PatchGraph::setCables (const Cable* cables, int count)
+{
+    if (count < 0 || count > kMaxCables || (count > 0 && cables == nullptr))
+        return false;
+
+    for (int i = 0; i < count; ++i)
+    {
+        if (cables[i].sourceModule == cables[i].destModule && cables[i].sourcePort == cables[i].destPort)
+            return false;
+        if (! indicesLegal (cables[i].sourceModule, cables[i].sourcePort, cables[i].destModule, cables[i].destPort))
+            return false;
+    }
+
+    editCableCount_ = count;
+    for (int i = 0; i < count; ++i)
+        editCables_[i] = cables[i];
+    publish();
+    stateError_ = "";
+    return true;
+}
+
+bool PatchGraph::writePresetKnob (int module, int knob, float value)
+{
+    if (module < 0 || module >= moduleCount_ || modules_[module] == nullptr)
+        return false;
+    if (knob < 0 || knob >= modules_[module]->presetKnobCount())
+        return false;
+    modules_[module]->setKnob (knob, value);
     return true;
 }

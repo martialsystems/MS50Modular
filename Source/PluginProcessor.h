@@ -3,21 +3,25 @@
 #pragma once
 
 #include "Modular/Divider.h"
+#include "Modular/FactoryPresets.h"
 #include "Modular/Eg1.h"
 #include "Modular/Eg2.h"
 #include "Modular/ExtIn.h"
 #include "Modular/Integrator.h"
 #include "Modular/Inverter.h"
 #include "Modular/Mg.h"
+#include "Modular/Mixer.h"
 #include "Modular/Noise.h"
 #include "Modular/OutputModule.h"
 #include "Modular/Ring.h"
+#include "Modular/SampleHold.h"
 #include "Modular/PatchGraph.h"
 #include "Modular/Vca1.h"
 #include "Modular/Vca2.h"
 #include "Modular/Vcf.h"
 #include "Modular/Vco.h"
 #include "UI/FaceKnobs.h"
+#include "UI/Meter.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
@@ -69,6 +73,8 @@ public:
     int dividerGraphIndex() const noexcept { return dividerModuleIndex_; }
     int inverterGraphIndex() const noexcept { return inverterModuleIndex_; }
     int integratorGraphIndex() const noexcept { return integratorModuleIndex_; }
+    int mixerGraphIndex() const noexcept { return mixerModuleIndex_; }
+    int sampleHoldGraphIndex() const noexcept { return sampleHoldModuleIndex_; }
 
     // Null when that column is still a picture.
     juce::AudioProcessorParameter* parameterForPanelKnob (const char* section, const char* label) const;
@@ -84,9 +90,14 @@ public:
     void setOutputMix (float zeroToOne);
     void setExtInButtonHeld (bool held);
 
+    // Output Wet until a jack has been selected. Selecting does not patch.
+    Meter& meter() noexcept { return meter_; }
+    float meterVolts() const noexcept;
+
 private:
     void addKnobParameter (const FaceKnobBinding& binding);
     void applyHostControls();
+    void applyProgramParameters (int index);
     juce::AudioParameterFloat* floatParameter (FaceKnob knob) const noexcept;
 
     PatchGraph graph;
@@ -104,6 +115,8 @@ private:
     Divider divider;
     Inverter inverter;
     Integrator integrator;
+    Mixer mixer;
+    SampleHold sampleHold;
     int extModuleIndex_ = -1;
     int outputModuleIndex_ = -1;
     int noiseModuleIndex_ = -1;
@@ -118,6 +131,8 @@ private:
     int dividerModuleIndex_ = -1;
     int inverterModuleIndex_ = -1;
     int integratorModuleIndex_ = -1;
+    int mixerModuleIndex_ = -1;
+    int sampleHoldModuleIndex_ = -1;
 
     juce::AudioParameterBool* effectOn_ = nullptr;
     juce::AudioParameterFloat* vcfCutoff_ = nullptr;
@@ -140,6 +155,12 @@ private:
     juce::AudioParameterFloat* eg2Attack_ = nullptr;
     juce::AudioParameterFloat* eg2Release_ = nullptr;
     juce::AudioParameterFloat* integratorTime_ = nullptr;
+    juce::AudioParameterFloat* mixerLevel1_ = nullptr;
+    juce::AudioParameterFloat* mixerLevel2_ = nullptr;
+    juce::AudioParameterFloat* mixerLevel3_ = nullptr;
+    juce::AudioParameterFloat* sampleHoldRate_ = nullptr;
+    Meter meter_;
+    int currentProgram_ = kDefaultFactoryPreset;
     juce::String presetError_;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MS50ModularAudioProcessor)

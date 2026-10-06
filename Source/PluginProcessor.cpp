@@ -51,6 +51,10 @@ MS50ModularAudioProcessor::MS50ModularAudioProcessor()
     addKnobParameter (faceKnobBinding ("EG 2", "ATTACK"));
     addKnobParameter (faceKnobBinding ("EG 2", "RELEASE"));
     addKnobParameter (faceKnobBinding ("INT", "TIME"));
+    addKnobParameter (faceKnobBinding ("MIX", "LEVEL 1"));
+    addKnobParameter (faceKnobBinding ("MIX", "LEVEL 2"));
+    addKnobParameter (faceKnobBinding ("MIX", "LEVEL 3"));
+    addKnobParameter (faceKnobBinding ("S&H", "RATE"));
 
     extModuleIndex_ = graph.addModule (extIn);
     outputModuleIndex_ = graph.addModule (output);
@@ -66,6 +70,8 @@ MS50ModularAudioProcessor::MS50ModularAudioProcessor()
     dividerModuleIndex_ = graph.addModule (divider);
     inverterModuleIndex_ = graph.addModule (inverter);
     integratorModuleIndex_ = graph.addModule (integrator);
+    mixerModuleIndex_ = graph.addModule (mixer);
+    sampleHoldModuleIndex_ = graph.addModule (sampleHold);
     connectFactoryCables (graph, extModuleIndex_, outputModuleIndex_, vcfModuleIndex_, vca1ModuleIndex_,
                           eg1ModuleIndex_);
     applyHostControls();
@@ -127,6 +133,14 @@ void MS50ModularAudioProcessor::addKnobParameter (const FaceKnobBinding& binding
         eg2Release_ = parameter;
     else if (binding.knob == FaceKnob::IntegratorTime)
         integratorTime_ = parameter;
+    else if (binding.knob == FaceKnob::MixerLevel1)
+        mixerLevel1_ = parameter;
+    else if (binding.knob == FaceKnob::MixerLevel2)
+        mixerLevel2_ = parameter;
+    else if (binding.knob == FaceKnob::MixerLevel3)
+        mixerLevel3_ = parameter;
+    else if (binding.knob == FaceKnob::SampleHoldRate)
+        sampleHoldRate_ = parameter;
 }
 
 juce::AudioParameterFloat* MS50ModularAudioProcessor::floatParameter (FaceKnob knob) const noexcept
@@ -171,6 +185,14 @@ juce::AudioParameterFloat* MS50ModularAudioProcessor::floatParameter (FaceKnob k
         return eg2Release_;
     if (knob == FaceKnob::IntegratorTime)
         return integratorTime_;
+    if (knob == FaceKnob::MixerLevel1)
+        return mixerLevel1_;
+    if (knob == FaceKnob::MixerLevel2)
+        return mixerLevel2_;
+    if (knob == FaceKnob::MixerLevel3)
+        return mixerLevel3_;
+    if (knob == FaceKnob::SampleHoldRate)
+        return sampleHoldRate_;
     return nullptr;
 }
 
@@ -213,6 +235,10 @@ void MS50ModularAudioProcessor::applyHostControls()
     apply (eg2Attack_, eg2, Eg2::kKnobAttack);
     apply (eg2Release_, eg2, Eg2::kKnobRelease);
     apply (integratorTime_, integrator, Integrator::kKnobTime);
+    apply (mixerLevel1_, mixer, Mixer::kKnobLevel1);
+    apply (mixerLevel2_, mixer, Mixer::kKnobLevel2);
+    apply (mixerLevel3_, mixer, Mixer::kKnobLevel3);
+    apply (sampleHoldRate_, sampleHold, SampleHold::kKnobRate);
     output.setMix (outputMixForEffect (effectIsOn()));
 }
 
@@ -261,6 +287,13 @@ void MS50ModularAudioProcessor::setExtInButtonHeld (bool held)
     extIn.setButtonHeld (held);
 }
 
+float MS50ModularAudioProcessor::meterVolts() const noexcept
+{
+    const int module = meter_.readingModule (outputModuleIndex_);
+    const int port = meter_.readingPort (2);
+    return graph.portVolts (module, port);
+}
+
 MS50ModularAudioProcessor::~MS50ModularAudioProcessor() = default;
 
 void MS50ModularAudioProcessor::prepareToPlay (double sampleRate, int)
@@ -280,6 +313,8 @@ void MS50ModularAudioProcessor::prepareToPlay (double sampleRate, int)
     divider.prepare (sampleRate);
     inverter.prepare (sampleRate);
     integrator.prepare (sampleRate);
+    mixer.prepare (sampleRate);
+    sampleHold.prepare (sampleRate);
     applyHostControls();
     setLatencySamples (0);
 }
@@ -363,22 +398,68 @@ double MS50ModularAudioProcessor::getTailLengthSeconds() const
 
 int MS50ModularAudioProcessor::getNumPrograms()
 {
-    // Hosts that divide by the program count reject a plugin that reports zero.
-    return 1;
+    return kFactoryPresetCount;
 }
 
 int MS50ModularAudioProcessor::getCurrentProgram()
 {
-    return 0;
+    return currentProgram_;
 }
 
-void MS50ModularAudioProcessor::setCurrentProgram (int)
+void MS50ModularAudioProcessor::applyProgramParameters (int index)
 {
+    auto restore = [] (juce::AudioParameterFloat* parameter, float fallback)
+    {
+        if (parameter != nullptr)
+            parameter->setValueNotifyingHost (fallback);
+    };
+
+    if (effectOn_ != nullptr)
+        effectOn_->setValueNotifyingHost (factoryPresetEffect (index) ? 1.0f : 0.0f);
+
+    restore (vcfCutoff_, 0.50f);
+    restore (vcfPeak_, 0.30f);
+    restore (vcfAmount_, 0.68f);
+    restore (vca1LowCut_, 0.68f);
+    restore (eg1Attack_, 0.50f);
+    restore (eg1Decay_, 0.30f);
+    restore (eg1Sustain_, 0.68f);
+    restore (eg1Release_, 0.42f);
+    restore (mgRate_, 0.50f);
+    restore (mgPw_, 0.30f);
+    restore (vcoRange_, 0.50f);
+    restore (vcoFine_, 0.30f);
+    restore (vcoPw_, 0.68f);
+    restore (vcoFm1_, 0.42f);
+    restore (vcoFm2_, 0.78f);
+    restore (eg2Hold_, 0.50f);
+    restore (eg2Delay_, 0.30f);
+    restore (eg2Attack_, 0.68f);
+    restore (eg2Release_, 0.42f);
+    restore (integratorTime_, 0.50f);
+    restore (mixerLevel1_, 0.80f);
+    restore (mixerLevel2_, 0.80f);
+    restore (mixerLevel3_, 0.80f);
+    restore (sampleHoldRate_, 0.50f);
 }
 
-const juce::String MS50ModularAudioProcessor::getProgramName (int)
+void MS50ModularAudioProcessor::setCurrentProgram (int index)
 {
-    return {};
+    if (! loadFactoryPreset (graph, index))
+        return;
+
+    currentProgram_ = index;
+    applyProgramParameters (index);
+    vca1.setKnob (Vca1::kKnobIntensity, 0.85f);
+    output.setLevel (1.0f);
+    applyHostControls();
+    const double rate = getSampleRate();
+    graph.prepare (rate > 0.0 ? rate : 48000.0);
+}
+
+const juce::String MS50ModularAudioProcessor::getProgramName (int index)
+{
+    return factoryPresetName (index);
 }
 
 void MS50ModularAudioProcessor::changeProgramName (int, const juce::String&)

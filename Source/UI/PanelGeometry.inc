@@ -14,7 +14,7 @@ struct PanelJackRec {
     const char* label;
     float x;
     float y;
-    int module; // 0 none, 1 Ext In, 2 Output, 3 Noise, 4 VCF, 5 VCA 1, 6 VCA 2, 7 EG 1, 8 MG, 9 VCO, 10 EG 2, 11 Ring, 12 Divider, 13 Inverter, 14 Integrator
+    int module; // 0 none, 1 Ext In, 2 Output, 3 Noise, 4 VCF, 5 VCA 1, 6 VCA 2, 7 EG 1, 8 MG, 9 VCO, 10 EG 2, 11 Ring, 12 Divider, 13 Inverter, 14 Integrator, 15 Mixer, 16 Sample and hold
     int port;
     int dir; // 0 in, 1 out, -1 when the jack is not on the graph
 };
@@ -194,9 +194,9 @@ inline constexpr PanelJackRec kPanelJacks[] = {
     { "EG 2", "DELAY", 679.7f, 481.0f, 10, 3, 1 },
     { "NOISE", "WHITE", 771.9f, 88.5f, 3, 0, 1 },
     { "NOISE", "PINK", 771.9f, 162.5f, 3, 1, 1 },
-    { "S&H", "IN", 858.4f, 146.5f, 0, -1, -1 },
-    { "S&H", "OUT", 858.4f, 220.5f, 0, -1, -1 },
-    { "S&H", "CLOCK", 858.4f, 294.5f, 0, -1, -1 },
+    { "S&H", "IN", 858.4f, 146.5f, 16, 0, 0 },
+    { "S&H", "OUT", 858.4f, 220.5f, 16, 1, 1 },
+    { "S&H", "CLOCK", 858.4f, 294.5f, 16, 2, 0 },
     { "RING", "A", 940.7f, 88.5f, 11, 0, 0 },
     { "RING", "B", 940.7f, 162.5f, 11, 1, 0 },
     { "RING", "OUT", 940.7f, 236.5f, 11, 2, 1 },
@@ -208,10 +208,10 @@ inline constexpr PanelJackRec kPanelJacks[] = {
     { "INV", "OUT", 1104.3f, 162.5f, 13, 1, 1 },
     { "INT", "IN", 1183.1f, 146.5f, 14, 0, 0 },
     { "INT", "OUT", 1183.1f, 220.5f, 14, 1, 1 },
-    { "MIX", "IN 1", 1272.3f, 246.5f, 0, -1, -1 },
-    { "MIX", "IN 2", 1272.3f, 320.5f, 0, -1, -1 },
-    { "MIX", "IN 3", 1272.3f, 394.5f, 0, -1, -1 },
-    { "MIX", "OUT", 1272.3f, 468.5f, 0, -1, -1 },
+    { "MIX", "IN 1", 1272.3f, 246.5f, 15, 0, 0 },
+    { "MIX", "IN 2", 1272.3f, 320.5f, 15, 1, 0 },
+    { "MIX", "IN 3", 1272.3f, 394.5f, 15, 2, 0 },
+    { "MIX", "OUT", 1272.3f, 468.5f, 15, 3, 1 },
     { "EXT IN", "L", 1444.1f, 88.5f, 1, 0, 1 },
     { "EXT IN", "R", 1444.1f, 162.5f, 1, 1, 1 },
     { "EXT IN", "MONO", 1444.1f, 236.5f, 1, 2, 1 },
@@ -249,9 +249,9 @@ inline constexpr PanelKnobRec kPanelKnobs[] = {
     { "S&H", "RATE", 858.4f, 101.0f, 13.0f, 0.50f, 837.4f, 80.0f, 42.0f, 42.0f, 0 },
     { "DIV", "RATIO SWITCH", 1024.1f, 105.0f, 11.0f, 0.50f, 1002.0f, 83.0f, 44.0f, 44.0f, 1 },
     { "INT", "TIME", 1183.1f, 101.0f, 13.0f, 0.50f, 1162.1f, 80.0f, 42.0f, 42.0f, 0 },
-    { "MIX", "LEVEL 1", 1272.3f, 101.0f, 13.0f, 0.50f, 1251.3f, 80.0f, 42.0f, 42.0f, 0 },
-    { "MIX", "LEVEL 2", 1272.3f, 151.0f, 13.0f, 0.30f, 1251.3f, 130.0f, 42.0f, 42.0f, 0 },
-    { "MIX", "LEVEL 3", 1272.3f, 201.0f, 13.0f, 0.68f, 1251.3f, 180.0f, 42.0f, 42.0f, 0 },
+    { "MIX", "LEVEL 1", 1272.3f, 101.0f, 13.0f, 0.80f, 1251.3f, 80.0f, 42.0f, 42.0f, 0 },
+    { "MIX", "LEVEL 2", 1272.3f, 151.0f, 13.0f, 0.80f, 1251.3f, 130.0f, 42.0f, 42.0f, 0 },
+    { "MIX", "LEVEL 3", 1272.3f, 201.0f, 13.0f, 0.80f, 1251.3f, 180.0f, 42.0f, 42.0f, 0 },
     { "OUTPUT", "MIX", 1536.9f, 101.0f, 13.0f, 0.50f, 1515.9f, 80.0f, 42.0f, 42.0f, 0 },
     { "OUTPUT", "LEVEL", 1536.9f, 151.0f, 13.0f, 0.30f, 1515.9f, 130.0f, 42.0f, 42.0f, 0 },
 };

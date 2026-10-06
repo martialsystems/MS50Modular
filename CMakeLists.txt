@@ -48,6 +48,8 @@ target_sources(MS50Modular PRIVATE
   Source/Modular/Divider.cpp
   Source/Modular/Inverter.cpp
   Source/Modular/Integrator.cpp
+  Source/Modular/Mixer.cpp
+  Source/Modular/SampleHold.cpp
   Source/UI/PatchBayLogic.cpp
   Source/UI/PatchBayView.cpp)
 
@@ -81,6 +83,10 @@ add_executable(MS50ModularTests
   Source/Tests/DividerTests.cpp
   Source/Tests/InverterTests.cpp
   Source/Tests/IntegratorTests.cpp
+  Source/Tests/MixerTests.cpp
+  Source/Tests/SampleHoldTests.cpp
+  Source/Tests/MeterTests.cpp
+  Source/Tests/FactoryPresetTests.cpp
   Source/Tests/PresetTests.cpp
   Source/Tests/FeedbackTests.cpp
   Source/Modular/Module.cpp
@@ -99,6 +105,8 @@ add_executable(MS50ModularTests
   Source/Modular/Divider.cpp
   Source/Modular/Inverter.cpp
   Source/Modular/Integrator.cpp
+  Source/Modular/Mixer.cpp
+  Source/Modular/SampleHold.cpp
   Source/UI/PatchBayLogic.cpp)
 
 juce_add_gui_app(MS50PanelProbe PRODUCT_NAME "MS50PanelProbe")
@@ -123,6 +131,8 @@ target_sources(MS50PanelProbe PRIVATE
   Source/Modular/Divider.cpp
   Source/Modular/Inverter.cpp
   Source/Modular/Integrator.cpp
+  Source/Modular/Mixer.cpp
+  Source/Modular/SampleHold.cpp
   Source/UI/PatchBayLogic.cpp
   Source/UI/PatchBayView.cpp)
 
@@ -144,6 +154,7 @@ target_compile_features(MS50ModularTests PRIVATE cxx_std_20)
 
 target_compile_definitions(MS50ModularTests PRIVATE
   MS50_PATCH_GRAPH_SOURCE="${CMAKE_SOURCE_DIR}/Source/Modular/PatchGraph.cpp"
-  MS50_PROCESSOR_SOURCE="${CMAKE_SOURCE_DIR}/Source/PluginProcessor.cpp")
+  MS50_PROCESSOR_SOURCE="${CMAKE_SOURCE_DIR}/Source/PluginProcessor.cpp"
+  MS50_PATCH_BAY_VIEW_SOURCE="${CMAKE_SOURCE_DIR}/Source/UI/PatchBayView.cpp")
 
 target_compile_options(MS50ModularTests PRIVATE -Wall -Wextra -Wpedantic)

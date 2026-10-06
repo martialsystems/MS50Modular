@@ -187,10 +187,10 @@ Cable rule: `METHODOLOGY.md`, Cable rule (2026-10-05).
 *   An empty jack starts a cable. An occupied jack, without Shift, grabs the top plug.
 *   Shift-drag adds a cable.
 *   Drop on empty space unplugs. Right-click away from a jack unplugs.
-*   Click an occupied jack to open the stack chooser. Dragging a chooser row reorders that jack and does not publish.
+*   Click an occupied jack to open the stack chooser. Dragging a chooser row reorders that jack and does not publish. A click on a mapped jack also selects the meter. That selection adds no cable.
 *   Escape cancels.
 *   Two inputs, two outputs, a jack with no graph module, or a cycle before step 19: the cable does not stay. Status strings stay "that jack does not take this cable" and "feedback is not available until step 19".
-*   Sample and hold, the mixer, and the meter are drawn and are not graph modules. Divider /2 and /4 stay unmapped until that module exists. Do not add /16 DSP. The research divider is /2 and /4.
+*   Sample and hold and the mixer are graph modules. The meter is a display and reads a jack. Divider /16 stays unmapped. Do not add /16 DSP. The research divider is /2 and /4.
 
 The top control is an on/off named Effect (2026-10-05). Off keeps Output mix at 0, so the dry cables pass. On sets Output mix to 1. FL Studio's FX slot already has the 0 to 100 percent wet control, so this plugin does not draw a second mix slider. Level stays 1. A working column knob is a host parameter with its own range. Picture columns are not parameters. Column knobs do not drive a module that is not in the graph. EXT IN is the column immediately left of OUTPUT.
 

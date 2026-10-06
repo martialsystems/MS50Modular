@@ -26,7 +26,11 @@ enum class FaceKnob {
     Eg2Delay,
     Eg2Attack,
     Eg2Release,
-    IntegratorTime
+    IntegratorTime,
+    MixerLevel1,
+    MixerLevel2,
+    MixerLevel3,
+    SampleHoldRate
 };
 
 // minimum and maximum are the host range for that parameter. They are not one
@@ -93,6 +97,14 @@ inline FaceKnobBinding faceKnobBinding (const char* section, const char* label)
         return { FaceKnob::Eg2Release, 3, 0.0f, 1.0f, 0.42f, "eg2Release", "EG 2 Release" };
     if (faceKnobText (section, "INT") && faceKnobText (label, "TIME"))
         return { FaceKnob::IntegratorTime, 0, 0.0f, 1.0f, 0.50f, "integratorTime", "Integrator Time" };
+    if (faceKnobText (section, "MIX") && faceKnobText (label, "LEVEL 1"))
+        return { FaceKnob::MixerLevel1, 0, 0.0f, 1.0f, 0.80f, "mixerLevel1", "Mixer Level 1" };
+    if (faceKnobText (section, "MIX") && faceKnobText (label, "LEVEL 2"))
+        return { FaceKnob::MixerLevel2, 1, 0.0f, 1.0f, 0.80f, "mixerLevel2", "Mixer Level 2" };
+    if (faceKnobText (section, "MIX") && faceKnobText (label, "LEVEL 3"))
+        return { FaceKnob::MixerLevel3, 2, 0.0f, 1.0f, 0.80f, "mixerLevel3", "Mixer Level 3" };
+    if (faceKnobText (section, "S&H") && faceKnobText (label, "RATE"))
+        return { FaceKnob::SampleHoldRate, 0, 0.0f, 1.0f, 0.50f, "sampleHoldRate", "S&H Rate" };
 
     return none;
 }

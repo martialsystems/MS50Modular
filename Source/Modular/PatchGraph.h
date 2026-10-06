@@ -37,6 +37,9 @@ public:
     int moduleCount() const { return moduleCount_; }
     int cableCount() const { return editCableCount_; }
 
+    // Live jack voltage for the meter. Not used by process().
+    float portVolts (int module, int port) const noexcept;
+
     // Copies the published snapshot. The caller supplies storage. No allocation.
     int copyPublishedCables (Cable* dest, int capacity) const;
 
@@ -56,6 +59,12 @@ public:
     // False leaves knobs, cables, and module memory as they were.
     // An accepted load calls prepare so filter and envelope memory restart.
     bool setState (const void* data, int size);
+
+    // Replaces the cable list. Does not append. Cycles stay, and publish picks the newest feedback edge.
+    // False leaves the previous list in place.
+    bool setCables (const Cable* cables, int count);
+
+    bool writePresetKnob (int module, int knob, float value);
     const char* stateError() const noexcept { return stateError_; }
 
 private:

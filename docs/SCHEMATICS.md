@@ -533,15 +533,16 @@ Test: `testRingFourQuadrant`. `testRingZeroKills`. `testRingPassesDcProduct`. `t
 
 CONFIRMED: four-quadrant IC, two inputs, one output, no panel knob, DC path. STAND-IN: S-21 scale and zero bleed.
 
-## Phase 2 faces (documented, no ports)
+## Phase 2 faces
 
-Do not instantiate these in `ModuleRack`.
+The adding amplifier and sample and hold are graph modules. The meter is a display on the panel. ESP, TRIG SW, the volt source, the headphone amp, and multiples remain notes in this section.
 
-*   Adding amp: three attenuators, inverting mix, DC. Needed later if fan-out (S-27) is removed.
-*   Sample and hold: IN, OUT, EXT CLOCK, CLOCK OUT, rate pot. FET hold. Not a stand-in inside Noise.
-*   ESP: preamp, follower, trigger. Not the Ext In gate (S-22), which must be deleted or relabeled when ESP exists.
+*   Adding amp: `Mixer`. Jacks In 1, In 2, In 3, Out. Knobs Level 1, Level 2, Level 3, each defaulting to 0.8. `Out = -(In1*level1 + In2*level2 + In3*level3)`. DC passes. No offset jack.
+*   Sample and hold: its own module. Jacks In, Out, Ext Clock, Clock Out, and a Rate knob. The panel hole labelled CLOCK is Ext Clock. Clock Out has no panel hole. The internal clock runs while Ext Clock is unpatched. A rising edge at 1 V holds In onto Out. Clock Out follows the clock that won, high at +5 V. Rate stand-in: 0.1 Hz at knob 0 through 100 Hz at knob 1, exponential. Divider /16 stays unmapped.
+*   Meter: a display. A click on a mapped jack selects that jack. The needle is about ±5 V full scale. With no selection it reads Output Wet. `process()` does not read it.
+*   ESP: preamp, follower, trigger. The Ext In gate (S-22) remains the gate until ESP is built.
 *   TRIG SW: active-low button module. Replaces the Ext In manual button's role as the obvious trigger.
-*   Volt source, meter, headphone amp: as in the research summary.
+*   Volt source and headphone amp: as in the research summary.
 *   Multiples: do not invent buffering. The sheet set does not show the circuit.
 
 ## State
