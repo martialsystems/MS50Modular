@@ -78,7 +78,7 @@ inline constexpr float kMeterScale = 1.56f;
 inline constexpr float kMeterMinAngle = -47.00f;
 inline constexpr float kMeterMaxAngle = 47.00f;
 
-inline constexpr int kPanelLabelCount = 110;
+inline constexpr int kPanelLabelCount = 108;
 inline constexpr PanelLabelRec kPanelLabels[] = {
     { "VCO", 69.2f, 56.1f, 27.6f, 11.3f },
     { "RANGE", 34.4f, 117.9f, 41.3f, 10.3f },
@@ -155,12 +155,10 @@ inline constexpr PanelLabelRec kPanelLabels[] = {
     { "OUT", 883.5f, 250.4f, 24.0f, 10.3f },
     { "DIV", 963.4f, 56.1f, 21.6f, 11.3f },
     { "2", 954.0f, 85.5f, 6.1f, 10.3f },
-    { "4", 971.1f, 77.9f, 6.1f, 10.3f },
-    { "16", 984.9f, 85.5f, 12.6f, 10.3f },
+    { "4", 988.3f, 85.5f, 6.1f, 10.3f },
     { "IN", 968.5f, 153.4f, 11.4f, 10.3f },
     { "/2", 969.4f, 227.4f, 9.6f, 10.3f },
     { "/4", 969.4f, 301.4f, 9.6f, 10.3f },
-    { "/16", 966.1f, 375.4f, 16.1f, 10.3f },
     { "INV", 1038.8f, 56.1f, 21.6f, 11.3f },
     { "IN", 1043.9f, 102.4f, 11.4f, 10.3f },
     { "OUT", 1037.6f, 176.4f, 24.0f, 10.3f },
@@ -192,7 +190,7 @@ inline constexpr PanelLabelRec kPanelLabels[] = {
     { "METER FACE", 1265.6f, 365.2f, 306.4f, 139.3f },
 };
 
-inline constexpr int kPanelJackCount = 58;
+inline constexpr int kPanelJackCount = 57;
 inline constexpr PanelJackRec kPanelJacks[] = {
     { "VCO", "HZ/V", 83.0f, 246.5f, 9, 0, 0 },
     { "VCO", "V/OCT", 83.0f, 283.5f, 9, 1, 0 },
@@ -236,7 +234,6 @@ inline constexpr PanelJackRec kPanelJacks[] = {
     { "DIV", "IN", 974.2f, 139.5f, 12, 0, 0 },
     { "DIV", "/2", 974.2f, 213.5f, 12, 1, 1 },
     { "DIV", "/4", 974.2f, 287.5f, 12, 2, 1 },
-    { "DIV", "/16", 974.2f, 361.5f, 0, -1, -1 },
     { "INV", "IN", 1049.6f, 88.5f, 13, 0, 0 },
     { "INV", "OUT", 1049.6f, 162.5f, 13, 1, 1 },
     { "INT", "IN", 1123.7f, 146.5f, 14, 0, 0 },
@@ -264,11 +261,11 @@ inline constexpr PanelKnobRec kPanelKnobs[] = {
     { "VCF", "CUTOFF", 196.3f, 101.0f, 13.0f, 0.50f, 175.3f, 80.0f, 42.0f, 42.0f, 0 },
     { "VCF", "PEAK", 196.3f, 151.0f, 13.0f, 0.30f, 175.3f, 130.0f, 42.0f, 42.0f, 0 },
     { "VCF", "MOD", 196.3f, 201.0f, 13.0f, 0.68f, 175.3f, 180.0f, 42.0f, 42.0f, 0 },
-    { "VCA 1", "INITIAL", 287.4f, 101.0f, 13.0f, 0.50f, 266.4f, 80.0f, 42.0f, 42.0f, 0 },
-    { "VCA 1", "MOD", 287.4f, 151.0f, 13.0f, 0.30f, 266.4f, 130.0f, 42.0f, 42.0f, 0 },
+    { "VCA 1", "INITIAL", 287.4f, 101.0f, 13.0f, 0.00f, 266.4f, 80.0f, 42.0f, 42.0f, 0 },
+    { "VCA 1", "MOD", 287.4f, 151.0f, 13.0f, 0.85f, 266.4f, 130.0f, 42.0f, 42.0f, 0 },
     { "VCA 1", "LOW CUT", 287.4f, 201.0f, 13.0f, 0.68f, 266.4f, 180.0f, 42.0f, 42.0f, 0 },
-    { "VCA 2", "INITIAL", 375.3f, 101.0f, 13.0f, 0.50f, 354.3f, 80.0f, 42.0f, 42.0f, 0 },
-    { "VCA 2", "MOD", 375.3f, 151.0f, 13.0f, 0.30f, 354.3f, 130.0f, 42.0f, 42.0f, 0 },
+    { "VCA 2", "INITIAL", 375.3f, 101.0f, 13.0f, 0.00f, 354.3f, 80.0f, 42.0f, 42.0f, 0 },
+    { "VCA 2", "MOD", 375.3f, 151.0f, 13.0f, 1.00f, 354.3f, 130.0f, 42.0f, 42.0f, 0 },
     { "MG", "RATE", 461.7f, 101.0f, 13.0f, 0.50f, 440.7f, 80.0f, 42.0f, 42.0f, 0 },
     { "MG", "PW", 461.7f, 151.0f, 13.0f, 0.30f, 440.7f, 130.0f, 42.0f, 42.0f, 0 },
     { "EG 1", "ATTACK", 554.4f, 101.0f, 13.0f, 0.50f, 533.4f, 80.0f, 42.0f, 42.0f, 0 },
@@ -280,7 +277,7 @@ inline constexpr PanelKnobRec kPanelKnobs[] = {
     { "EG 2", "ATTACK", 648.8f, 201.0f, 13.0f, 0.68f, 627.8f, 180.0f, 42.0f, 42.0f, 0 },
     { "EG 2", "RELEASE", 648.8f, 251.0f, 13.0f, 0.42f, 627.8f, 230.0f, 42.0f, 42.0f, 0 },
     { "S&H", "RATE", 817.9f, 101.0f, 13.0f, 0.50f, 796.9f, 80.0f, 42.0f, 42.0f, 0 },
-    { "DIV", "RATIO SWITCH", 974.2f, 105.0f, 11.0f, 0.50f, 952.0f, 83.0f, 44.0f, 44.0f, 1 },
+    { "DIV", "RATIO SWITCH", 974.2f, 105.0f, 11.0f, 0.00f, 952.0f, 83.0f, 44.0f, 44.0f, 1 },
     { "INT", "TIME", 1123.7f, 101.0f, 13.0f, 0.50f, 1102.7f, 80.0f, 42.0f, 42.0f, 0 },
     { "MIX", "LEVEL 1", 1208.1f, 101.0f, 13.0f, 0.80f, 1187.1f, 80.0f, 42.0f, 42.0f, 0 },
     { "MIX", "LEVEL 2", 1208.1f, 151.0f, 13.0f, 0.80f, 1187.1f, 130.0f, 42.0f, 42.0f, 0 },

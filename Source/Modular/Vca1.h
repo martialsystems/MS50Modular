@@ -12,7 +12,7 @@ public:
     static constexpr int kOut = 2;
     static constexpr int kKnobLowCut = 0;
     static constexpr int kKnobIntensity = 1;
-    // Not stored in the graph blob. Feedback and the self-mod presets set 0.7.
+    // Host parameter vca1Initial (panel VCA 1 INITIAL). Not stored in the graph blob. Feedback and the self-mod presets set 0.7.
     // Voice, Hold, and the other factory presets clear it.
     static constexpr int kKnobInitial = 2;
 

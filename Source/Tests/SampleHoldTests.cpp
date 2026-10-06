@@ -168,8 +168,7 @@ int testSampleHoldRateChangesInternalClock()
     const int in = panelJackIndex ("S&H", "IN");
     const int out = panelJackIndex ("S&H", "OUT");
     const int clock = panelJackIndex ("S&H", "CLOCK");
-    const int div16 = panelJackIndex ("DIV", "/16");
-    check (in >= 0 && out >= 0 && clock >= 0 && div16 >= 0, "sample and hold jacks exist");
+    check (in >= 0 && out >= 0 && clock >= 0, "sample and hold jacks exist");
     check (kPanelJacks[in].module == 16 && kPanelJacks[in].port == 0 && kPanelJacks[in].dir == 0, "in");
     check (kPanelJacks[out].module == 16 && kPanelJacks[out].port == 1 && kPanelJacks[out].dir == 1, "out");
     check (kPanelJacks[clock].module == 16 && kPanelJacks[clock].port == SampleHold::kExtClock && kPanelJacks[clock].dir == 0,
@@ -181,8 +180,8 @@ int testSampleHoldRateChangesInternalClock()
             ++shJacks;
     }
     check (shJacks == 3, "clock out has no panel hole");
-    check (kPanelJacks[div16].module == 0 && kPanelJacks[div16].port < 0, "/16 stays a hole");
-    check (kPanelJackCount == 58, "jack count unchanged");
+    check (panelJackIndex ("DIV", "/16") < 0, "the /16 hole is gone");
+    check (kPanelJackCount == 57, "jack count");
 
     PanelLink refused;
     check (orientPanelJacks (out, panelJackIndex ("VCF", "CUTOFF"), 0, 1, 2, refused) == PanelLinkResult::Unmapped,

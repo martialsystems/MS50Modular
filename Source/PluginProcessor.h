@@ -140,7 +140,11 @@ private:
     juce::AudioParameterFloat* vcfCutoff_ = nullptr;
     juce::AudioParameterFloat* vcfPeak_ = nullptr;
     juce::AudioParameterFloat* vcfAmount_ = nullptr;
+    juce::AudioParameterFloat* vca1Initial_ = nullptr;
+    juce::AudioParameterFloat* vca1Mod_ = nullptr;
     juce::AudioParameterFloat* vca1LowCut_ = nullptr;
+    juce::AudioParameterFloat* vca2Initial_ = nullptr;
+    juce::AudioParameterFloat* vca2Mod_ = nullptr;
     juce::AudioParameterFloat* eg1Attack_ = nullptr;
     juce::AudioParameterFloat* eg1Decay_ = nullptr;
     juce::AudioParameterFloat* eg1Sustain_ = nullptr;
