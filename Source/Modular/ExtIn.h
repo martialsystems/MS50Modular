@@ -6,7 +6,7 @@
 
 #include <atomic>
 
-// Plugin boundary. Not an MS-50 module. S-01: host ±1 maps to ±5 V.
+// Plugin boundary. Not a hardware module. S-01: host ±1 maps to ±5 V.
 // S-22: absolute mono into a one-pole follower. The momentary button ORs the gate.
 class ExtIn : public Module {
 public:

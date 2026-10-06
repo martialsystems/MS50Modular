@@ -200,7 +200,7 @@ public:
     {
         processor = std::make_unique<MS50ModularAudioProcessor>();
         auto* created = processor->createEditor();
-        window = std::make_unique<juce::DocumentWindow> ("MS-50 panel probe",
+        window = std::make_unique<juce::DocumentWindow> ("RONIN panel probe",
                                                           juce::Colours::black,
                                                           juce::DocumentWindow::allButtons);
         window->setUsingNativeTitleBar (true);

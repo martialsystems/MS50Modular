@@ -1,6 +1,4 @@
-Copyright (c) 2026 Martial Systems LLC. All rights reserved.
-
-The Korg MS-50, the MS-50 name, and the circuit designs of that instrument are the property of Korg Inc. Martial Systems LLC claims copyright only in the original text of this repository and in any code later written here. The work is an independent study of published schematics and of the literature cited in the research summary. Korg has not produced, sponsored, or endorsed it. No license is granted to the MS-50 design, to the Korg drawings, or to the Korg trademarks. The instrument's name is used only to identify the subject of the study.
+Copyright (c) 2026 Martial Systems LLC. All rights reserved. RONIN is part of the Jidai Collection.
 
 # Test plan
 
@@ -8,7 +6,7 @@ Date: 2026-09-21.
 
 Automated tests live in `Source/Tests/GraphTests.cpp` and are run with the `MS50ModularTests` target from step 2 on. Host checks are done in a real plugin host after the step that needs them. This environment's design pack does not include a host, so a step that says "host" is not done until a person or an agent with a host has done it and written the host name.
 
-Stand-in ids are defined in `METHODOLOGY.md`. A test that encodes a stand-in number must name the id in a comment on the assertion.
+Stand-in ids are defined in `docs/METHODOLOGY.md`. A test that encodes a stand-in number must name the id in a comment on the assertion.
 
 ## Plugin loads
 
@@ -108,7 +106,7 @@ Step 6 on the tile rack. The panel in Panel patch bay (2026-10-05) lets either j
 
 `testRejectCycle` still passes: a jack into itself is refused, and a cycle stays patched. `testFanOutAllowed` and `testRejectSignalIntoGate` stay.
 
-Unpatch: drag a drawn cable onto empty space, or right-click it. A 1978 MS-50 jack took one plug. This plugin stacks. See Panel patch bay (2026-10-05).
+Unpatch: drag a drawn cable onto empty space, or right-click it. A jack on the 1978 hardware took one plug. This plugin stacks. See Panel patch bay (2026-10-05).
 
 ## Panel patch bay (2026-10-05)
 
@@ -159,9 +157,9 @@ Do not commit the videos or the bounces.
 
 | When | Source | Pass condition |
 |---|---|---|
-| After step 8 and again after step 20 | Gladén `MwJk36KnB04`, MS-50 sections at 0:51, 2:28, 4:20 | Low peak is duller at low cutoff. High peak rings and stays finite. Step 20: a louder saw is not a scaled copy of a quiet saw |
+| After step 8 and again after step 20 | Gladén `MwJk36KnB04`, original-hardware sections at 0:51, 2:28, 4:20 | Low peak is duller at low cutoff. High peak rings and stays finite. Step 20: a louder saw is not a scaled copy of a quiet saw |
 | After step 12 | Synth Party `C6oqCY0ArvM` after 0:51, as a reminder of Hz/V plus S-trig | Plugin Oct/V and Hz/V tests already encode the laws. The video is a sanity listen, not a pitch measurement |
-| After step 11 | Alex Ball `3YFDDDXw6F8` near 8:43 | Optional. Confirms you are not listening to a Korg-35 story. Not a measurement |
+| After step 11 | Alex Ball `3YFDDDXw6F8` near 8:43 | Optional. Confirms you are hearing the diode-bridge filter. Not a measurement |
 | Never as a timbre reference | Dr. Kunz `_iJJYsWUYd0`, Perfect Circuit `UXW39LO-bxY` | Effects or a second synth are in the file |
 
 Write mismatches into `docs/listening/step-20.md`. Change a stand-in only in a follow-up commit that names the id.

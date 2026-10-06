@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
-"""Play a stereo sine through the MS-50 Modular VST3 and compare it to the input.
+"""Play a stereo sine through the RONIN VST3 and compare it to the input.
 
 Mix stays at the plugin default, which is 0. This script does not install packages.
 """
@@ -26,8 +26,8 @@ def fail(max_error=None) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Sine through the MS-50 Modular VST3 at mix 0.")
-    parser.add_argument("--vst3", required=True, help="Path to the MS-50 Modular.vst3 bundle")
+    parser = argparse.ArgumentParser(description="Sine through the RONIN VST3 at mix 0.")
+    parser.add_argument("--vst3", required=True, help="Path to the RONIN.vst3 bundle")
     parser.add_argument("--sr", type=float, default=48000.0)
     parser.add_argument("--seconds", type=float, default=0.25)
     parser.add_argument("--hz", type=float, default=220.0)

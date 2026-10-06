@@ -1,7 +1,7 @@
 Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
-The Korg MS-50, the MS-50 name, and the circuit designs of that instrument are the property of Korg Inc. Martial Systems LLC claims copyright only in the original text of this repository and in any code later written here. The work is an independent study of published schematics and of the literature cited in the research summary. Korg has not produced, sponsored, or endorsed it. No license is granted to the MS-50 design, to the Korg drawings, or to the Korg trademarks. The instrument's name is used only to identify the subject of the study.
+RONIN and the Jidai Collection are products of Martial Systems LLC. No license is granted to copy, modify, or redistribute this software or its artwork without written permission from Martial Systems LLC.
 
-The repository is published so that the study can be read. Publication does not transfer any right in the MS-50, and it is not permission to offer this material as an official Korg product. Schematic scans and redrawn copies of the Korg drawings are not included. Citations of published sources are collected in docs/01-research.md.
+RONIN is inspired by the Korg MS-50. Korg and MS-50 are trademarks of their respective owners. Martial Systems LLC is not affiliated with or endorsed by Korg.
 
-No warranty is offered. The notes describe a method of study. They are not a measurement of any particular instrument.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED.

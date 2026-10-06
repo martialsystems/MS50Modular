@@ -177,7 +177,7 @@ int main(int argc, char** argv)
     }
     if (!foundAudioClass)
         return failText("audio class");
-    if (std::strcmp(audioClass.name, "MS-50 Modular") != 0)
+    if (std::strcmp(audioClass.name, "RONIN") != 0)
         return failText("plugin name");
     if (!subcategoryHas(audioClass.subCategories, "Fx"))
         return failText("subcategory Fx");

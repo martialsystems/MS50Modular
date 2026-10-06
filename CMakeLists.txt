@@ -12,7 +12,8 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(JUCE)
 
 juce_add_plugin(MS50Modular
-  COMPANY_NAME "Personal"
+  COMPANY_NAME "Martial Systems"
+  BUNDLE_ID com.martialsystems.ronin
   IS_SYNTH FALSE
   NEEDS_MIDI_INPUT FALSE
   NEEDS_MIDI_OUTPUT FALSE
@@ -22,7 +23,7 @@ juce_add_plugin(MS50Modular
   PLUGIN_MANUFACTURER_CODE Psnl
   PLUGIN_CODE Ms50
   FORMATS VST3
-  PRODUCT_NAME "MS-50 Modular")
+  PRODUCT_NAME "RONIN")
 
 juce_add_binary_data(MS50PanelAssets
   HEADER_NAME PanelAssets.h

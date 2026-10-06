@@ -448,7 +448,7 @@ bool MS50ModularAudioProcessor::hasEditor() const
 
 const juce::String MS50ModularAudioProcessor::getName() const
 {
-    return "MS-50 Modular";
+    return "RONIN";
 }
 
 bool MS50ModularAudioProcessor::acceptsMidi() const

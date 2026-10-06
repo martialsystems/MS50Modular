@@ -1,24 +1,22 @@
-Copyright (c) 2026 Martial Systems LLC. All rights reserved.
-
-The Korg MS-50, the MS-50 name, and the circuit designs of that instrument are the property of Korg Inc. Martial Systems LLC claims copyright only in the original text of this repository and in any code later written here. The work is an independent study of published schematics and of the literature cited in the research summary. Korg has not produced, sponsored, or endorsed it. No license is granted to the MS-50 design, to the Korg drawings, or to the Korg trademarks. The instrument's name is used only to identify the subject of the study.
+Copyright (c) 2026 Martial Systems LLC. All rights reserved. RONIN is part of the Jidai Collection.
 
 # Build guide
 
 Date: 2026-09-21.
 
-Implement one step, run its acceptance test, then stop. A later step that seems small is still a later step. If the test fails, fix it inside the same step. If the fix needs a change to `METHODOLOGY.md` or `SCHEMATICS.md`, make that change in the same branch and say why. Do not silently retune a stand-in.
+Implement one step, run its acceptance test, then stop. A later step that seems small is still a later step. If the test fails, fix it inside the same step. If the fix needs a change to `docs/METHODOLOGY.md` or `docs/SCHEMATICS.md`, make that change in the same branch and say why. Do not silently retune a stand-in.
 
 Branch name: `feat/step-XX` with XX from 00 to 20. Open it from `main` after the previous step is merged.
 
-Global ban, every step: no MIDI note path, no neural net, no phase 2 module, no second copy of a phase 1 module, no heap use in `processBlock` or `processSample`, no Korg drawing scans.
+Global ban, every step: no MIDI note path, no neural net, no phase 2 module, no second copy of a phase 1 module, no heap use in `processBlock` or `processSample`, no drawing scans.
 
 JUCE is fetched at tag `8.0.4` unless that tag will not configure, in which case stop and record the tag that did. Do not vendor the JUCE tree.
 
 ## Step 0: repo, docs, license
 
-Files: `README.md`, `METHODOLOGY.md`, `LICENSE`, `.gitignore`, `docs/01-research.md`, `docs/SCHEMATICS.md`, `docs/BUILD_GUIDE.md`, `docs/TESTPLAN.md`, `docs/REPO_SETUP.md`, `docs/MS50_Modular_Design_Pack.pdf`, `scripts/init-repo.sh`, `scripts/build_design_pdf.py`.
+Files: `README.md`, `docs/METHODOLOGY.md`, `LICENSE`, `.gitignore`, `docs/SCHEMATICS.md`, `docs/BUILD_GUIDE.md`, `docs/TESTPLAN.md`. (Step 0 also produced a research summary and a design-pack PDF. They are in git history before the RONIN product release, not in the tree.)
 
-Acceptance: `python3 scripts/build_design_pdf.py` exits 0 and the PDF opens. `git status` shows no audio files and no schematic scans. A search of the markdown finds no second stand-in number for a quantity that already has an id.
+Acceptance: `git status` shows no audio files and no schematic scans. A search of the markdown finds no second stand-in number for a quantity that already has an id.
 
 Do not touch: nothing exists yet besides these files. Do not add `CMakeLists.txt`.
 
@@ -61,7 +59,7 @@ juce_add_plugin(MS50Modular
   PLUGIN_MANUFACTURER_CODE Psnl
   PLUGIN_CODE Ms50
   FORMATS VST3
-  PRODUCT_NAME "MS-50 Modular")
+  PRODUCT_NAME "RONIN")
 
 target_sources(MS50Modular PRIVATE
   Source/PluginProcessor.cpp
@@ -78,7 +76,7 @@ target_link_libraries(MS50Modular PRIVATE
   juce::juce_recommended_warning_flags)
 ```
 
-Processor: stereo in, stereo out, `isBusesLayoutSupported` accepts only stereo. `processBlock` copies input to output. Editor: a label "MS-50 Modular" and the words "no patch yet".
+Processor: stereo in, stereo out, `isBusesLayoutSupported` accepts only stereo. `processBlock` copies input to output. Editor: a label "RONIN" and the words "no patch yet".
 
 Acceptance:
 
@@ -163,7 +161,7 @@ Rollback: ignore mouse-up. Keyboard of cables is not required.
 
 ## Stackable inputs (2026-09-29)
 
-An input sums every cable. A second `connect` to the same input succeeds, appends a cable, and publishes. A 1978 MS-50 jack took one plug. This plugin stacks. The panel gestures are in Panel patch bay (2026-10-05). Fan-out from one output stays allowed. Cycles, a cable from a port to itself, in-to-in, out-to-out, and the type matrix stay rejected.
+An input sums every cable. A second `connect` to the same input succeeds, appends a cable, and publishes. A jack on the 1978 hardware took one plug. This plugin stacks. The panel gestures are in Panel patch bay (2026-10-05). Fan-out from one output stays allowed. Cycles, a cable from a port to itself, in-to-in, out-to-out, and the type matrix stay rejected.
 
 Status strings stay "that jack does not take this cable" and "feedback is not available until step 19". A legal second cable does not use "input already has a cable".
 
@@ -181,7 +179,7 @@ The editor is the landscape panel. `panel/assets/layout.json` is the geometry. `
 
 Files: `Source/UI/PatchBayView.cpp/.h`, `Source/UI/PatchBayLogic.cpp/.h`, `Source/PluginEditor.cpp/.h`. The tile views `RackView`, `JackView`, and `CableView` are not in the plugin target. Steps 4 to 6 above record that those files were the development UI.
 
-Cable rule: `METHODOLOGY.md`, Cable rule (2026-10-05).
+Cable rule: `docs/METHODOLOGY.md`, Cable rule (2026-10-05).
 
 *   A drag may start on either jack. The graph orients output to input.
 *   An empty jack starts a cable. An occupied jack, without Shift, grabs the top plug.
@@ -374,7 +372,7 @@ Stop. Phase 2 is a new packet. Do not start the adding amplifier because fan-out
 
 The landscape chassis landed in Panel patch bay (2026-10-05). Column knobs turn as of Knob rule (2026-10-05). Cable color stays off `Cable`. The notes below are the 2026-09-29 plan for that pass.
 
-Goal: replace the tile rack with one landscape chassis copied from the 1978 MS-50. Knobs sit in an upper band. Two continuous jack rows run along the bottom. Modules are labeled columns.
+Goal: replace the tile rack with one landscape chassis modeled on the 1978 hardware. Knobs sit in an upper band. Two continuous jack rows run along the bottom. Modules are labeled columns.
 
 When: after Step 6 works, and after at least the VCO, VCF, and VCA make sound, so the knobs have a signal to control. Do not block steps 7 to 20 on this pass.
 

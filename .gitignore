@@ -53,6 +53,6 @@ credentials.*
 # Panel rasters. The editor uses panel/assets/panel.svg.
 panel/assets/*.png
 
-# Do not commit Korg scans, even if someone drops them in while studying.
+# Do not commit schematic scans or photos of drawings.
 /reference-scans/
 *.djvu
