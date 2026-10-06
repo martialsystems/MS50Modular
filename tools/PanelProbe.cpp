@@ -116,6 +116,24 @@ bool knobPixelsDiffer (const juce::Image& before, const juce::Image& after, juce
     return false;
 }
 
+// Pixels in the HOLD lamp's disc that turned red between two shots. Cables and their shadows may cross the lamp,
+// so count over the disc rather than sample one point.
+int holdLampPixelsLit (PatchBayView& bay, const juce::Image& up, const juce::Image& down)
+{
+    const auto topLeft = bay.designToLocal (kHoldLampCx - kHoldLampR, kHoldLampCy - kHoldLampR);
+    const auto bottomRight = bay.designToLocal (kHoldLampCx + kHoldLampR, kHoldLampCy + kHoldLampR);
+    int lit = 0;
+    for (int y = juce::jmax (0, (int) topLeft.y); y <= juce::jmin (down.getHeight() - 1, (int) bottomRight.y); ++y)
+        for (int x = juce::jmax (0, (int) topLeft.x); x <= juce::jmin (down.getWidth() - 1, (int) bottomRight.x); ++x)
+        {
+            const auto before = up.getPixelAt (x, y);
+            const auto after = down.getPixelAt (x, y);
+            if (after.getRed() > before.getRed() + 50 && after.getGreen() * 2 < after.getRed() && after.getBlue() * 2 < after.getRed())
+                ++lit;
+        }
+    return lit;
+}
+
 void clickAt (PatchBayView& bay, float x, float y)
 {
     auto source = juce::Desktop::getInstance().getMainMouseSource();
@@ -664,14 +682,7 @@ private:
                 format.writeImageToStream (downClip, downStream);
             }
             expect (knobPixelsDiffer (snapshot, heldShot, crop), "holding the button repaints the cap");
-            const auto litPoint = bay->designToLocal (kHoldCx + 8.0f, kHoldCy + 8.0f);
-            const int litX = juce::jlimit (0, heldShot.getWidth() - 1, static_cast<int> (litPoint.x));
-            const int litY = juce::jlimit (0, heldShot.getHeight() - 1, static_cast<int> (litPoint.y));
-            const auto unlitCorner = snapshot.getPixelAt (litX, litY);
-            const auto heldPixel = heldShot.getPixelAt (litX, litY);
-            expect (heldPixel.getRed() > unlitCorner.getRed() + 20
-                        && heldPixel.getBlue() + 20 < unlitCorner.getBlue(),
-                    "a held key is amber");
+            expect (holdLampPixelsLit (*bay, snapshot, heldShot) >= 3, "the red HOLD lamp lights while the key is held");
             expect (processor->extInButtonHeld(), "mouse down holds the key");
 
             const auto dragged = bay->designToLocal (kHoldCx + 80.0f, kHoldCy + 40.0f);
@@ -691,17 +702,14 @@ private:
             juce::Image offHeld (juce::Image::ARGB, bay->getWidth(), bay->getHeight(), true);
             juce::Graphics offHeldGraphics (offHeld);
             bay->paintEntireComponent (offHeldGraphics, true);
-            const auto offHeldPixel = offHeld.getPixelAt (litX, litY);
             expect (processor->extInButtonHeld(), "mouse down holds the key while the effect is off");
-            expect (offHeldPixel.getRed() > unlitCorner.getRed() + 20
-                        && offHeldPixel.getBlue() + 20 < unlitCorner.getBlue(),
-                    "a held key is amber while the effect is off");
+            expect (holdLampPixelsLit (*bay, snapshot, offHeld) >= 3, "the HOLD lamp lights while the effect is off");
             bay->mouseUp (up);
             expect (! processor->extInButtonHeld(), "mouse up releases the hold while the effect is off");
             clickAt (*bay, onX, powerY);
             expect (bay->outputMix() == 1.0f, "hold check turns the effect back on");
 
-            const auto legend = bay->designToLocal (1325.6f + 10.0f, 284.4f + 4.0f);
+            const auto legend = bay->designToLocal (1325.6f + 10.0f, 288.4f + 4.0f);
             juce::MouseEvent legendDown (source, legend, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
                                          bay, bay, time, legend, time, 1, false);
             bay->mouseDown (legendDown);

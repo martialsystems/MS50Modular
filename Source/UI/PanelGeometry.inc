@@ -45,11 +45,15 @@ inline constexpr float kPowerH = 20.00f;
 // Momentary HOLD key under the EXT IN jacks. Mouse down holds the gate. Mouse up releases it.
 // The view paints the cap before the cables.
 inline constexpr float kHoldCx = 1341.80f;
-inline constexpr float kHoldCy = 262.50f;
+inline constexpr float kHoldCy = 266.50f;
 inline constexpr float kHoldHitX = 1324.80f;
-inline constexpr float kHoldHitY = 245.50f;
+inline constexpr float kHoldHitY = 249.50f;
 inline constexpr float kHoldHitW = 34.00f;
 inline constexpr float kHoldHitH = 34.00f;
+// Red lamp above the HOLD key, lit while the key is held (like the SQ-10 START lamp). The dark bezel is in the SVG.
+inline constexpr float kHoldLampCx = 1341.80f;
+inline constexpr float kHoldLampCy = 240.00f;
+inline constexpr float kHoldLampR = 3.50f;
 
 // Preset LCD in the top bar. The glass is in the SVG. The view draws the dots.
 inline constexpr float kPresetBezelX = 680.00f;
@@ -187,7 +191,7 @@ inline constexpr PanelLabelRec kPanelLabels[] = {
     { "WET", 1496.4f, 284.4f, 25.2f, 10.3f },
     { "THRESHOLD", 1260.9f, 229.9f, 71.6f, 10.3f },
     { "RELEASE", 1359.7f, 229.9f, 54.4f, 10.3f },
-    { "HOLD", 1325.6f, 284.4f, 32.4f, 10.3f },
+    { "HOLD", 1325.6f, 288.4f, 32.4f, 10.3f },
     { "VU METER", 1385.0f, 322.8f, 67.6f, 11.3f },
     { "METER FACE", 1265.6f, 365.2f, 306.4f, 139.3f },
 };

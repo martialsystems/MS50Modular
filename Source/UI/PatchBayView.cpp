@@ -28,30 +28,30 @@ CablePaint paintFor (int color)
     }
 }
 
-// Momentary square key. The HOLD legend is already drawn on the plate.
-// Mouse down holds the gate. Mouse up releases it. The cap sinks and turns amber while down.
+// Momentary square key. The HOLD legend and the lamp bezel are already drawn on the plate.
+// Mouse down holds the gate. Mouse up releases it. The cap sinks and the red lamp above it lights while down,
+// the same lamp the SQ-10 shows under START.
 void paintExtInHold (juce::Graphics& g, juce::Point<float> origin, float scale, bool held)
 {
-    const bool lit = held;
+    const float lx = origin.x + kHoldLampCx * scale;
+    const float ly = origin.y + kHoldLampCy * scale;
+    const float lr = kHoldLampR * scale;
+    if (held)
+    {
+        g.setColour (juce::Colour (0x55ff3b2b));
+        g.fillEllipse (lx - lr * 2.2f, ly - lr * 2.2f, lr * 4.4f, lr * 4.4f);
+    }
+    g.setColour (held ? juce::Colour (0xffff4a36) : juce::Colour (0xff4a0c08));
+    g.fillEllipse (lx - lr, ly - lr, 2.0f * lr, 2.0f * lr);
+
     const float sink = held ? 1.6f * scale : 0.0f;
     const float cx = origin.x + kHoldCx * scale;
     const float cy = origin.y + kHoldCy * scale + sink;
-    if (lit)
-    {
-        const float glowY = origin.y + kHoldCy * scale;
-        juce::ColourGradient glow (juce::Colour (0xffffd27a).withAlpha (0.55f), cx, glowY,
-                                   juce::Colour (0xffffd27a).withAlpha (0.0f), cx, glowY - 24.0f * scale,
-                                   true);
-        g.setGradientFill (glow);
-        g.fillEllipse (cx - 24.0f * scale, glowY - 24.0f * scale, 48.0f * scale, 48.0f * scale);
-    }
 
     const float cap = 26.0f * scale;
     const float x = cx - 13.0f * scale;
     const float y = cy - 13.0f * scale;
-    const juce::Colour shellHi = lit ? juce::Colour (0xfffff6d6) : juce::Colour (0xfff4eedc);
-    const juce::Colour shellLo = lit ? juce::Colour (0xffe2b65a) : juce::Colour (0xffb3ab94);
-    juce::ColourGradient shell (shellHi, x, y, shellLo, x + cap, y + cap, false);
+    juce::ColourGradient shell (juce::Colour (0xfff4eedc), x, y, juce::Colour (0xffb3ab94), x + cap, y + cap, false);
     g.setGradientFill (shell);
     g.fillRoundedRectangle (x, y, cap, cap, 3.0f * scale);
     g.setColour (juce::Colour (0xff6f6a5a));
@@ -64,11 +64,9 @@ void paintExtInHold (juce::Graphics& g, juce::Point<float> origin, float scale, 
     const float faceY = cy - 10.0f * scale;
     const float faceW = 19.0f * scale;
     const float faceH = 17.0f * scale;
-    const juce::Colour faceHi = lit ? juce::Colour (0xfffffbe8) : juce::Colour (0xfff8f3e4);
-    const juce::Colour faceLo = lit ? juce::Colour (0xfff5cf7a) : juce::Colour (0xffd0c8b2);
     const float gx = faceX + faceW * 0.45f;
     const float gy = faceY + faceH * 0.40f;
-    juce::ColourGradient face (faceHi, gx, gy, faceLo, gx + 0.8f * faceW, gy, true);
+    juce::ColourGradient face (juce::Colour (0xfff8f3e4), gx, gy, juce::Colour (0xffd0c8b2), gx + 0.8f * faceW, gy, true);
     g.setGradientFill (face);
     g.fillRoundedRectangle (faceX, faceY, faceW, faceH, 2.5f * scale);
 }
