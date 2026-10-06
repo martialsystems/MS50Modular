@@ -37,6 +37,10 @@ target_sources(MS50Modular PRIVATE
   Source/Modular/ExtIn.cpp
   Source/Modular/OutputModule.cpp
   Source/Modular/Noise.cpp
+  Source/Modular/Vcf.cpp
+  Source/Modular/Vca1.cpp
+  Source/Modular/Vca2.cpp
+  Source/Modular/Eg1.cpp
   Source/UI/PatchBayLogic.cpp
   Source/UI/PatchBayView.cpp)
 
@@ -59,11 +63,18 @@ add_executable(MS50ModularTests
   Source/Tests/SineThroughFxTests.cpp
   Source/Tests/NoiseTests.cpp
   Source/Tests/PatchBayTests.cpp
+  Source/Tests/VcfTests.cpp
+  Source/Tests/VcaTests.cpp
+  Source/Tests/Eg1Tests.cpp
   Source/Modular/Module.cpp
   Source/Modular/PatchGraph.cpp
   Source/Modular/ExtIn.cpp
   Source/Modular/OutputModule.cpp
   Source/Modular/Noise.cpp
+  Source/Modular/Vcf.cpp
+  Source/Modular/Vca1.cpp
+  Source/Modular/Vca2.cpp
+  Source/Modular/Eg1.cpp
   Source/UI/PatchBayLogic.cpp)
 
 juce_add_gui_app(MS50PanelProbe PRODUCT_NAME "MS50PanelProbe")
@@ -77,6 +88,10 @@ target_sources(MS50PanelProbe PRIVATE
   Source/Modular/ExtIn.cpp
   Source/Modular/OutputModule.cpp
   Source/Modular/Noise.cpp
+  Source/Modular/Vcf.cpp
+  Source/Modular/Vca1.cpp
+  Source/Modular/Vca2.cpp
+  Source/Modular/Eg1.cpp
   Source/UI/PatchBayLogic.cpp
   Source/UI/PatchBayView.cpp)
 

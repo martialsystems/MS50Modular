@@ -211,8 +211,9 @@ private:
         }
 
         expect (bay->panelLoaded(), "panel SVG parsed");
-        expect (publishedCount (*processor) == 2, "default dry cables");
-        expect (bay->visualCount() == 2, "default cables are drawn");
+        const int factoryCount = publishedCount (*processor);
+        expect (factoryCount == 8, "default patch has eight cables");
+        expect (bay->visualCount() == factoryCount, "default cables are drawn");
 
         const auto there = bay->designToLocal (100.0f, 80.0f);
         const auto back = bay->localToDesign (there);
@@ -267,39 +268,44 @@ private:
         const int outWet = panelJackIndex ("OUTPUT", "WET");
         const int vco = panelJackIndex ("VCO", "HZ/V");
         const int white = panelJackIndex ("NOISE", "WHITE");
-        gesture (*bay, kPanelJacks[extMono].x, kPanelJacks[extMono].y, kPanelJacks[outL].x, kPanelJacks[outL].y, false, false);
-        expect (publishedCount (*processor) == 3, "second cable stacks on Output L");
+        // Mono already feeds the filter. Shift stacks a second cable on Output L.
+        gesture (*bay, kPanelJacks[extMono].x, kPanelJacks[extMono].y, kPanelJacks[outL].x, kPanelJacks[outL].y, true, false);
+        expect (publishedCount (*processor) == factoryCount + 1, "second cable stacks on Output L");
         expect (near (hostLeftAfter (*processor, 1.0f, 0.0f), 1.5f), "stacked Output L sums to 1.5");
 
         gesture (*bay, kPanelJacks[outL].x, kPanelJacks[outL].y, 800.0f, 600.0f, false, false);
-        expect (publishedCount (*processor) == 2, "drop on empty unplugs the top plug");
+        expect (publishedCount (*processor) == factoryCount, "drop on empty unplugs the top plug");
         expect (near (hostLeftAfter (*processor, 1.0f, 0.0f), 1.0f), "dry left returns after unplug");
 
         gesture (*bay, kPanelJacks[vco].x, kPanelJacks[vco].y, kPanelJacks[outWet].x, kPanelJacks[outWet].y, false, false);
-        expect (publishedCount (*processor) == 2, "unmapped jack does not connect");
+        expect (publishedCount (*processor) == factoryCount, "unmapped jack does not connect");
         expect (bay->statusText() == "that jack does not take this cable", "refusal uses the type status");
 
+        int wetBeforePlugs[8] {};
+        const int wetBefore = bay->plugsOnJack (outWet, wetBeforePlugs, 8);
         gesture (*bay, kPanelJacks[white].x, kPanelJacks[white].y, kPanelJacks[outWet].x, kPanelJacks[outWet].y, true, false);
         gesture (*bay, kPanelJacks[extMono].x, kPanelJacks[extMono].y, kPanelJacks[outWet].x, kPanelJacks[outWet].y, true, false);
-        expect (publishedCount (*processor) == 4, "two cables stack on Output Wet");
+        expect (publishedCount (*processor) == factoryCount + 2, "two cables stack on Output Wet");
 
         clickAt (*bay, kPanelJacks[outWet].x, kPanelJacks[outWet].y);
         expect (bay->menuOpen(), "occupied jack opens the stack chooser");
         expect (bay->keyPressed (juce::KeyPress (juce::KeyPress::escapeKey)), "escape handles the chooser");
         expect (! bay->menuOpen(), "escape closes the stack chooser");
 
-        Cable before[8] {};
-        const int beforeCount = processor->copyPublishedCables (before, 8);
+        Cable before[16] {};
+        const int beforeCount = processor->copyPublishedCables (before, 16);
         int plugs[8] {};
         const int onWet = bay->plugsOnJack (outWet, plugs, 8);
-        expect (onWet == 2, "wet jack shows two plugs");
-        if (onWet == 2)
+        expect (onWet == wetBefore + 2, "wet jack shows the added plugs");
+        if (onWet >= 2 && onWet <= 8)
         {
-            const int reversed[2] = { plugs[1], plugs[0] };
-            expect (bay->reorderStack (outWet, reversed, 2), "chooser reorder");
+            int reversed[8] {};
+            for (int i = 0; i < onWet; ++i)
+                reversed[i] = plugs[onWet - 1 - i];
+            expect (bay->reorderStack (outWet, reversed, onWet), "chooser reorder");
         }
-        Cable after[8] {};
-        const int afterCount = processor->copyPublishedCables (after, 8);
+        Cable after[16] {};
+        const int afterCount = processor->copyPublishedCables (after, 16);
         expect (afterCount == beforeCount, "reorder count");
         bool same = beforeCount == afterCount;
         for (int i = 0; i < beforeCount && same; ++i)
@@ -323,11 +329,12 @@ private:
                 "mapping at 1100 wide");
 
         editor->setSize (1280, 512);
-        const float mixX = kMixTrackX + kMixTrackW - 6.0f;
-        gesture (*bay, mixX, kMixTrackY, mixX, kMixTrackY, false, false);
-        expect (bay->outputMix() > 0.9f, "top mix slider reaches the right");
-        gesture (*bay, kMixTrackX + 2.0f, kMixTrackY, kMixTrackX + 2.0f, kMixTrackY, false, false);
-        expect (bay->outputMix() < 0.05f, "top mix slider returns to dry");
+        const float switchX = kEffectSwitchX + kEffectSwitchW * 0.5f;
+        const float switchY = kEffectSwitchY + kEffectSwitchH * 0.5f;
+        clickAt (*bay, switchX, switchY);
+        expect (bay->outputMix() == 1.0f, "effect switch turns on");
+        clickAt (*bay, switchX, switchY);
+        expect (bay->outputMix() == 0.0f, "effect switch turns off");
 
         for (int i = 0; i < 20; ++i)
             bay->advanceCableFrame();

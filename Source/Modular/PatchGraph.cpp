@@ -298,8 +298,13 @@ void PatchGraph::process()
             const PortDesc desc = module->port (portIndex);
             if (desc.dir != PortDir::In)
                 continue;
-            if (desc.type == PortType::Gate && ! patched[moduleIndex][portIndex])
+            if (! patched[moduleIndex][portIndex])
+            {
+                if (desc.type == PortType::Gate)
+                    continue;
+                module->portValue[portIndex] = desc.rest;
                 continue;
+            }
             module->portValue[portIndex] = 0.0f;
         }
     }
@@ -315,7 +320,14 @@ void PatchGraph::process()
             if (cable.destModule != moduleIndex)
                 continue;
             const Module* source = modules_[cable.sourceModule];
-            module->portValue[cable.destPort] += source->portValue[cable.sourcePort];
+            float contributed = source->portValue[cable.sourcePort];
+            const PortDesc sourceDesc = source->port (cable.sourcePort);
+            const PortDesc destDesc = module->port (cable.destPort);
+            // S-15: a held gate contributes 0 V, a released gate contributes +5 V.
+            // Gate-to-gate stays the raw 0 or 1 level.
+            if (sourceDesc.type == PortType::Gate && destDesc.type != PortType::Gate)
+                contributed = contributed >= 0.5f ? 0.0f : 5.0f;
+            module->portValue[cable.destPort] += contributed;
         }
 
         module->processSample();

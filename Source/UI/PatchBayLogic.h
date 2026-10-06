@@ -39,13 +39,15 @@ enum class PanelLinkResult {
 
 int panelJackIndex (const char* section, const char* label);
 
-int jackForGraphPort (int module, int port, int extIndex, int outputIndex, int noiseIndex);
+int jackForGraphPort (int module, int port, int extIndex, int outputIndex, int noiseIndex,
+                      int vcfIndex = -1, int vca1Index = -1, int vca2Index = -1, int eg1Index = -1);
 
 // Either jack may be the output. The link runs output to input.
 // Same direction, a jack with no graph port, or both ends on one jack: not Ok.
 PanelLinkResult orientPanelJacks (int jackA, int jackB,
                                   int extIndex, int outputIndex, int noiseIndex,
-                                  PanelLink& link);
+                                  PanelLink& link,
+                                  int vcfIndex = -1, int vca1Index = -1, int vca2Index = -1, int eg1Index = -1);
 
 // Plugs on this jack, bottom to top, which is array order.
 int plugsAtJack (const VisualCable* cables, int count, int jack, int* out, int capacity);
@@ -57,7 +59,8 @@ bool reorderJackStack (VisualCable* cables, int count, int jack, const int* bott
 // One visual cable per published link that has both jacks on this panel.
 int loadPublishedCables (VisualCable* dest, int capacity,
                          const Cable* published, int publishedCount,
-                         int extIndex, int outputIndex, int noiseIndex);
+                         int extIndex, int outputIndex, int noiseIndex,
+                         int vcfIndex = -1, int vca1Index = -1, int vca2Index = -1, int eg1Index = -1);
 
 int panelKnobIndex (const char* section, const char* label);
 

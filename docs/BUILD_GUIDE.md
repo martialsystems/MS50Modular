@@ -192,11 +192,11 @@ Cable rule: `METHODOLOGY.md`, Cable rule (2026-10-05).
 *   Two inputs, two outputs, a jack with no graph module, or a cycle before step 19: the cable does not stay. Status strings stay "that jack does not take this cable" and "feedback is not available until step 19".
 *   Sample and hold, the mixer, and the meter are drawn and are not graph modules. Divider /2 and /4 stay unmapped until that module exists. Do not add /16 DSP. The research divider is /2 and /4.
 
-Top MIX is Output mix, default 0. Level stays 1. Column knobs turn, as in Knob rule (2026-10-05), and do not drive a module that is not in the graph. EXT IN is the column immediately left of OUTPUT.
+The top control is an on/off named Effect (2026-10-05). Off keeps Output mix at 0, so the dry cables pass. On sets Output mix to 1. FL Studio's FX slot already has the 0 to 100 percent wet control, so this plugin does not draw a second mix slider. Level stays 1. A working column knob is a host parameter with its own range. Picture columns are not parameters. Column knobs do not drive a module that is not in the graph. EXT IN is the column immediately left of OUTPUT.
 
 A move disconnects the old link first, then connects the new one, so the old link is not read as a cycle. If the new link is refused, the old link is connected again and is then the newest published cable.
 
-Acceptance: `testPanelStackRule` and `testPanelKnobs`. `SINE_DRY` still passes. `tools/PanelProbe.cpp` opens a window, turns a column knob without publishing, steps the divider switch, stacks Ext In Mono on Output L, unplugs it, refuses VCO Hz/V into Output Wet, stacks two cables on Wet, opens the chooser, reorders them without changing the published bytes, moves the top mix, and right-clicks a cable.
+Acceptance: `testPanelStackRule` and `testPanelKnobs`. `SINE_DRY` still passes. `tools/PanelProbe.cpp` opens a window, turns a column knob without publishing, steps the divider switch, stacks Ext In Mono on Output L, unplugs it, refuses VCO Hz/V into Output Wet, stacks two cables on Wet, opens the chooser, reorders them without changing the published bytes, toggles the effect switch, and right-clicks a cable.
 
 Do not touch: module DSP that does not exist yet.
 

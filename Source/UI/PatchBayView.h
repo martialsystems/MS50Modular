@@ -35,7 +35,7 @@ public:
     void visualEnds (int index, int& jackA, int& jackB) const;
     bool menuOpen() const;
     const juce::String& statusText() const noexcept { return status_; }
-    float outputMix() const noexcept { return mix_; }
+    float outputMix() const noexcept { return audioProcessor.effectIsOn() ? 1.0f : 0.0f; }
     int knobCount() const noexcept { return kPanelKnobCount; }
     float knobValue (int index) const;
     const juce::String& knobReadout() const noexcept { return knobReadout_; }
@@ -71,9 +71,11 @@ private:
     void setKnobValue (int index, float value);
     int labelAt (float x, float y) const;
     int cableNear (float x, float y) const;
-    bool mixAt (float x, float y) const;
+    bool switchAt (float x, float y) const;
     int swatchAt (float x, float y) const;
-    void setMixFromDesignX (float x);
+    juce::AudioProcessorParameter* parameterForKnob (int index) const;
+    void endGesture();
+    void syncHostKnobs();
     void removeCable (int index);
     void restoreGrabbedEnd();
     void clearGrab();
@@ -93,8 +95,8 @@ private:
     juce::Path stroke_;
     int count_ = 0;
     int currentColor_ = 0;
-    float mix_ = 0.0f;
     float knobValue_[kPanelKnobCount] {};
+    juce::AudioProcessorParameter* gestureParam_ = nullptr;
     juce::String status_;
     juce::String knobReadout_;
 
@@ -108,7 +110,7 @@ private:
     bool downActive_ = false;
     bool downMoved_ = false;
     bool downShift_ = false;
-    bool mixDrag_ = false;
+    bool effectPress_ = false;
     bool knobDrag_ = false;
     bool knobDragMoved_ = false;
     bool knobSuppressSwitchStep_ = false;

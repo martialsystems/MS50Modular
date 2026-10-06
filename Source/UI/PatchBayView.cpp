@@ -295,7 +295,11 @@ PatchBayView::PatchBayView (MS50ModularAudioProcessor& processor)
     count_ = loadPublishedCables (cables_, kPatchBayMaxCables, published, publishedCount,
                                   audioProcessor.extInGraphIndex(),
                                   audioProcessor.outputGraphIndex(),
-                                  audioProcessor.noiseGraphIndex());
+                                  audioProcessor.noiseGraphIndex(),
+                                  audioProcessor.vcfGraphIndex(),
+                                  audioProcessor.vca1GraphIndex(),
+                                  audioProcessor.vca2GraphIndex(),
+                                  audioProcessor.eg1GraphIndex());
     startTimerHz (60);
 }
 
@@ -641,9 +645,35 @@ int PatchBayView::cableNear (float x, float y) const
     return hit;
 }
 
-bool PatchBayView::mixAt (float x, float y) const
+bool PatchBayView::switchAt (float x, float y) const
 {
-    return x >= kMixTrackX - 6.0f && x <= kMixTrackX + kMixTrackW + 6.0f && y >= 8.0f && y <= 34.0f;
+    return x >= kEffectSwitchX - 28.0f && x <= kEffectSwitchX + kEffectSwitchW + 8.0f
+           && y >= 8.0f && y <= 36.0f;
+}
+
+juce::AudioProcessorParameter* PatchBayView::parameterForKnob (int index) const
+{
+    if (index < 0 || index >= kPanelKnobCount)
+        return nullptr;
+    return audioProcessor.parameterForPanelKnob (kPanelKnobs[index].section, kPanelKnobs[index].label);
+}
+
+void PatchBayView::endGesture()
+{
+    if (gestureParam_ != nullptr)
+        gestureParam_->endChangeGesture();
+    gestureParam_ = nullptr;
+}
+
+void PatchBayView::syncHostKnobs()
+{
+    for (int i = 0; i < kPanelKnobCount; ++i)
+    {
+        auto* parameter = parameterForKnob (i);
+        if (parameter == nullptr || parameter == gestureParam_)
+            continue;
+        knobValue_[i] = parameter->getValue();
+    }
 }
 
 int PatchBayView::swatchAt (float x, float y) const
@@ -657,13 +687,7 @@ int PatchBayView::swatchAt (float x, float y) const
     return -1;
 }
 
-void PatchBayView::setMixFromDesignX (float x)
-{
-    const float travel = kMixTrackW - 12.0f;
-    mix_ = clampf ((x - kMixTrackX) / travel, 0.0f, 1.0f);
-    audioProcessor.setOutputMix (mix_);
-    repaint();
-}
+
 
 void PatchBayView::removeCable (int index)
 {
@@ -812,7 +836,11 @@ void PatchBayView::dropAt (int targetJack)
                                                         audioProcessor.extInGraphIndex(),
                                                         audioProcessor.outputGraphIndex(),
                                                         audioProcessor.noiseGraphIndex(),
-                                                        link);
+                                                        link,
+                                                        audioProcessor.vcfGraphIndex(),
+                                                        audioProcessor.vca1GraphIndex(),
+                                                        audioProcessor.vca2GraphIndex(),
+                                                        audioProcessor.eg1GraphIndex());
     if (oriented != PanelLinkResult::Ok)
     {
         if (isNew)
@@ -880,6 +908,7 @@ void PatchBayView::dropAt (int targetJack)
 
 void PatchBayView::timerCallback()
 {
+    syncHostKnobs();
     prepareRopes (true);
     stepRopes();
     repaint();
@@ -1010,17 +1039,12 @@ void PatchBayView::paint (juce::Graphics& g)
         }
     }
 
-    const float travel = kMixTrackW - 12.0f;
-    const float thumbX = kMixTrackX + mix_ * travel;
-    const auto thumbOrigin = screenPoint (thumbX, 17.0f);
-    const juce::Rectangle<float> thumb (thumbOrigin.x, thumbOrigin.y, 12.0f * scale, 20.0f * scale);
-    const auto trackOrigin = screenPoint (kMixTrackX, kMixTrackY);
-    g.setColour (juce::Colour (0xffc29f4c).withAlpha (0.8f));
-    g.fillRoundedRectangle (trackOrigin.x, trackOrigin.y, (thumbX - kMixTrackX) * scale, kMixTrackH * scale, 2.0f * scale);
-    g.setColour (juce::Colour (0xff2a2a2c));
-    g.fillRoundedRectangle (thumb, 2.0f * scale);
-    g.setColour (juce::Colour (0xfff1ede0));
-    g.drawLine (thumb.getCentreX(), thumb.getY() + 3.0f * scale, thumb.getCentreX(), thumb.getBottom() - 3.0f * scale, 1.4f * scale);
+    const bool effectOn = audioProcessor.effectIsOn();
+    const float thumbDesignX = effectOn ? (kEffectSwitchX + kEffectSwitchW - 22.0f) : (kEffectSwitchX + 2.0f);
+    const auto thumbOrigin = screenPoint (thumbDesignX, kEffectSwitchY + 2.0f);
+    const juce::Rectangle<float> thumb (thumbOrigin.x, thumbOrigin.y, 20.0f * scale, 12.0f * scale);
+    g.setColour (effectOn ? juce::Colour (0xffc29f4c) : juce::Colour (0xff2a2a2c));
+    g.fillRoundedRectangle (thumb, 6.0f * scale);
 
     juce::String line = status_;
     if (line.isEmpty())
@@ -1103,22 +1127,33 @@ void PatchBayView::mouseDown (const juce::MouseEvent& event)
         return;
     }
 
-    if (mixAt (design.x, design.y))
+    if (switchAt (design.x, design.y))
     {
-        mixDrag_ = true;
-        setMixFromDesignX (design.x);
+        endGesture();
+        effectPress_ = true;
+        if (auto* parameter = audioProcessor.effectParameter())
+        {
+            gestureParam_ = parameter;
+            parameter->beginChangeGesture();
+            parameter->setValueNotifyingHost (parameter->getValue() < 0.5f ? 1.0f : 0.0f);
+        }
+        repaint();
         return;
     }
 
     const int knob = knobAt (design.x, design.y);
     if (knob >= 0)
     {
+        endGesture();
         knobDrag_ = true;
         knobDragMoved_ = false;
         knobSuppressSwitchStep_ = false;
         knobDragIndex_ = knob;
         knobDragStartY_ = event.position.y;
         knobDragStartValue_ = knobValue_[knob];
+        gestureParam_ = parameterForKnob (knob);
+        if (gestureParam_ != nullptr)
+            gestureParam_->beginChangeGesture();
         return;
     }
 
@@ -1147,19 +1182,18 @@ void PatchBayView::mouseDrag (const juce::MouseEvent& event)
         if (std::fabs (deltaUp) > 3.0f)
             knobDragMoved_ = true;
         const bool isSwitch = kPanelKnobs[knobDragIndex_].kind == 1;
-        setKnobValue (knobDragIndex_,
-                      panelKnobDrag (knobDragStartValue_, deltaUp, event.mods.isShiftDown(), isSwitch));
+        const float next = panelKnobDrag (knobDragStartValue_, deltaUp, event.mods.isShiftDown(), isSwitch);
+        setKnobValue (knobDragIndex_, next);
+        if (gestureParam_ != nullptr)
+            gestureParam_->setValueNotifyingHost (clampf (next, 0.0f, 1.0f));
         return;
     }
 
     hoverJack_ = jackAt (design.x, design.y);
     hoverLabel_ = labelAt (design.x, design.y);
 
-    if (mixDrag_)
-    {
-        setMixFromDesignX (design.x);
+    if (effectPress_)
         return;
-    }
 
     if (downActive_ && ! grabActive_ && std::hypot (design.x - downX_, design.y - downY_) > 6.0f)
     {
@@ -1198,14 +1232,20 @@ void PatchBayView::mouseUp (const juce::MouseEvent& event)
         knobDragIndex_ = -1;
         knobSuppressSwitchStep_ = false;
         if (! suppress && ! moved && index >= 0 && index < kPanelKnobCount && kPanelKnobs[index].kind == 1)
-            setKnobValue (index, panelKnobSwitchClick (knobValue_[index]));
+        {
+            const float next = panelKnobSwitchClick (knobValue_[index]);
+            setKnobValue (index, next);
+            if (gestureParam_ != nullptr)
+                gestureParam_->setValueNotifyingHost (clampf (next, 0.0f, 1.0f));
+        }
+        endGesture();
         return;
     }
 
-    if (mixDrag_)
+    if (effectPress_)
     {
-        mixDrag_ = false;
-        setMixFromDesignX (design.x);
+        effectPress_ = false;
+        endGesture();
         return;
     }
 
@@ -1234,7 +1274,14 @@ void PatchBayView::mouseDoubleClick (const juce::MouseEvent& event)
         return;
 
     knobSuppressSwitchStep_ = true;
-    setKnobValue (index, kPanelKnobs[index].valueDefault);
+    const float reset = kPanelKnobs[index].valueDefault;
+    setKnobValue (index, reset);
+    if (auto* parameter = parameterForKnob (index))
+    {
+        parameter->beginChangeGesture();
+        parameter->setValueNotifyingHost (clampf (reset, 0.0f, 1.0f));
+        parameter->endChangeGesture();
+    }
 }
 
 void PatchBayView::mouseWheelMove (const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel)
@@ -1247,8 +1294,15 @@ void PatchBayView::mouseWheelMove (const juce::MouseEvent& event, const juce::Mo
     if (index < 0)
         return;
 
-    setKnobValue (index, panelKnobFromWheel (knobValue_[index], wheel.deltaY, wheel.isReversed,
-                                              event.mods.isShiftDown(), kPanelKnobs[index].kind == 1));
+    const float next = panelKnobFromWheel (knobValue_[index], wheel.deltaY, wheel.isReversed,
+                                           event.mods.isShiftDown(), kPanelKnobs[index].kind == 1);
+    setKnobValue (index, next);
+    if (auto* parameter = parameterForKnob (index))
+    {
+        parameter->beginChangeGesture();
+        parameter->setValueNotifyingHost (clampf (next, 0.0f, 1.0f));
+        parameter->endChangeGesture();
+    }
 }
 
 int PatchBayView::knobAt (float x, float y) const

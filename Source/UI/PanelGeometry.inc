@@ -14,7 +14,7 @@ struct PanelJackRec {
     const char* label;
     float x;
     float y;
-    int module; // 0 none, 1 Ext In, 2 Output, 3 Noise
+    int module; // 0 none, 1 Ext In, 2 Output, 3 Noise, 4 VCF, 5 VCA 1, 6 VCA 2, 7 EG 1
     int port;
     int dir; // 0 in, 1 out, -1 when the jack is not on the graph
 };
@@ -35,10 +35,10 @@ struct PanelKnobRec {
 
 inline constexpr float kPanelW = 1600.0f;
 inline constexpr float kPanelH = 640.0f;
-inline constexpr float kMixTrackX = 1396.0f;
-inline constexpr float kMixTrackY = 25.0f;
-inline constexpr float kMixTrackW = 170.0f;
-inline constexpr float kMixTrackH = 4.0f;
+inline constexpr float kEffectSwitchX = 1524.0f;
+inline constexpr float kEffectSwitchY = 16.0f;
+inline constexpr float kEffectSwitchW = 48.0f;
+inline constexpr float kEffectSwitchH = 16.0f;
 
 inline constexpr int kPanelLabelCount = 109;
 inline constexpr PanelLabelRec kPanelLabels[] = {
@@ -163,25 +163,25 @@ inline constexpr PanelJackRec kPanelJacks[] = {
     { "VCO", "TRI", 85.4f, 431.5f, 0, -1, -1 },
     { "VCO", "SAW", 85.4f, 468.5f, 0, -1, -1 },
     { "VCO", "PULSE", 85.4f, 505.5f, 0, -1, -1 },
-    { "VCF", "IN", 203.4f, 246.5f, 0, -1, -1 },
-    { "VCF", "CUTOFF", 203.4f, 320.5f, 0, -1, -1 },
-    { "VCF", "OUT", 203.4f, 394.5f, 0, -1, -1 },
-    { "VCA 1", "IN", 299.3f, 246.5f, 0, -1, -1 },
-    { "VCA 1", "ENV", 299.3f, 320.5f, 0, -1, -1 },
-    { "VCA 1", "OUT", 299.3f, 394.5f, 0, -1, -1 },
-    { "VCA 2", "IN", 391.9f, 196.5f, 0, -1, -1 },
-    { "VCA 2", "CV", 391.9f, 270.5f, 0, -1, -1 },
-    { "VCA 2", "OUT", 391.9f, 344.5f, 0, -1, -1 },
+    { "VCF", "IN", 203.4f, 246.5f, 4, 0, 0 },
+    { "VCF", "CUTOFF", 203.4f, 320.5f, 4, 1, 0 },
+    { "VCF", "OUT", 203.4f, 394.5f, 4, 2, 1 },
+    { "VCA 1", "IN", 299.3f, 246.5f, 5, 0, 0 },
+    { "VCA 1", "ENV", 299.3f, 320.5f, 5, 1, 0 },
+    { "VCA 1", "OUT", 299.3f, 394.5f, 5, 2, 1 },
+    { "VCA 2", "IN", 391.9f, 196.5f, 6, 0, 0 },
+    { "VCA 2", "CV", 391.9f, 270.5f, 6, 1, 0 },
+    { "VCA 2", "OUT", 391.9f, 344.5f, 6, 2, 1 },
     { "MG", "FM", 483.1f, 196.5f, 0, -1, -1 },
     { "MG", "PWM", 483.1f, 254.2f, 0, -1, -1 },
     { "MG", "TRI", 483.1f, 311.8f, 0, -1, -1 },
     { "MG", "SAW", 483.1f, 369.5f, 0, -1, -1 },
     { "MG", "INV SAW", 483.1f, 427.2f, 0, -1, -1 },
     { "MG", "PULSE", 483.1f, 484.8f, 0, -1, -1 },
-    { "EG 1", "TRIG", 580.5f, 296.5f, 0, -1, -1 },
-    { "EG 1", "OUT A", 580.5f, 358.0f, 0, -1, -1 },
-    { "EG 1", "OUT B", 580.5f, 419.5f, 0, -1, -1 },
-    { "EG 1", "OUT C", 580.5f, 481.0f, 0, -1, -1 },
+    { "EG 1", "TRIG", 580.5f, 296.5f, 7, 0, 0 },
+    { "EG 1", "OUT A", 580.5f, 358.0f, 7, 1, 1 },
+    { "EG 1", "OUT B", 580.5f, 419.5f, 7, 2, 1 },
+    { "EG 1", "OUT C", 580.5f, 481.0f, 7, 3, 1 },
     { "EG 2", "TRIG", 679.7f, 296.5f, 0, -1, -1 },
     { "EG 2", "OUT +", 679.7f, 358.0f, 0, -1, -1 },
     { "EG 2", "OUT −", 679.7f, 419.5f, 0, -1, -1 },

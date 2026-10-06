@@ -451,6 +451,28 @@ int testNoisePinkIsDarkerThanWhite();
 int testNoiseHasNoKnobs();
 int testPanelStackRule();
 int testPanelKnobs();
+int testVcfPassesDcOrLow();
+int testVcfPeakIncreasesResonance();
+int testVcfPositiveCvRaisesCutoff();
+int testVcfWetPathQuieterAtLowCutoff();
+int testVcfPanelJacks();
+int testVca1SilentWithoutEnv();
+int testVca1IntensityScalesOutput();
+int testVca1LowCutDarkens();
+int testVca1NegativeEnvIsClosed();
+int testVca2PassesDc();
+int testVca2ControlDoesNotClick();
+int testVca2NoKnobs();
+int testVcaPanelJacks();
+int testVcaFactoryWetIsSilent();
+int testEg1SustainLevel();
+int testEg1OutBIsNegation();
+int testEg1ReleasesWhenTriggerLifts();
+int testEg1HasDecay();
+int testEg1ThreeJacks();
+int testEg1UnpatchedTrigIsIdle();
+int testEg1PromotedGate();
+int testEg1FactoryPatch();
 
 int main()
 {
@@ -479,5 +501,27 @@ int main()
     failed += testNoiseHasNoKnobs();
     failed += testPanelStackRule();
     failed += testPanelKnobs();
+    failed += testVcfPassesDcOrLow();
+    failed += testVcfPeakIncreasesResonance();
+    failed += testVcfPositiveCvRaisesCutoff();
+    failed += testVcfWetPathQuieterAtLowCutoff();
+    failed += testVcfPanelJacks();
+    failed += testVca1SilentWithoutEnv();
+    failed += testVca1IntensityScalesOutput();
+    failed += testVca1LowCutDarkens();
+    failed += testVca1NegativeEnvIsClosed();
+    failed += testVca2PassesDc();
+    failed += testVca2ControlDoesNotClick();
+    failed += testVca2NoKnobs();
+    failed += testVcaPanelJacks();
+    failed += testVcaFactoryWetIsSilent();
+    failed += testEg1SustainLevel();
+    failed += testEg1OutBIsNegation();
+    failed += testEg1ReleasesWhenTriggerLifts();
+    failed += testEg1HasDecay();
+    failed += testEg1ThreeJacks();
+    failed += testEg1UnpatchedTrigIsIdle();
+    failed += testEg1PromotedGate();
+    failed += testEg1FactoryPatch();
     return failed == 0 ? 0 : 1;
 }

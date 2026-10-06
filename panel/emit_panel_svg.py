@@ -28,6 +28,19 @@ LIVE = {
     ("OUTPUT", "WET"): (2, 2, 0),
     ("NOISE", "WHITE"): (3, 0, 1),
     ("NOISE", "PINK"): (3, 1, 1),
+    ("VCF", "IN"): (4, 0, 0),
+    ("VCF", "CUTOFF"): (4, 1, 0),
+    ("VCF", "OUT"): (4, 2, 1),
+    ("VCA 1", "IN"): (5, 0, 0),
+    ("VCA 1", "ENV"): (5, 1, 0),
+    ("VCA 1", "OUT"): (5, 2, 1),
+    ("VCA 2", "IN"): (6, 0, 0),
+    ("VCA 2", "CV"): (6, 1, 0),
+    ("VCA 2", "OUT"): (6, 2, 1),
+    ("EG 1", "TRIG"): (7, 0, 0),
+    ("EG 1", "OUT A"): (7, 1, 1),
+    ("EG 1", "OUT B"): (7, 2, 1),
+    ("EG 1", "OUT C"): (7, 3, 1),
 }
 
 INK = "#dcd6c2"
@@ -103,13 +116,14 @@ def build_svg(lay):
         parts.append(
             f'<line x1="{rule}" y1="{frame_top}" x2="{rule}" y2="{frame_bottom}" stroke="{GOLD}" stroke-width="1.6"/>'
         )
-    # Top mix track is drawn empty. The editor paints the thumb from Output mix.
+    # Top control is an on/off. FL Studio's FX slot owns the wet percent.
+    # The editor paints the thumb snapped to one end.
     parts.append(
         f'<text x="{M + 4}" y="{CH_Y + 21}" font-family="Helvetica" font-size="14" '
         f'font-weight="bold" fill="#9a9684">SYNTHESIZER</text>'
-        f'<text x="{W - M - 228}" y="{CH_Y + 19}" font-family="Helvetica" font-size="11" '
-        f'font-weight="bold" fill="{INK}">MIX</text>'
-        f'<rect x="{W - M - 190}" y="{CH_Y + 13}" width="170" height="4" rx="2" fill="#050505" stroke="#3a3a3c"/>'
+        f'<text x="1484" y="31" font-family="Helvetica" font-size="11" '
+        f'font-weight="bold" fill="{INK}">ON</text>'
+        f'<rect x="1524" y="16" width="48" height="16" rx="8" fill="#050505" stroke="#3a3a3c"/>'
     )
     mtr = next(c for c in cols if c["title"] == "MTR")
     cx = mtr["x"] + mtr["w"] / 2
@@ -179,7 +193,7 @@ def build_inc(lay):
         "    const char* label;",
         "    float x;",
         "    float y;",
-        "    int module; // 0 none, 1 Ext In, 2 Output, 3 Noise",
+        "    int module; // 0 none, 1 Ext In, 2 Output, 3 Noise, 4 VCF, 5 VCA 1, 6 VCA 2, 7 EG 1",
         "    int port;",
         "    int dir; // 0 in, 1 out, -1 when the jack is not on the graph",
         "};",
@@ -200,10 +214,10 @@ def build_inc(lay):
         "",
         "inline constexpr float kPanelW = 1600.0f;",
         "inline constexpr float kPanelH = 640.0f;",
-        "inline constexpr float kMixTrackX = 1396.0f;",
-        "inline constexpr float kMixTrackY = 25.0f;",
-        "inline constexpr float kMixTrackW = 170.0f;",
-        "inline constexpr float kMixTrackH = 4.0f;",
+        "inline constexpr float kEffectSwitchX = 1524.0f;",
+        "inline constexpr float kEffectSwitchY = 16.0f;",
+        "inline constexpr float kEffectSwitchW = 48.0f;",
+        "inline constexpr float kEffectSwitchH = 16.0f;",
         "",
     ]
     labels = lay["labels"]
