@@ -223,7 +223,7 @@ public:
                                                           juce::DocumentWindow::allButtons);
         window->setUsingNativeTitleBar (true);
         window->setContentOwned (created, true);
-        window->centreWithSize (1280, 512);
+        window->centreWithSize (1280, 451);
         window->setVisible (true);
         window->toFront (true);
         juce::Timer::callAfterDelay (150, [this] { run(); });
@@ -434,7 +434,7 @@ private:
 
         const auto there = bay->designToLocal (100.0f, 80.0f);
         const auto back = bay->localToDesign (there);
-        expect (std::fabs (back.x - 100.0f) < 0.6f && std::fabs (back.y - 80.0f) < 0.6f, "design mapping at 1280x512");
+        expect (std::fabs (back.x - 100.0f) < 0.6f && std::fabs (back.y - 80.0f) < 0.6f, "design mapping at 1280x451");
 
         const int cutoff = panelKnobIndex ("VCF", "CUTOFF");
         const int ratio = panelKnobIndex ("DIV", "RATIO SWITCH");
@@ -575,18 +575,18 @@ private:
         }
         expect (same, "reordering the stack does not change the graph");
 
-        editor->setSize (1600, 640);
+        editor->setSize (1600, 564);
         const auto wide = bay->designToLocal (kPanelJacks[outL].x, kPanelJacks[outL].y);
         const auto wideBack = bay->localToDesign (wide);
         expect (std::fabs (wideBack.x - kPanelJacks[outL].x) < 0.6f, "mapping at 1600 wide");
-        editor->setSize (1100, 440);
+        editor->setSize (1100, 388);
         const auto narrow = bay->designToLocal (kPanelJacks[white].x, kPanelJacks[white].y);
         const auto narrowBack = bay->localToDesign (narrow);
         expect (std::fabs (narrowBack.x - kPanelJacks[white].x) < 0.6f
                 && std::fabs (narrowBack.y - kPanelJacks[white].y) < 0.6f,
                 "mapping at 1100 wide");
 
-        editor->setSize (1280, 512);
+        editor->setSize (1280, 451);
         const float powerY = kPowerY + kPowerH * 0.5f;
         const float onX = kPowerX + kPowerW * 0.75f;
         const float offX = kPowerX + kPowerW * 0.25f;

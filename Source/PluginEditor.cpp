@@ -7,11 +7,11 @@ MS50ModularAudioProcessorEditor::MS50ModularAudioProcessorEditor (MS50ModularAud
       bay (audioProcessor)
 {
     addAndMakeVisible (bay);
-    constrainer.setFixedAspectRatio (1600.0 / 640.0);
-    constrainer.setSizeLimits (960, 384, 2400, 960);
+    constrainer.setFixedAspectRatio (1600.0 / 564.0);
+    constrainer.setSizeLimits (960, 338, 2400, 846);
     setConstrainer (&constrainer);
     setResizable (true, true);
-    setSize (1280, 512);
+    setSize (1280, 451);
 }
 
 MS50ModularAudioProcessorEditor::~MS50ModularAudioProcessorEditor() = default;
