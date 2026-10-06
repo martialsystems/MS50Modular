@@ -42,7 +42,8 @@ inline constexpr float kPowerY = 17.00f;
 inline constexpr float kPowerW = 40.00f;
 inline constexpr float kPowerH = 20.00f;
 
-// Latching HOLD key under the EXT IN jacks. The view paints the cap before the cables.
+// Momentary HOLD key under the EXT IN jacks. Mouse down holds the gate. Mouse up releases it.
+// The view paints the cap before the cables.
 inline constexpr float kHoldCx = 1341.80f;
 inline constexpr float kHoldCy = 262.50f;
 inline constexpr float kHoldHitX = 1324.80f;

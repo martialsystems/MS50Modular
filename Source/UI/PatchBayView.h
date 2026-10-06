@@ -118,6 +118,7 @@ private:
     bool downMoved_ = false;
     bool downShift_ = false;
     bool effectPress_ = false;
+    bool extInPress_ = false;
     bool presetMenu_ = false;
     int presetHi_ = 0;
     bool knobDrag_ = false;

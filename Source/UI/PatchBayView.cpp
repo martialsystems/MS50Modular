@@ -28,12 +28,12 @@ CablePaint paintFor (int color)
     }
 }
 
-// Latching square key. The HOLD legend is already drawn on the plate.
-// Amber only while latched and the effect is on. Latched with the effect off sinks the cap.
-void paintExtInHold (juce::Graphics& g, juce::Point<float> origin, float scale, bool held, bool powered)
+// Momentary square key. The HOLD legend is already drawn on the plate.
+// Mouse down holds the gate. Mouse up releases it. The cap sinks and turns amber while down.
+void paintExtInHold (juce::Graphics& g, juce::Point<float> origin, float scale, bool held)
 {
-    const bool lit = held && powered;
-    const float sink = held && ! powered ? 1.6f * scale : 0.0f;
+    const bool lit = held;
+    const float sink = held ? 1.6f * scale : 0.0f;
     const float cx = origin.x + kHoldCx * scale;
     const float cy = origin.y + kHoldCy * scale + sink;
     if (lit)
@@ -49,9 +49,8 @@ void paintExtInHold (juce::Graphics& g, juce::Point<float> origin, float scale, 
     const float cap = 26.0f * scale;
     const float x = cx - 13.0f * scale;
     const float y = cy - 13.0f * scale;
-    const bool sunk = held && ! powered;
-    const juce::Colour shellHi = lit ? juce::Colour (0xfffff6d6) : (sunk ? juce::Colour (0xffe4dcc8) : juce::Colour (0xfff4eedc));
-    const juce::Colour shellLo = lit ? juce::Colour (0xffe2b65a) : (sunk ? juce::Colour (0xff8d8572) : juce::Colour (0xffb3ab94));
+    const juce::Colour shellHi = lit ? juce::Colour (0xfffff6d6) : juce::Colour (0xfff4eedc);
+    const juce::Colour shellLo = lit ? juce::Colour (0xffe2b65a) : juce::Colour (0xffb3ab94);
     juce::ColourGradient shell (shellHi, x, y, shellLo, x + cap, y + cap, false);
     g.setGradientFill (shell);
     g.fillRoundedRectangle (x, y, cap, cap, 3.0f * scale);
@@ -65,8 +64,8 @@ void paintExtInHold (juce::Graphics& g, juce::Point<float> origin, float scale, 
     const float faceY = cy - 10.0f * scale;
     const float faceW = 19.0f * scale;
     const float faceH = 17.0f * scale;
-    const juce::Colour faceHi = lit ? juce::Colour (0xfffffbe8) : (sunk ? juce::Colour (0xffe7dfcc) : juce::Colour (0xfff8f3e4));
-    const juce::Colour faceLo = lit ? juce::Colour (0xfff5cf7a) : (sunk ? juce::Colour (0xffa39984) : juce::Colour (0xffd0c8b2));
+    const juce::Colour faceHi = lit ? juce::Colour (0xfffffbe8) : juce::Colour (0xfff8f3e4);
+    const juce::Colour faceLo = lit ? juce::Colour (0xfff5cf7a) : juce::Colour (0xffd0c8b2);
     const float gx = faceX + faceW * 0.45f;
     const float gy = faceY + faceH * 0.40f;
     juce::ColourGradient face (faceHi, gx, gy, faceLo, gx + 0.8f * faceW, gy, true);
@@ -1393,7 +1392,7 @@ void PatchBayView::paint (juce::Graphics& g)
                       knob.kind == 1, knobValue_[i]);
     }
 
-    paintExtInHold (g, origin, scale, audioProcessor.extInButtonHeld(), audioProcessor.effectIsOn());
+    paintExtInHold (g, origin, scale, audioProcessor.extInButtonHeld());
 
     for (int cable = 0; cable < count_; ++cable)
     {
@@ -1661,7 +1660,8 @@ void PatchBayView::mouseDown (const juce::MouseEvent& event)
 
     if (extInButtonAt (design.x, design.y))
     {
-        audioProcessor.setExtInButtonHeld (! audioProcessor.extInButtonHeld());
+        extInPress_ = true;
+        audioProcessor.setExtInButtonHeld (true);
         repaint();
         return;
     }
@@ -1718,7 +1718,7 @@ void PatchBayView::mouseDrag (const juce::MouseEvent& event)
     hoverJack_ = jackAt (design.x, design.y);
     hoverLabel_ = labelAt (design.x, design.y);
 
-    if (effectPress_)
+    if (effectPress_ || extInPress_)
         return;
 
     if (downActive_ && ! grabActive_ && std::hypot (design.x - downX_, design.y - downY_) > 6.0f)
@@ -1772,6 +1772,14 @@ void PatchBayView::mouseUp (const juce::MouseEvent& event)
     {
         effectPress_ = false;
         endGesture();
+        return;
+    }
+
+    if (extInPress_)
+    {
+        extInPress_ = false;
+        audioProcessor.setExtInButtonHeld (false);
+        repaint();
         return;
     }
 

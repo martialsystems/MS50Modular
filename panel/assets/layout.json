@@ -6,7 +6,7 @@
    "label": "HOLD",
    "cx": 1341.8,
    "cy": 262.5,
-   "latching": true,
+   "latching": false,
    "hit": [
     1324.8,
     245.5,

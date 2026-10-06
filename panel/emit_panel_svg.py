@@ -276,7 +276,8 @@ def build_inc(lay):
     hold = lay["buttons"][0]
     hit = hold["hit"]
     lines += [
-        "// Latching HOLD key under the EXT IN jacks. The view paints the cap before the cables.",
+        "// Momentary HOLD key under the EXT IN jacks. Mouse down holds the gate. Mouse up releases it.",
+        "// The view paints the cap before the cables.",
         f"inline constexpr float kHoldCx = {cf(hold['cx'])};",
         f"inline constexpr float kHoldCy = {cf(hold['cy'])};",
         f"inline constexpr float kHoldHitX = {cf(hit[0])};",

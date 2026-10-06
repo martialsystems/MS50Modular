@@ -641,20 +641,51 @@ private:
             const auto heldPixel = heldShot.getPixelAt (litX, litY);
             expect (heldPixel.getRed() > unlitCorner.getRed() + 20
                         && heldPixel.getBlue() + 20 < unlitCorner.getBlue(),
-                    "latched hold key is amber");
-            expect (processor->extInButtonHeld(), "hold latches");
+                    "a held key is amber");
+            expect (processor->extInButtonHeld(), "mouse down holds the key");
+
+            const auto dragged = bay->designToLocal (kHoldCx + 80.0f, kHoldCy + 40.0f);
+            juce::MouseEvent drag (source, dragged, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                   bay, bay, time, centre, time, 1, true);
+            bay->mouseDrag (drag);
+            expect (processor->extInButtonHeld(), "dragging off the key keeps it held");
 
             juce::MouseEvent up (source, centre, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
                                  bay, bay, time, centre, time, 1, false);
             bay->mouseUp (up);
-            expect (processor->extInButtonHeld(), "mouse up leaves the hold latched");
+            expect (! processor->extInButtonHeld(), "mouse up releases the hold");
+
+            clickAt (*bay, offX, powerY);
+            expect (bay->outputMix() == 0.0f, "hold check turns the effect off");
             bay->mouseDown (down);
-            expect (! processor->extInButtonHeld(), "a second press releases the hold");
+            juce::Image offHeld (juce::Image::ARGB, bay->getWidth(), bay->getHeight(), true);
+            juce::Graphics offHeldGraphics (offHeld);
+            bay->paintEntireComponent (offHeldGraphics, true);
+            const auto offHeldPixel = offHeld.getPixelAt (litX, litY);
+            expect (processor->extInButtonHeld(), "mouse down holds the key while the effect is off");
+            expect (offHeldPixel.getRed() > unlitCorner.getRed() + 20
+                        && offHeldPixel.getBlue() + 20 < unlitCorner.getBlue(),
+                    "a held key is amber while the effect is off");
             bay->mouseUp (up);
-            clickAt (*bay, 1325.6f + 10.0f, 284.4f + 4.0f);
-            expect (processor->extInButtonHeld(), "the HOLD legend latches the key");
-            clickAt (*bay, 1325.6f + 10.0f, 284.4f + 4.0f);
+            expect (! processor->extInButtonHeld(), "mouse up releases the hold while the effect is off");
+            clickAt (*bay, onX, powerY);
+            expect (bay->outputMix() == 1.0f, "hold check turns the effect back on");
+
+            const auto legend = bay->designToLocal (1325.6f + 10.0f, 284.4f + 4.0f);
+            juce::MouseEvent legendDown (source, legend, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                         bay, bay, time, legend, time, 1, false);
+            bay->mouseDown (legendDown);
+            expect (processor->extInButtonHeld(), "the HOLD legend holds the key");
+            juce::MouseEvent legendUp (source, legend, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                       bay, bay, time, legend, time, 1, false);
+            bay->mouseUp (legendUp);
             expect (! processor->extInButtonHeld(), "the HOLD legend releases the key");
+
+            const juce::ModifierKeys right (juce::ModifierKeys::rightButtonModifier);
+            juce::MouseEvent rightDown (source, centre, right, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                        bay, bay, time, centre, time, 1, false);
+            bay->mouseDown (rightDown);
+            expect (! processor->extInButtonHeld(), "a right-click does not hold the key");
         }
 
         bool foundRope = false;
