@@ -50,7 +50,7 @@ inline constexpr float kHoldHitX = 1324.80f;
 inline constexpr float kHoldHitY = 248.50f;
 inline constexpr float kHoldHitW = 34.00f;
 inline constexpr float kHoldHitH = 34.00f;
-// Red lamp above the HOLD key, lit while the key is held (like the SQ-10 START lamp). The dark bezel is in the SVG.
+// Red lamp above the HOLD key, lit while the key is held (like the BUSHIDO START lamp). The dark bezel is in the SVG.
 inline constexpr float kHoldLampCx = 1341.80f;
 inline constexpr float kHoldLampCy = 239.50f;
 inline constexpr float kHoldLampR = 3.50f;

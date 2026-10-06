@@ -286,7 +286,7 @@ def build_inc(lay):
         f"inline constexpr float kHoldHitY = {cf(hit[1])};",
         f"inline constexpr float kHoldHitW = {cf(hit[2])};",
         f"inline constexpr float kHoldHitH = {cf(hit[3])};",
-        "// Red lamp above the HOLD key, lit while the key is held (like the SQ-10 START lamp). The dark bezel is in the SVG.",
+        "// Red lamp above the HOLD key, lit while the key is held (like the BUSHIDO START lamp). The dark bezel is in the SVG.",
         f"inline constexpr float kHoldLampCx = {cf(hold['lamp']['cx'])};",
         f"inline constexpr float kHoldLampCy = {cf(hold['lamp']['cy'])};",
         f"inline constexpr float kHoldLampR = {cf(hold['lamp']['r'])};",

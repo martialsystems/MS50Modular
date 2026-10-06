@@ -30,7 +30,7 @@ CablePaint paintFor (int color)
 
 // Momentary square key. The HOLD legend and the lamp bezel are already drawn on the plate.
 // Mouse down holds the gate. Mouse up releases it. The cap sinks and the red lamp above it lights while down,
-// the same lamp the SQ-10 shows under START.
+// the same lamp BUSHIDO shows under START.
 void paintExtInHold (juce::Graphics& g, juce::Point<float> origin, float scale, bool held)
 {
     const float lx = origin.x + kHoldLampCx * scale;
