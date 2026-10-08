@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
 #include "Modular/PatchGraph.h"
+#include "Modular/Jcs.h"
 #include "Modular/Vco.h"
 #include "UI/FaceKnobs.h"
 #include "UI/PatchBayLogic.h"
@@ -12,7 +13,7 @@
 namespace {
 
 constexpr double kRate = 48000.0;
-constexpr float kEightFoot = 130.813f;
+constexpr float kEightFoot = static_cast<float> (jcs::pitch::kC3Hz);   // 8' = C3 (JCS R4, exact)
 
 int gChecks = 0;
 
@@ -95,7 +96,7 @@ int testScaleDoesNotChangeOctJack()
     high.setKnob (Vco::kKnobScale, 1.0f);
     const float eight = measureHz (low, 48000, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, false);
     const float four = measureHz (high, 48000, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, false);
-    const float footageRatio = 261.626f / kEightFoot;
+    const float footageRatio = Vco::footageHzFor (3) / kEightFoot;   // 4' / 8' = 2
     check (ratioClose (four / eight, footageRatio) < 0.02f, "scale ratio follows footage, with the same Oct/V");
     check (ratioClose (eight / (kEightFoot * 2.0f), 1.0f) < 0.02f, "8' with +1 V Oct/V is two times footage");
     return finish ("testScaleDoesNotChangeOctJack");

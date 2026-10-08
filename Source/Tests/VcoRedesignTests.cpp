@@ -2,12 +2,14 @@
 // RONIN_Redesign §3.2, §5 items 4-5. Numbers from jidai-audit/verify/verify_ronin.py
 // (proposed_tri_polyblamp, vco_tri_shape, vco_saw_alias_dB_below_signal_in_0_20kHz).
 
+#include "Modular/Jcs.h"
 #include "Modular/Vco.h"
 #include "Spectrum.h"
 
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <functional>
 #include <vector>
 
 namespace {
@@ -31,14 +33,14 @@ int finish (const char* name)
     return failed == 0 ? 0 : 1;
 }
 
-// Runs the VCO at `hz` through the linear HZ/V jack at 8' (130.813 Hz per volt).
+// Runs the VCO at `hz` through the linear HZ/V jack at 8' (kC3Hz = 130.8127826502993 Hz per volt).
 std::vector<double> render (Vco& vco, double hz, int samples, int port)
 {
     std::vector<double> out (static_cast<size_t> (samples));
     for (int i = 0; i < samples; ++i)
     {
         vco.inputConnected[Vco::kHzPerVolt] = true;
-        vco.portValue[Vco::kHzPerVolt] = static_cast<float> (hz / 130.813);
+        vco.portValue[Vco::kHzPerVolt] = static_cast<float> (hz / jcs::pitch::kC3Hz);
         vco.portValue[Vco::kOct] = 0.0f;
         vco.portValue[Vco::kFreqA] = 0.0f;
         vco.portValue[Vco::kFreqB] = 0.0f;
@@ -82,7 +84,7 @@ int testTriDefaultIsTriangle()
     // No DC servo and no start transient: the first 50 ms already average 0 V (the parabola sat at -5.9 V).
     Vco start;
     start.prepare (48000.0);
-    const auto first = render (start, 130.813, 2400, Vco::kTri);
+    const auto first = render (start, jcs::pitch::kC3Hz, 2400, Vco::kTri);
     double mean = 0.0;
     for (double v : first)
         mean += v;
@@ -139,7 +141,7 @@ int testFootageSwitchesAtWrap()
 {
     Vco vco;
     vco.prepare (48000.0);
-    // 8' at 0 V: 130.813 Hz. Run partway into a cycle, then move RANGE to 4'.
+    // 8' at 0 V: C3 = kC3Hz. Run partway into a cycle, then move RANGE to 4'.
     for (int i = 0; i < 100; ++i)
     {
         vco.portValue[Vco::kOct] = 0.0f;
@@ -163,7 +165,12 @@ int testFootageSwitchesAtWrap()
         prevSaw = saw;
     }
     check (switched, "the new footage takes over at the wrap");
-    check (std::fabs (Vco::footageHzFor (2) - 130.813f) < 1.0e-4f, "8' is C3 = 130.813 Hz (footage table KEPT)");
+    check (std::equal_to<float>() (Vco::footageHzFor (2), static_cast<float> (jcs::pitch::kC3Hz)),
+           "8' is C3 = the shared exact kC3Hz (130.8127826502993 Hz)");
+    check (std::equal_to<float>() (Vco::footageHzFor (0) * 4.0f, Vco::footageHzFor (2))
+               && std::equal_to<float>() (Vco::footageHzFor (1) * 2.0f, Vco::footageHzFor (2))
+               && std::equal_to<float>() (Vco::footageHzFor (3), Vco::footageHzFor (2) * 2.0f),
+           "32', 16', 4' are exact octaves of 8'");
     return finish ("testFootageSwitchesAtWrap");
 }
 

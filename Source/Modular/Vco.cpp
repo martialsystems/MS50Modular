@@ -2,12 +2,17 @@
 
 #include "Vco.h"
 
+#include "Jcs.h"
+
 #include <cmath>
 
 namespace {
 
-// S-03 footage. 8' is the unpatched panel pitch.
-constexpr float kFootage[4] = { 32.703f, 65.406f, 130.813f, 261.626f };
+// S-03 footage, equal-tempered C at A4 = 440 (JCS R4). 8' is the unpatched panel pitch: C3 = the shared exact
+// jcs::pitch::kC3Hz (130.8127826502993 Hz); 32', 16' and 4' are whole octaves of it.
+constexpr double kC3 = jcs::pitch::kC3Hz;
+constexpr float kFootage[4] = { static_cast<float> (kC3 / 4.0), static_cast<float> (kC3 / 2.0), static_cast<float> (kC3),
+                                static_cast<float> (kC3 * 2.0) };
 
 }
 
@@ -96,7 +101,7 @@ int Vco::numPorts() const
 PortDesc Vco::port (int index) const
 {
     // JCS R4: VCO:HZ/V is the linear HZ/V LIN role (f = footage * max(V, 0.05)), never the rack pitch standard.
-    // VCO:V/OCT is the rack standard, relative: f = footage * 2^V, so 8' at 0 V = C3 = 130.813 Hz.
+    // VCO:V/OCT is the rack standard, relative: f = footage * 2^V, so 8' at 0 V = C3 = jcs::pitch::kC3Hz.
     if (index == kHzPerVolt)
         return { "Hz/V", PortType::CV, PortDir::In, 0.0f, false, false, PortRole::HzvLin };
     if (index == kOct)

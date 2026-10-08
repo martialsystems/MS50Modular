@@ -106,14 +106,14 @@ Rules:
 | S-26 | EG2 timeline | See SCHEMATICS, EG2. No sustain plateau | An owner's sentence or a scope shot of hold versus delay |
 | S-27 | Output fan-out | One output may feed many inputs. An input sums every cable that lands on it. Stack order, cable color, and cable shape do not change that sum. A jack on the 1978 hardware took one plug. This plugin stacks | If a later pass removes fan-out, the multiples module (phase 2) becomes required first |
 
-Footage frequencies used with S-03 and S-04, equal-tempered C, A440. These pitches are a stand-in for what "32'" meant at the jack with no cable inserted. The switch positions 32', 16', 8', 4' are confirmed. The hertz numbers are not.
+Footage frequencies used with S-03 and S-04, equal-tempered C, A440: 8' is the shared exact C3 (`jcs::pitch::kC3Hz` = 440·2^(−21/12) Hz, jidai-common 1.1.1) and the others are whole octaves of it. These pitches are a stand-in for what "32'" meant at the jack with no cable inserted. The switch positions 32', 16', 8', 4' are confirmed. The hertz numbers are not.
 
 | SCALE | Stand-in Hz at the reference |
 |---|---|
-| 32' | 32.703 |
-| 16' | 65.406 |
-| 8' | 130.813 |
-| 4' | 261.626 |
+| 32' | 32.70319566 |
+| 16' | 65.40639133 |
+| 8' | 130.81278265 |
+| 4' | 261.62556530 |
 
 ## Cable rule (2026-10-05)
 
