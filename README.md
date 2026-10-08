@@ -49,7 +49,7 @@ The front panel keeps its open, symmetric layout. Everything else lives on tabs 
 
 ## Formats and compatibility
 
-- VST3 effect for macOS (universal: Apple silicon and Intel) and Linux. Version 0.1 is a beta.
+- VST3 effect, built for Mac and Windows. Version 0.1 is a beta.
 - Patches save with your DAW project. Older RONIN projects are updated when they load: envelope times keep their length, the oscillator keeps the parabola shape, and filter settings are adjusted for the new input pull. SETUP shows what changed. Once re-saved, a project needs this version of RONIN or later.
 - 22 factory programs on the PRESET screen, voiced for classic EDM: effects for your input (filters, a trance gate, a side-chain pump, a random filter and a ring modulator), six self-playing acid basses ready for a BUSHIDO sequence, basses, a lead, drums and sound effects. Each one says what input it expects; see `docs/presets.md`.
 
@@ -69,7 +69,7 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --target Ronin_VST3
 ```
 
-The plugin lands in `build/Ronin_artefacts/Release/VST3/RONIN.vst3`. On macOS with FL Studio, `scripts/install_fl_plugin.sh` builds the universal bundle and installs it for you. For tests and developer documents, see `docs/DEVELOPING.md`.
+The plugin lands in `build/Ronin_artefacts/Release/VST3/RONIN.vst3`. On a Mac with FL Studio, `scripts/install_fl_plugin.sh` builds the plugin and installs it for you. For tests and developer documents, see `docs/DEVELOPING.md`.
 
 ## The Jidai Collection
 

@@ -395,13 +395,12 @@ Copy `RONIN.vst3` into your system's VST3 folder:
 
 | System | VST3 folder |
 |---|---|
-| macOS | `~/Library/Audio/Plug-Ins/VST3/` (just you) or `/Library/Audio/Plug-Ins/VST3/` (all users) |
+| Mac | `~/Library/Audio/Plug-Ins/VST3/` (just you) or `/Library/Audio/Plug-Ins/VST3/` (all users) |
 | Windows | `C:\Program Files\Common Files\VST3\` |
-| Linux | `~/.vst3/` |
 
 Then have your DAW rescan its plugins. RONIN is listed under **Martial Systems**, as an effect. Keep a single copy: a second `RONIN.vst3` in another VST3 folder shows up as a second entry.
 
-Version 0.1 is a beta for macOS (a universal build) and Linux. When a Windows build is available, it installs the same way, into the folder above.
+RONIN is built for Mac and Windows. Version 0.1 is a beta.
 
 ### Using it in any DAW
 
@@ -413,7 +412,7 @@ Version 0.1 is a beta for macOS (a universal build) and Linux. When a Windows bu
 
 ### Example: FL Studio
 
-1. Close FL Studio, copy `RONIN.vst3` into your VST3 folder, and open FL Studio. On macOS, use the universal build: FL Studio's plugin bridge loads the x86_64 part of the bundle.
+1. Close FL Studio, copy `RONIN.vst3` into your VST3 folder, and open FL Studio.
 2. Open **Options › Manage plugins** and click **Find installed plugins**. RONIN is listed under the effects.
 3. In the **Mixer**, select an insert track, click an empty effect slot and choose RONIN.
 4. Route an audio channel to that insert for the effect programs. For the self-playing programs, any insert works.
@@ -428,7 +427,7 @@ Version 0.1 is a beta for macOS (a universal build) and Linux. When a Windows bu
 | | |
 |---|---|
 | Type | Semi-modular synthesizer and effect, 16 sections |
-| Format | VST3 audio effect. Version 0.1 beta for macOS (universal build) and Linux. |
+| Format | VST3 audio effect for Mac and Windows. Version 0.1 beta. |
 | Channels | Stereo in, stereo out |
 | MIDI | None in the plugin (MIDI to CV is available in the JIDAI RACK) |
 | Jacks | 57 on the panel: 28 inputs, 29 outputs. 61 in the JIDAI RACK (adds HOST IN L/R, HOST OUT L/R). |
@@ -507,9 +506,8 @@ In the JIDAI RACK, RONIN is a 4 U device when open and a 1 U strip when closed. 
 
 | System | Folder |
 |---|---|
-| macOS | `~/Library/RONIN/` |
+| Mac | `~/Library/RONIN/` |
 | Windows | `%APPDATA%\RONIN\` |
-| Linux | `~/.config/RONIN/` |
 
 ### Back-only jacks
 
