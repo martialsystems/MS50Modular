@@ -603,20 +603,199 @@ void RoninAudioProcessor::changeProgramName (int, const juce::String&)
 {
 }
 
+RackIndices RoninAudioProcessor::rackIndices() const noexcept
+{
+    RackIndices r;
+    r.ext = extModuleIndex_;
+    r.output = outputModuleIndex_;
+    r.noise = noiseModuleIndex_;
+    r.vcf = vcfModuleIndex_;
+    r.vca1 = vca1ModuleIndex_;
+    r.vca2 = vca2ModuleIndex_;
+    r.eg1 = eg1ModuleIndex_;
+    r.mg = mgModuleIndex_;
+    r.vco = vcoModuleIndex_;
+    r.eg2 = eg2ModuleIndex_;
+    r.ring = ringModuleIndex_;
+    r.divider = dividerModuleIndex_;
+    r.inverter = inverterModuleIndex_;
+    r.integrator = integratorModuleIndex_;
+    r.mixer = mixerModuleIndex_;
+    r.sampleHold = sampleHoldModuleIndex_;
+    return r;
+}
+
+// State format 2 (JCS R7): knobs by parameter id, cables by canonical jack id, oldest first. See PatchState.h.
 void RoninAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
     juce::XmlElement xml ("RONIN");
+    xml.setAttribute ("format", patchstate::kFormat);
+    xml.setAttribute ("unit", patchstate::kUnit);
     for (auto* parameter : getParameters())
     {
         if (auto* ranged = dynamic_cast<juce::RangedAudioParameter*> (parameter))
             xml.setAttribute (ranged->getParameterID(), static_cast<double> (parameter->getValue()));
     }
 
-    unsigned char blob[4096];
-    const int bytes = graph.getState (blob, static_cast<int> (sizeof blob));
-    if (bytes > 0)
-        xml.setAttribute ("graph", juce::String::toHexString (blob, bytes));
+    const RackIndices rack = rackIndices();
+    Cable cables[PatchGraph::kMaxCables];
+    const int count = graph.copyPublishedCables (cables, PatchGraph::kMaxCables);
+    auto* list = xml.createNewChildElement ("CABLES");
+    for (int i = 0; i < count; ++i)
+    {
+        const std::string from = patchstate::jackId (rack, cables[i].sourceModule, cables[i].sourcePort);
+        const std::string to = patchstate::jackId (rack, cables[i].destModule, cables[i].destPort);
+        if (from.empty() || to.empty())
+            continue;
+        auto* cable = list->createNewChildElement ("CABLE");
+        cable->setAttribute ("from", juce::String::fromUTF8 (from.c_str()));
+        cable->setAttribute ("to", juce::String::fromUTF8 (to.c_str()));
+        if (cables[i].legacyInvert)
+            cable->setAttribute ("legacyInvert", 1);
+        if (cables[i].colour != 0)
+            cable->setAttribute ("colour", juce::String::toHexString (static_cast<juce::int64> (cables[i].colour)).paddedLeft ('0', 8));
+    }
     copyXmlToBinary (xml, destData);
+}
+
+void RoninAudioProcessor::readParameters (const juce::XmlElement& xml)
+{
+    for (auto* parameter : getParameters())
+    {
+        if (auto* ranged = dynamic_cast<juce::RangedAudioParameter*> (parameter))
+        {
+            const juce::String id = ranged->getParameterID();
+            if (xml.hasAttribute (id))
+                parameter->setValue (static_cast<float> (xml.getDoubleAttribute (id)));
+        }
+    }
+}
+
+void RoninAudioProcessor::loadFormat2 (const juce::XmlElement& xml, int format)
+{
+    if (format > patchstate::kFormat)
+        loadReport_.add ("This patch was saved by a newer RONIN (format " + juce::String (format)
+                         + "). It was loaded best-effort; settings this version does not know were ignored.");
+
+    const RackIndices rack = rackIndices();
+    Cable cables[PatchGraph::kMaxCables];
+    int count = 0;
+    if (auto* list = xml.getChildByName ("CABLES"))
+    {
+        for (auto* item : list->getChildWithTagNameIterator ("CABLE"))
+        {
+            const juce::String from = item->getStringAttribute ("from");
+            const juce::String to = item->getStringAttribute ("to");
+            Cable cable;
+            if (! patchstate::jackAddress (rack, from.toStdString(), cable.sourceModule, cable.sourcePort)
+                || ! patchstate::jackAddress (rack, to.toStdString(), cable.destModule, cable.destPort))
+            {
+                loadReport_.add ("Skipped a cable with an unknown jack: " + from + " -> " + to);
+                continue;
+            }
+            if (count >= PatchGraph::kMaxCables)
+            {
+                loadReport_.add ("Skipped cables beyond " + juce::String (PatchGraph::kMaxCables));
+                break;
+            }
+            cable.legacyInvert = item->getIntAttribute ("legacyInvert", 0) != 0;
+            cable.colour = static_cast<std::uint32_t> (item->getStringAttribute ("colour", "0").getHexValue64());
+            cables[count++] = cable;
+        }
+    }
+    // Illegal cables (direction or type) are dropped one by one so the rest of the patch still loads.
+    Cable legal[PatchGraph::kMaxCables];
+    int legalCount = 0;
+    for (int i = 0; i < count; ++i)
+    {
+        if (graph.cableIsLegal (cables[i]))
+            legal[legalCount++] = cables[i];
+        else
+            loadReport_.add ("Skipped a cable the patch bay does not allow.");
+    }
+    graph.setCables (legal, legalCount);
+    readParameters (xml);
+}
+
+// Format 1: an index blob plus parameter attributes. Migrated per RONIN_Redesign §6 and reported.
+void RoninAudioProcessor::loadFormat1 (const juce::XmlElement& xml)
+{
+    if (xml.hasAttribute ("graph"))
+    {
+        juce::MemoryBlock block;
+        block.loadFromHexString (xml.getStringAttribute ("graph"));
+        if (! graph.setState (block.getData(), static_cast<int> (block.getSize())))
+        {
+            presetError_ = graph.stateError();
+            return;
+        }
+    }
+
+    // vca1Initial is a host parameter now, under the attribute older saves already wrote.
+    // Absent on saves from before that attribute. Those sessions keep Initial at 0.
+    if (! xml.hasAttribute ("vca1Initial"))
+    {
+        vca1.setKnob (Vca1::kKnobInitial, 0.0f);
+        if (vca1Initial_ != nullptr)
+            *vca1Initial_ = 0.0f;
+    }
+    readParameters (xml);
+
+    // M-R1: EG knobs keep their segment durations under the new 1 ms .. 60 s real-time law.
+    // Only knobs the session stored are migrated; an absent attribute keeps the current (new-law) value.
+    auto migrate = [&xml] (juce::AudioParameterFloat* parameter, bool attack, bool& stalled)
+    {
+        if (parameter == nullptr || ! xml.hasAttribute (parameter->getParameterID()))
+            return;
+        const double old = parameter->convertTo0to1 (parameter->get());
+        if (attack && patchstate::attackStalledInV1 (old))
+            stalled = true;
+        const double now = attack ? patchstate::migrateEgAttack (old) : patchstate::migrateEgDecayRelease (old);
+        *parameter = parameter->convertFrom0to1 (static_cast<float> (now));
+    };
+    bool stalled = false;
+    migrate (eg1Attack_, true, stalled);
+    migrate (eg1Decay_, false, stalled);
+    migrate (eg1Release_, false, stalled);
+    migrate (eg2Attack_, true, stalled);
+    migrate (eg2Release_, false, stalled);
+    loadReport_.add ("M-R1: EG knobs moved to the real-time law (same segment times).");
+    if (stalled)
+        loadReport_.add ("M-R1: an EG attack that used to stall now reaches decay and sustain (a fix).");
+
+    // M-R2: user-saved format-1 patches keep the parabola triangle.
+    if (vcoTriShape_ != nullptr)
+        *vcoTriShape_ = 1;
+    loadReport_.add ("M-R2: VCO TRI SHAPE set to PARABOLA (legacy), the shape this patch was saved with.");
+
+    // M-R3: Gate -> non-S-trig cables keep their old inversion.
+    Cable cables[PatchGraph::kMaxCables];
+    const int count = graph.copyPublishedCables (cables, PatchGraph::kMaxCables);
+    const int marked = patchstate::markLegacyInvert (graph, cables, count);
+    if (marked > 0)
+    {
+        graph.setCables (cables, count);
+        loadReport_.add ("M-R3: " + juce::String (marked) + (marked == 1 ? " cable kept its" : " cables kept their")
+                         + " old S-trig inversion (legacyInvert).");
+    }
+
+    // M-R5: drive-pull cutoff compensation, only for a direct VCO SAW or PULSE cable into VCF IN.
+    const auto feed = patchstate::directVcfFeed (cables, count, rackIndices());
+    const double level = patchstate::referenceLevel (feed);
+    if (level > 0.0 && vcfCutoff_ != nullptr)
+    {
+        const double old = vcfCutoff_->convertTo0to1 (vcfCutoff_->get());
+        const double now = patchstate::compensateCutoff (old, level);
+        *vcfCutoff_ = vcfCutoff_->convertFrom0to1 (static_cast<float> (now));
+        loadReport_.add ("M-R5: VCF CUTOFF " + juce::String (old, 3) + " -> " + juce::String (now, 3)
+                         + " (same cutoff for the VCO " + (feed == patchstate::VcfFeed::VcoSaw ? "SAW" : "PULSE")
+                         + " under the new drive pull).");
+    }
+    else if (feed != patchstate::VcfFeed::None)
+    {
+        loadReport_.add ("M-R5: VCF CUTOFF left as saved: the VCF input is not a single direct VCO SAW or PULSE "
+                         "cable, so its level is unknown. The filter may sound brighter under the new drive pull.");
+    }
 }
 
 void RoninAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
@@ -625,37 +804,22 @@ void RoninAudioProcessor::setStateInformation (const void* data, int sizeInBytes
     if (xml == nullptr || ! xml->hasTagName ("RONIN"))
         return;
 
-    if (xml->hasAttribute ("graph"))
+    const int format = xml->getIntAttribute ("format", 1);
+    juce::StringArray previousReport;
+    previousReport.swapWith (loadReport_);
+    presetError_.clear();
+    if (format >= 2)
+        loadFormat2 (*xml, format);
+    else
+        loadFormat1 (*xml);
+    if (presetError_.isNotEmpty())
     {
-        juce::MemoryBlock block;
-        block.loadFromHexString (xml->getStringAttribute ("graph"));
-        if (! graph.setState (block.getData(), static_cast<int> (block.getSize())))
-        {
-            presetError_ = graph.stateError();
-            return;
-        }
-        presetError_.clear();
+        loadReport_.swapWith (previousReport);   // a rejected load leaves everything as it was
+        return;
     }
-
-    // vca1Initial is a host parameter now, under the attribute older saves already wrote.
-    // Absent on saves from before that attribute. Those sessions keep Initial at 0.
-    if (! xml->hasAttribute ("vca1Initial"))
-    {
-        vca1.setKnob (Vca1::kKnobInitial, 0.0f);
-        if (vca1Initial_ != nullptr)
-            *vca1Initial_ = 0.0f;
-    }
-
-    for (auto* parameter : getParameters())
-    {
-        if (auto* ranged = dynamic_cast<juce::RangedAudioParameter*> (parameter))
-        {
-            const juce::String id = ranged->getParameterID();
-            if (xml->hasAttribute (id))
-                parameter->setValue (static_cast<float> (xml->getDoubleAttribute (id)));
-        }
-    }
+    loadedFormat_ = format;
     applyHostControls();
+    graph.prepare (engineSampleRate());
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()

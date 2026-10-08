@@ -127,12 +127,257 @@ void testTriDefaultFreshAndInit()
     finish ("testTriDefaultFreshAndInit");
 }
 
+// ---- §6 migration and state format 2 ---------------------------------------------------------
+
+namespace {
+
+// A format-1 session: parameter attributes plus the v1 index blob, built from a rack in the processor's order.
+juce::MemoryBlock makeV1State (const RoninAudioProcessor& layout, const std::vector<Cable>& cables,
+                               const std::vector<std::pair<const char*, double>>& params)
+{
+    ExtIn ext; OutputModule output; NoiseModule noise; Vcf vcf; Vca1 vca1; Vca2 vca2; Eg1 eg1; MgModule mg; Vco vco;
+    Eg2 eg2; Ring ring; Divider divider; Inverter inverter; Integrator integrator; Mixer mixer; SampleHold sh;
+    PatchGraph g;
+    Module* order[] = { &ext, &output, &noise, &vcf, &vca1, &vca2, &eg1, &mg, &vco, &eg2, &ring, &divider, &inverter,
+                        &integrator, &mixer, &sh };
+    for (Module* m : order)
+        g.addModule (*m);
+    jassert (layout.vcoGraphIndex() == 8 && layout.vcfGraphIndex() == 3 && layout.sampleHoldGraphIndex() == 15);
+    for (const Cable& c : cables)
+        g.connect (c.sourceModule, c.sourcePort, c.destModule, c.destPort);
+    unsigned char blob[4096];
+    const int bytes = g.getState (blob, static_cast<int> (sizeof blob));
+    juce::XmlElement xml ("RONIN");   // format 1 has no format attribute
+    for (const auto& kv : params)
+        xml.setAttribute (kv.first, kv.second);
+    xml.setAttribute ("graph", juce::String::toHexString (blob, bytes));
+    juce::MemoryBlock block;
+    juce::AudioProcessor::copyXmlToBinary (xml, block);
+    return block;
+}
+
+bool reportHas (const RoninAudioProcessor& p, const char* text)
+{
+    for (const auto& line : p.loadReport())
+        if (line.contains (text))
+            return true;
+    return false;
+}
+
+float param01 (RoninAudioProcessor& p, const char* section, const char* label)
+{
+    auto* parameter = dynamic_cast<juce::RangedAudioParameter*> (p.parameterForPanelKnob (section, label));
+    return parameter != nullptr ? parameter->getValue() : -1.0f;
+}
+
+double cents (double a, double b) { return 1200.0 * std::log2 (a / b); }
+
+}
+
+void testTriDefaultByOrigin()
+{
+    RoninAudioProcessor fresh;
+    check (fresh.triShape() == Vco::TriShape::Triangle, "fresh instance -> TRIANGLE");
+    fresh.triShapeParameter()->setValueNotifyingHost (1.0f);
+    fresh.setCurrentProgram (kInitPreset);
+    check (fresh.triShape() == Vco::TriShape::Triangle, "new / INIT -> TRIANGLE");
+
+    RoninAudioProcessor user;
+    const auto v1 = makeV1State (user, {}, { { "vcfCutoff", 0.45 } });
+    user.setStateInformation (v1.getData(), static_cast<int> (v1.getSize()));
+    check (user.triShape() == Vco::TriShape::Parabola, "user format-1 state -> PARABOLA (legacy)");
+    check (reportHas (user, "M-R2"), "the load report records M-R2");
+    auto* attack = dynamic_cast<juce::RangedAudioParameter*> (user.parameterForPanelKnob ("EG 1", "ATTACK"));
+    check (attack != nullptr && std::fabs (attack->getValue() - PanelDefault::kEg1Attack) < 1.0e-6f,
+           "an EG knob the session did not store is not migrated twice");
+
+    for (int stored : { 0, 1 })
+    {
+        RoninAudioProcessor saver;
+        saver.triShapeParameter()->setValueNotifyingHost (static_cast<float> (stored));
+        const auto v2 = saveState (saver);
+        RoninAudioProcessor loader;
+        loader.triShapeParameter()->setValueNotifyingHost (1.0f - static_cast<float> (stored));
+        loader.setStateInformation (v2.getData(), static_cast<int> (v2.getSize()));
+        check (loader.triShape() == (stored == 1 ? Vco::TriShape::Parabola : Vco::TriShape::Triangle),
+               "format-2 state -> the stored value");
+        check (loader.loadedFormat() == 2 && ! reportHas (loader, "M-R2"), "format 2 is not migrated");
+    }
+    finish ("testTriDefaultByOrigin");
+}
+
+void testParabolaSelectable()
+{
+    RoninAudioProcessor p;
+    p.triShapeParameter()->setValueNotifyingHost (1.0f);
+    check (p.triShape() == Vco::TriShape::Parabola, "PARABOLA is selectable");
+    check (p.triShapeParameter()->getCurrentChoiceName() == "PARABOLA (legacy)", "named PARABOLA (legacy)");
+    const auto state = saveState (p);
+    RoninAudioProcessor q;
+    q.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+    check (q.triShape() == Vco::TriShape::Parabola, "PARABOLA is saved and recalled");
+    finish ("testParabolaSelectable");
+}
+
+void testUserPatchCutoffCompensation()
+{
+    RoninAudioProcessor layout;
+    const int vco = layout.vcoGraphIndex();
+    const int vcf = layout.vcfGraphIndex();
+    const int ext = layout.extInGraphIndex();
+    {
+        RoninAudioProcessor p;
+        const auto v1 = makeV1State (p, { Cable { vco, Vco::kSaw, vcf, Vcf::kSigIn } }, { { "vcfCutoff", 0.45 } });
+        p.setStateInformation (v1.getData(), static_cast<int> (v1.getSize()));
+        const double now = param01 (p, "VCF", "CUTOFF");
+        const double oldHz = Vcf::effectiveHzFor (Vcf::knobHzFor (0.45), 2.5, Vcf::kLegacyInputPull);
+        const double newHz = Vcf::effectiveHzFor (Vcf::knobHzFor (now), 2.5, Vcf::kInputPull);
+        std::printf ("  saw: cutoff 0.45 -> %.4f, %.1f Hz vs %.1f Hz (%.3f c)\n", now, newHz, oldHz, cents (newHz, oldHz));
+        check (std::fabs (now - 0.385) < 0.001, "VCO SAW -> VCF IN at 0.45 loads at 0.385");
+        check (std::fabs (cents (newHz, oldHz)) < 1.0, "same effective cutoff within 1 cent");
+        check (reportHas (p, "M-R5"), "compensation is reported");
+    }
+    {
+        RoninAudioProcessor p;
+        const auto v1 = makeV1State (p, { Cable { vco, Vco::kPulse, vcf, Vcf::kSigIn } }, { { "vcfCutoff", 0.45 } });
+        p.setStateInformation (v1.getData(), static_cast<int> (v1.getSize()));
+        const double now = param01 (p, "VCF", "CUTOFF");
+        check (std::fabs ((now - 0.45) + 0.130) < 0.002, "VCO PULSE -> VCF IN: delta c ~ -0.130");
+    }
+    {
+        RoninAudioProcessor p;
+        const auto v1 = makeV1State (p, { Cable { ext, 2, vcf, Vcf::kSigIn } }, { { "vcfCutoff", 0.45 } });
+        p.setStateInformation (v1.getData(), static_cast<int> (v1.getSize()));
+        check (std::fabs (param01 (p, "VCF", "CUTOFF") - 0.45f) < 1.0e-6f, "EXT IN -> VCF IN: cutoff unchanged");
+        check (reportHas (p, "left as saved"), "... and listed in the load report");
+    }
+    {
+        // A format-2 state is never compensated.
+        RoninAudioProcessor saver;
+        saver.connectJacks (vco, Vco::kSaw, vcf, Vcf::kSigIn);
+        const auto v2 = saveState (saver);
+        RoninAudioProcessor p;
+        p.setStateInformation (v2.getData(), static_cast<int> (v2.getSize()));
+        check (std::fabs (param01 (p, "VCF", "CUTOFF") - param01 (saver, "VCF", "CUTOFF")) < 1.0e-6f,
+               "format 2 keeps its cutoff");
+    }
+    finish ("testUserPatchCutoffCompensation");
+}
+
+void testFormat1MigrationEgAndLegacyInvert()
+{
+    RoninAudioProcessor p;
+    const int eg2 = p.eg2GraphIndex();
+    const int div = p.dividerGraphIndex();
+    const int eg1 = p.eg1GraphIndex();
+    const int ext = p.extInGraphIndex();
+    const auto v1 = makeV1State (p,
+                                 { Cable { eg2, Eg2::kDelayTrig, div, Divider::kIn },     // Gate -> V-trig: legacy
+                                   Cable { eg2, Eg2::kDelayTrig, eg1, Eg1::kTrig },       // Gate -> S-trig: converted anyway
+                                   Cable { ext, 3, eg1, Eg1::kTrig } },                   // S-trig source: never
+                                 { { "eg1Attack", 0.5 }, { "eg1Decay", 0.5 }, { "eg1Release", 1.0 }, { "eg2Attack", 0.0 },
+                                   { "eg2Release", 0.0 } });
+    p.setStateInformation (v1.getData(), static_cast<int> (v1.getSize()));
+    check (std::fabs (param01 (p, "EG 1", "ATTACK") - 0.5846f) < 2.0e-4f, "M-R1: attack 0.5 -> 0.5846 (0.6215 s)");
+    check (std::fabs (param01 (p, "EG 1", "DECAY") - 0.5574f) < 2.0e-4f, "M-R1: decay 0.5 -> 0.5574");
+    check (std::fabs (param01 (p, "EG 1", "RELEASE") - 0.976f) < 1.0e-3f, "M-R1: release 1.0 -> 0.976");
+    check (std::fabs (param01 (p, "EG 2", "ATTACK") - 0.1661f) < 2.0e-4f, "M-R1: EG 2 attack 0.0 -> 0.1661");
+    check (std::fabs (param01 (p, "EG 2", "RELEASE") - 0.1388f) < 2.0e-4f, "M-R1: EG 2 release 0.0 -> 0.1388");
+
+    Cable cables[8];
+    const int n = p.copyPublishedCables (cables, 8);
+    check (n == 3, "three cables load");
+    check (n == 3 && cables[0].legacyInvert && ! cables[1].legacyInvert && ! cables[2].legacyInvert,
+           "M-R3: only the Gate -> non-S-trig cable gets legacyInvert");
+    check (reportHas (p, "M-R3: 1 cable"), "M-R3 is reported");
+
+    // The flag survives a format-2 save and load.
+    const auto v2 = saveState (p);
+    RoninAudioProcessor q;
+    q.setStateInformation (v2.getData(), static_cast<int> (v2.getSize()));
+    Cable back[8];
+    const int m = q.copyPublishedCables (back, 8);
+    check (m == 3 && back[0].legacyInvert && ! back[1].legacyInvert, "legacyInvert round-trips in format 2");
+    check (std::fabs (param01 (q, "EG 1", "ATTACK") - param01 (p, "EG 1", "ATTACK")) < 1.0e-6f, "format 2 is not re-migrated");
+    finish ("testFormat1MigrationEgAndLegacyInvert");
+}
+
+void testFormat2Xml()
+{
+    RoninAudioProcessor p;
+    const auto state = saveState (p);
+    auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
+    check (xml != nullptr && xml->getIntAttribute ("format") == 2 && xml->getStringAttribute ("unit") == "RONIN",
+           "format=2 unit=RONIN");
+    check (xml != nullptr && ! xml->hasAttribute ("graph"), "no index blob");
+    auto* list = xml != nullptr ? xml->getChildByName ("CABLES") : nullptr;
+    check (list != nullptr && list->getNumChildElements() == 8, "INIT's eight cables by jack id");
+    if (list != nullptr && list->getNumChildElements() > 0)
+    {
+        auto* first = list->getChildElement (0);
+        check (first->getStringAttribute ("from") == "EXT IN:MONO" && first->getStringAttribute ("to") == "VCF:IN",
+               "cables are SECTION:LABEL ids, oldest first");
+    }
+
+    // Hand-written format-3 state: an unknown jack, a colour override, a prefixed id, an unknown attribute.
+    juce::XmlElement future ("RONIN");
+    future.setAttribute ("format", 3);
+    future.setAttribute ("unit", "RONIN");
+    future.setAttribute ("vcfCutoff", 0.25);
+    future.setAttribute ("someFutureThing", 7);
+    auto* cables = future.createNewChildElement ("CABLES");
+    auto* a = cables->createNewChildElement ("CABLE");
+    a->setAttribute ("from", "RONIN#2/VCO:SAW");
+    a->setAttribute ("to", "VCF:IN");
+    a->setAttribute ("colour", "ff112233");
+    auto* b = cables->createNewChildElement ("CABLE");
+    b->setAttribute ("from", "VCO:SINE");
+    b->setAttribute ("to", "VCF:IN");
+    auto* c = cables->createNewChildElement ("CABLE");
+    c->setAttribute ("from", "VCF:IN");      // input -> input: not allowed
+    c->setAttribute ("to", "VCA 1:IN");
+    juce::MemoryBlock block;
+    juce::AudioProcessor::copyXmlToBinary (future, block);
+    RoninAudioProcessor q;
+    q.setStateInformation (block.getData(), static_cast<int> (block.getSize()));
+    Cable loaded[8];
+    const int n = q.copyPublishedCables (loaded, 8);
+    check (n == 1 && loaded[0].colour == 0xff112233u, "the known cable loads with its colour");
+    check (std::fabs (param01 (q, "VCF", "CUTOFF") - 0.25f) < 1.0e-6f, "known parameters load");
+    check (reportHas (q, "newer RONIN"), "a newer format loads best-effort with a warning");
+    check (reportHas (q, "unknown jack: VCO:SINE"), "an unknown jack is skipped and reported");
+    check (reportHas (q, "does not allow"), "an illegal cable is skipped and reported");
+
+    // Colour survives a save.
+    const auto again = saveState (q);
+    RoninAudioProcessor r;
+    r.setStateInformation (again.getData(), static_cast<int> (again.getSize()));
+    Cable rc[8];
+    check (r.copyPublishedCables (rc, 8) == 1 && rc[0].colour == 0xff112233u, "colour override round-trips");
+
+    // A corrupt format-1 blob is rejected and leaves the patch alone.
+    RoninAudioProcessor s;
+    juce::XmlElement bad ("RONIN");
+    bad.setAttribute ("graph", "00ff");
+    juce::MemoryBlock badBlock;
+    juce::AudioProcessor::copyXmlToBinary (bad, badBlock);
+    s.setStateInformation (badBlock.getData(), static_cast<int> (badBlock.getSize()));
+    Cable sc[8];
+    check (s.copyPublishedCables (sc, 8) == 8 && s.presetError().isNotEmpty(), "a corrupt v1 state is rejected");
+    finish ("testFormat2Xml");
+}
+
 int main()
 {
     juce::ScopedJuceInitialiser_GUI juce;
     testHqDefaultOff();
     testHqLatencyIsTwentyThree();
     testTriDefaultFreshAndInit();
+    testTriDefaultByOrigin();
+    testParabolaSelectable();
+    testUserPatchCutoffCompensation();
+    testFormat1MigrationEgAndLegacyInvert();
+    testFormat2Xml();
     std::printf ("ProcessorTests: %d passed, %d failed\n", gPassed, gFailed);
     return gFailed == 0 ? 0 : 1;
 }

@@ -69,6 +69,8 @@ public:
     bool setCables (const Cable* cables, int count);
 
     bool writePresetKnob (int module, int knob, float value);
+    // True when connect() would accept this cable (indices, direction, type, not one jack to itself).
+    bool cableIsLegal (const Cable& cable) const;
     const char* stateError() const noexcept { return stateError_; }
 
 private:

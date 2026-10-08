@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "Modular/PatchState.h"
 #include "Modular/Divider.h"
 #include "Modular/FactoryPresets.h"
 #include "Modular/Halfband.h"
@@ -59,6 +60,10 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
     const juce::String& presetError() const noexcept { return presetError_; }
+    // Migration / load report of the last setStateInformation (SETUP tab, RONIN_Redesign §4.1, M-R1..M-R5).
+    const juce::StringArray& loadReport() const noexcept { return loadReport_; }
+    int loadedFormat() const noexcept { return loadedFormat_; }
+    RackIndices rackIndices() const noexcept;
 
     // Graph indices from addModule. Panel jack ids live in PanelGeometry.inc.
     int extInGraphIndex() const noexcept { return extModuleIndex_; }
@@ -132,6 +137,12 @@ private:
     Integrator integrator;
     Mixer mixer;
     SampleHold sampleHold;
+    juce::StringArray loadReport_;
+    int loadedFormat_ = patchstate::kFormat;
+    void loadFormat1 (const juce::XmlElement& xml);
+    void loadFormat2 (const juce::XmlElement& xml, int format);
+    void readParameters (const juce::XmlElement& xml);
+
     int extModuleIndex_ = -1;
     int outputModuleIndex_ = -1;
     int noiseModuleIndex_ = -1;

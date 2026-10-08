@@ -35,6 +35,7 @@ target_sources(Ronin PRIVATE
   Source/PluginEditor.cpp
   Source/Modular/Module.cpp
   Source/Modular/PatchGraph.cpp
+  Source/Modular/PatchState.cpp
   Source/Modular/ExtIn.cpp
   Source/Modular/OutputModule.cpp
   Source/Modular/Noise.cpp
@@ -98,6 +99,7 @@ add_executable(RoninTests
   Source/Tests/GraphRedesignTests.cpp
   Source/Modular/Module.cpp
   Source/Modular/PatchGraph.cpp
+  Source/Modular/PatchState.cpp
   Source/Modular/ExtIn.cpp
   Source/Modular/OutputModule.cpp
   Source/Modular/Noise.cpp
@@ -124,6 +126,7 @@ target_sources(RoninPanelProbe PRIVATE
   Source/PluginEditor.cpp
   Source/Modular/Module.cpp
   Source/Modular/PatchGraph.cpp
+  Source/Modular/PatchState.cpp
   Source/Modular/ExtIn.cpp
   Source/Modular/OutputModule.cpp
   Source/Modular/Noise.cpp
@@ -175,6 +178,7 @@ target_sources(RoninProcessorTests PRIVATE
   Source/PluginEditor.cpp
   Source/Modular/Module.cpp
   Source/Modular/PatchGraph.cpp
+  Source/Modular/PatchState.cpp
   Source/Modular/ExtIn.cpp
   Source/Modular/OutputModule.cpp
   Source/Modular/Noise.cpp

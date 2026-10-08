@@ -224,7 +224,8 @@ int testFactoryPresetCount()
     check (ctor.find ("connectFactoryCables") == std::string::npos, "construction does not patch its own cable list");
     check (choose.find ("loadFactoryPreset") != std::string::npos, "choosing a program loads that preset");
     check (processor.find ("vca1Initial") != std::string::npos, "session state keeps VCA 1 Initial");
-    const std::string restore = functionBody (processor, "void RoninAudioProcessor::setStateInformation");
+    // Format-1 sessions are restored (and migrated) in loadFormat1 (state format 2, JCS R7).
+    const std::string restore = functionBody (processor, "void RoninAudioProcessor::loadFormat1");
     check (restore.find ("vca1Initial") != std::string::npos, "session restore reads VCA 1 Initial");
     check (restore.find ("kKnobInitial, 0.0f") != std::string::npos, "an old session leaves VCA 1 Initial at 0");
 

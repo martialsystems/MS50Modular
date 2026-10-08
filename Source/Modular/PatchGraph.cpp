@@ -694,6 +694,13 @@ bool PatchGraph::setCables (const Cable* cables, int count)
     return true;
 }
 
+bool PatchGraph::cableIsLegal (const Cable& cable) const
+{
+    if (cable.sourceModule == cable.destModule && cable.sourcePort == cable.destPort)
+        return false;
+    return indicesLegal (cable.sourceModule, cable.sourcePort, cable.destModule, cable.destPort);
+}
+
 Module* PatchGraph::moduleAt (int index) noexcept
 {
     if (index < 0 || index >= moduleCount_)
