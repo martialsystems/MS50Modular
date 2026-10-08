@@ -600,6 +600,7 @@ int testSchmittInputs();
 int testGraphFeedbackOneSampleNoDoubleRun();
 int testGraphStrigScopeAndLegacyInvert();
 int testGraphTypedRestNoLatch();
+int testDrivePull();
 
 int main()
 {
@@ -729,5 +730,6 @@ int main()
     failed += testGraphFeedbackOneSampleNoDoubleRun();
     failed += testGraphStrigScopeAndLegacyInvert();
     failed += testGraphTypedRestNoLatch();
+    failed += testDrivePull();
     return failed == 0 ? 0 : 1;
 }

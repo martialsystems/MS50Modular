@@ -15,7 +15,9 @@ constexpr double kIs = 2.52e-9;
 constexpr double kN = 1.752;
 constexpr double kVt = 0.02585;
 constexpr double kBridgeC = 22.0e-9;
-constexpr double kInputPull = 0.012;
+// RONIN_Redesign §5.13b (N13, DECIDED by the user): 0.012 -> 0.004. A 1 kHz knob with a 2.5 V mean input now
+// droops to 801.8 Hz (was 515.4 Hz). User-saved format-1 patches get cutoff compensation on load (M-R5).
+constexpr double kInputPull = Vcf::kInputPull;
 constexpr double kDiodeVolts = 5.0;
 
 void flushState (double& state)
@@ -117,6 +119,18 @@ void Vcf::prepare (double rate)
     hpX_ = 0.0;
     hpY_ = 0.0;
     cutoffSmooth_.prepare (rate);
+    // §5.13 (N14): rate-only coefficients are computed here, not per sample.
+    const double r = rate > 1.0 ? rate : 48000.0;
+    envA_ = -std::expm1 (-1.0 / (0.03 * r));
+    hpA_ = std::exp (-2.0 * kPi * 5.0 / r);
+}
+
+double Vcf::effectiveHzFor (double knobHz, double envVolts, double pull) noexcept
+{
+    double hz = hzFromBias (biasForHz (knobHz) - pull * envVolts);
+    if (! std::isfinite (hz) || hz < 15.0)
+        hz = 15.0;
+    return hz;
 }
 
 float Vcf::knobHz() const
@@ -160,8 +174,7 @@ void Vcf::processSample()
     cutoffSmooth_.next();
     const float q = resonance();
     const double rate = sampleRate > 1.0 ? sampleRate : 48000.0;
-    const double envA = 1.0 - std::exp (-1.0 / (0.03 * rate));
-    env_ += (std::fabs (static_cast<double> (input)) - env_) * envA;
+    env_ += (std::fabs (static_cast<double> (input)) - env_) * envA_;
     flushState (env_);
 
     // S-07 and S-08 set the unpulled bias. S-10 turns that bias into bridge current.
@@ -193,8 +206,7 @@ void Vcf::processSample()
     flushState (z2_);
 
     // S-10b. Output coupling, one pole at 5 Hz.
-    const double hpA = std::exp (-2.0 * kPi * 5.0 / rate);
-    const double hp = hpA * (hpY_ + v2 - hpX_);
+    const double hp = hpA_ * (hpY_ + v2 - hpX_);
     hpX_ = v2;
     hpY_ = hp;
     flushState (hpX_);

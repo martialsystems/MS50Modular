@@ -360,3 +360,41 @@ int testSchmittInputs()
     check (feed (0.49f) == 5.0f && feed (1.5f) == 0.0f, "below 0.5 V re-arms");
     return finish ("testSchmittInputs");
 }
+
+// ---- §5.13 / 13b VCF caching and drive pull (N13, N14) ----------------------------------------
+
+int testDrivePull()
+{
+    check (Vcf::kInputPull == 0.004, "kInputPull == 0.004");
+    const double hz = Vcf::effectiveHzFor (1000.0, 2.5, Vcf::kInputPull);
+    std::printf ("  1 kHz knob, 2.5 V mean: %.2f Hz (legacy %.2f Hz)\n", hz,
+                 Vcf::effectiveHzFor (1000.0, 2.5, Vcf::kLegacyInputPull));
+    check (std::fabs (hz - 801.8) < 0.5, "a 1 kHz knob with a 2.5 V mean gives 801.8 Hz +-0.5");
+    check (std::fabs (Vcf::effectiveHzFor (1000.0, 2.5, Vcf::kLegacyInputPull) - 515.4) < 0.5, "legacy 0.012 gave 515.4 Hz");
+
+    // The running filter: a +-2.5 V square (mean |x| = 2.5 V) settles to the law.
+    Vcf vcf;
+    vcf.setKnob (Vcf::kKnobCutoff, static_cast<float> (std::log (1000.0 / 20.0) / std::log (900.0)));
+    vcf.setKnob (Vcf::kKnobAmount, 0.0f);
+    vcf.prepare (48000.0);
+    for (int i = 0; i < 48000; ++i)
+    {
+        vcf.portValue[Vcf::kSigIn] = (i / 24) % 2 == 0 ? 2.5f : -2.5f;   // 1 kHz square, mean |x| = 2.5 V
+        vcf.processSample();
+    }
+    std::printf ("  running VCF effective cutoff %.2f Hz\n", vcf.effectiveHz());
+    check (std::fabs (vcf.effectiveHz() - 801.8f) < 1.0f, "the running VCF droops to 801.8 Hz");
+
+    // Rate-independent law (coefficients cached in prepare): same effective cutoff at 96 kHz.
+    Vcf fast;
+    fast.setKnob (Vcf::kKnobCutoff, static_cast<float> (std::log (1000.0 / 20.0) / std::log (900.0)));
+    fast.setKnob (Vcf::kKnobAmount, 0.0f);
+    fast.prepare (96000.0);
+    for (int i = 0; i < 96000; ++i)
+    {
+        fast.portValue[Vcf::kSigIn] = (i / 48) % 2 == 0 ? 2.5f : -2.5f;
+        fast.processSample();
+    }
+    check (std::fabs (fast.effectiveHz() - vcf.effectiveHz()) < 1.0f, "the follower and law are rate-independent");
+    return finish ("testDrivePull");
+}
