@@ -132,7 +132,7 @@ void testTriDefaultFreshAndInit()
 namespace {
 
 // A format-1 session: parameter attributes plus the v1 index blob, built from a rack in the processor's order.
-juce::MemoryBlock makeV1State (const RoninAudioProcessor& layout, const std::vector<Cable>& cables,
+juce::MemoryBlock makeV1State (const RoninAudioProcessor& /*layout*/, const std::vector<Cable>& cables,
                                const std::vector<std::pair<const char*, double>>& params)
 {
     ExtIn ext; OutputModule output; NoiseModule noise; Vcf vcf; Vca1 vca1; Vca2 vca2; Eg1 eg1; MgModule mg; Vco vco;

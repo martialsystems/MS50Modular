@@ -25,6 +25,8 @@ inline constexpr float kTrigLow = 0.5f;       // JCS R3: goes low below this
 inline constexpr float kStrigHeld = 1.0f;     // JCS R3s: held below this
 inline constexpr float kStrigRelease = 1.5f;  // JCS R3s: released above this
 inline constexpr float kStrigRest = 5.0f;     // JCS R3s / R10: unpatched S-trig input rests released
+inline constexpr float kOverRangeVolts = 5.5f;       // JCS R15: |V| above this ...
+inline constexpr double kOverRangeSeconds = 0.010;   // ... for longer than this lights the over-range flag
 
 constexpr float gateVolts (bool high) noexcept { return high ? kGateHigh : kGateLow; }
 

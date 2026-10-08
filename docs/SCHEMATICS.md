@@ -570,4 +570,6 @@ Cable colour (JCS R14): by default (SETUP: BY ROLE) a cable takes the role colou
 
 Tabs (RONIN_Redesign §4.0): the panel art is unchanged and is the MAIN tab. A 36-design-px strip above it holds MAIN · VOICE · ENV · PATCH · SETUP; a non-MAIN tab replaces the face at the same size. The editor is 1280 x 480 by default (art 1280 x 451 + 29 px strip), aspect 1600:600, 960 to 2560 wide, SETUP scale 75 / 100 / 125 / 150 / 200 %. MAIN adds only transient overlays: knob read-outs in real units on hover and drag, right-click on a knob to type a value, jack hover with role, live volts and far end, a role-coloured hover ring, and the MIX inverting-sum note.
 
+Over-range (JCS R15): the graph flags a port once |V| > 5.5 V has lasted more than 10 ms (`PatchGraph::portOverRange`, held 100 ms for the UI). The front panel gets no LED; the flag shows as OVER in the jack hover text and as the red lamp in the PATCH jack monitor.
+
 Column knobs turn. A turn does not drive a module that is not in the graph. The top MIX control is Output mix. Output level stays 1. EXT IN is the column immediately left of OUTPUT.

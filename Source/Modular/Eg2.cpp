@@ -4,6 +4,7 @@
 #include "EgLaw.h"
 
 #include <cmath>
+#include <functional>
 
 namespace {
 
@@ -70,7 +71,7 @@ void Eg2::setKnob (int knob, float zeroToOne)
     else if (knob == kKnobAttack || knob == kKnobRelease)
     {
         float& slot = knob == kKnobAttack ? attack01_ : release01_;
-        if (slot == value)
+        if (std::equal_to<float>{} (slot, value))   // exact: change detection only
             return;
         slot = value;
         updateCoefficients();

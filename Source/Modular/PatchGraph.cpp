@@ -2,6 +2,7 @@
 
 #include "PatchGraph.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -245,6 +246,15 @@ void PatchGraph::disconnect (int sourceModule, int sourcePort, int destModule, i
 void PatchGraph::prepare (double sampleRate)
 {
     preparedRate_ = sampleRate;
+    overNeed_ = std::max (1, static_cast<int> (std::lround (jcs::kOverRangeSeconds * sampleRate)));
+    overHoldSamples_ = std::max (1, static_cast<int> (std::lround (0.1 * sampleRate)));
+    for (int m = 0; m < kMaxModules; ++m)
+        for (int p = 0; p < kMaxPorts; ++p)
+        {
+            overRun_[m][p] = 0;
+            overHold_[m][p] = 0;
+            overFlag_[m][p].store (false, std::memory_order_relaxed);
+        }
     for (int i = 0; i < moduleCount_; ++i)
     {
         modules_[i]->sampleRate = sampleRate;
@@ -516,6 +526,40 @@ void PatchGraph::process()
         const Cable& cable = snapshot.cables[i];
         snapshot.held[i] = modules_[cable.sourceModule]->portValue[cable.sourcePort];
     }
+
+    // JCS R15: over-range when |V| > 5.5 V for more than 10 ms. No allocation, no lock.
+    for (int m = 0; m < moduleCount_; ++m)
+    {
+        const Module* module = modules_[m];
+        const int ports = std::min (module->numPorts(), static_cast<int> (kMaxPorts));
+        for (int p = 0; p < ports; ++p)
+        {
+            const float v = module->portValue[p];
+            if (std::fabs (v) > jcs::kOverRangeVolts)
+            {
+                if (overRun_[m][p] < overNeed_)
+                    ++overRun_[m][p];
+                if (overRun_[m][p] >= overNeed_)
+                    overHold_[m][p] = overHoldSamples_;
+            }
+            else
+            {
+                overRun_[m][p] = 0;
+                if (overHold_[m][p] > 0)
+                    --overHold_[m][p];
+            }
+            const bool lit = overHold_[m][p] > 0;
+            if (overFlag_[m][p].load (std::memory_order_relaxed) != lit)
+                overFlag_[m][p].store (lit, std::memory_order_relaxed);
+        }
+    }
+}
+
+bool PatchGraph::portOverRange (int module, int port) const noexcept
+{
+    if (module < 0 || module >= kMaxModules || port < 0 || port >= kMaxPorts)
+        return false;
+    return overFlag_[module][port].load (std::memory_order_relaxed);
 }
 
 int PatchGraph::getState (void* dest, int capacity) const

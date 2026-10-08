@@ -605,6 +605,7 @@ int testHzvJackRoleLin();
 int testExtInGateHysteresis();
 int testKnobUnits();
 int testKnobTypeValue();
+int testGraphOverRangeR15();
 
 int main()
 {
@@ -739,5 +740,6 @@ int main()
     failed += testExtInGateHysteresis();
     failed += testKnobUnits();
     failed += testKnobTypeValue();
+    failed += testGraphOverRangeR15();
     return failed == 0 ? 0 : 1;
 }

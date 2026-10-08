@@ -40,6 +40,9 @@ public:
 
     // Live jack voltage for the meter. Not used by process().
     float portVolts (int module, int port) const noexcept;
+    // JCS R15: true once |V| > 5.5 V has lasted more than 10 ms on that port, held for 100 ms after it ends so a
+    // 20 Hz UI cannot miss it. Written by process() (relaxed), read by the UI.
+    bool portOverRange (int module, int port) const noexcept;
 
     // Copies the published snapshot. The caller supplies storage. No allocation.
     int copyPublishedCables (Cable* dest, int capacity) const;
@@ -106,4 +109,10 @@ private:
     std::atomic<int> published_ { 0 };
     double preparedRate_ = 0.0;
     const char* stateError_ = "";
+    // JCS R15 tracking (audio thread writes, UI reads relaxed). Counts in graph samples.
+    int overRun_[kMaxModules][kMaxPorts] {};
+    int overHold_[kMaxModules][kMaxPorts] {};
+    std::atomic<bool> overFlag_[kMaxModules][kMaxPorts] {};
+    int overNeed_ = 480;
+    int overHoldSamples_ = 4800;
 };

@@ -188,7 +188,7 @@ New tests in `RoninTests` (the numbers come from `jidai-audit/verify/verify_roni
 | 9 integrator | `testIntegratorDoubleFlushCached` |
 | 10 Schmitt | `testSchmittInputs` (noisy ramp: 2 edges, was 176) |
 | 11 DelayTrig | `testEg2LabelsAndDelayTrig` (5 V) |
-| 12 graph | `testGraphFeedbackOneSampleNoDoubleRun`, `testGraphStrigScopeAndLegacyInvert`, `testGraphTypedRestNoLatch` |
+| 12 graph | `testGraphFeedbackOneSampleNoDoubleRun`, `testGraphStrigScopeAndLegacyInvert`, `testGraphTypedRestNoLatch`, `testGraphOverRangeR15` (JCS R15) |
 | 13 / 13b VCF | `testDrivePull` (801.8 Hz at a 2.5 V mean, legacy 515.4 Hz) |
 | 13c roles | `testHzvJackRoleLin` |
 | 14 EXT IN | `testExtInGateHysteresis` (1 open, was 79) |

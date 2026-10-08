@@ -201,3 +201,31 @@ int testGraphTypedRestNoLatch()
     check (! eg.inputConnected[Eg1::kTrig], "inputConnected clears");
     return finish ("testGraphTypedRestNoLatch");
 }
+
+// JCS R15: a port is over range once |V| > 5.5 V has lasted more than 10 ms; 5.5 V itself is not over range.
+int testGraphOverRangeR15()
+{
+    PatchGraph graph;
+    CountingModule src (6.0f);   // Out = 0 V rest + 6 V
+    CountingModule safe (5.5f);
+    const int is = graph.addModule (src);
+    const int iz = graph.addModule (safe);
+    graph.prepare (48000.0);
+    for (int i = 0; i < 479; ++i)
+        graph.process();
+    check (! graph.portOverRange (is, 1), "under 10 ms of 6 V is not yet over range");
+    for (int i = 0; i < 2; ++i)
+        graph.process();
+    check (graph.portOverRange (is, 1), "6 V for 10 ms lights the flag");
+    check (! graph.portOverRange (iz, 1), "exactly 5.5 V is in range");
+    check (! graph.portOverRange (is, 0), "the 0 V input stays dark");
+    check (! graph.portOverRange (99, 0) && ! graph.portOverRange (is, 99), "bad ports read false");
+    graph.prepare (96000.0);
+    for (int i = 0; i < 900; ++i)
+        graph.process();
+    check (! graph.portOverRange (is, 1), "the 10 ms window follows the sample rate");
+    for (int i = 0; i < 100; ++i)
+        graph.process();
+    check (graph.portOverRange (is, 1), "960 samples at 96 kHz is 10 ms");
+    return finish ("testGraphOverRangeR15");
+}

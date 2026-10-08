@@ -603,11 +603,11 @@ void PatchPage::paintPage (juce::Graphics& g)
         const float vTo = processor.jackVolts (c.destModule, c.destPort);
         const PortDesc toDesc = processor.portDesc (c.destModule, c.destPort);
         row (110, jackName (processor, c.sourceModule, c.sourcePort), cableRole (processor, c),
-             juce::String (vFrom, 2) + " V", std::fabs (vFrom) > 5.5f);
+             juce::String (vFrom, 2) + " V", processor.jackOverRange (c.sourceModule, c.sourcePort));
         juce::String toValue = juce::String (vTo, 2) + " V";
         if (toDesc.strigInput)
             toValue += vTo < 1.0f ? " held" : " rel";
-        row (170, jackName (processor, c.destModule, c.destPort), portRole (toDesc), toValue, std::fabs (vTo) > 5.5f);
+        row (170, jackName (processor, c.destModule, c.destPort), portRole (toDesc), toValue, processor.jackOverRange (c.destModule, c.destPort));
     }
     else
     {
@@ -617,7 +617,7 @@ void PatchPage::paintPage (juce::Graphics& g)
     const juce::String db = std::fabs (outL) > 1.0e-6f ? juce::String (20.0 * std::log10 (std::fabs (outL)), 1) + " dBFS"
                                                        : juce::String ("-inf dBFS");
     row (230, "OUTPUT:L (dry in)", jcs::Role::Audio, db, std::fabs (outL) > 1.0f);
-    text (g, { 1160, 486, 380, 30 }, "red lamp: |V| > 5.5 V (JCS R15)", 9.5f, kDim);
+    text (g, { 1160, 486, 380, 30 }, "red lamp: |V| > 5.5 V for over 10 ms (JCS R15)", 9.5f, kDim);
 }
 
 void PatchPage::showMenu (int index)

@@ -3,6 +3,7 @@
 #include "Integrator.h"
 
 #include <cmath>
+#include <functional>
 
 namespace {
 
@@ -57,7 +58,7 @@ void Integrator::setKnob (int knob, float zeroToOne)
     if (knob == kKnobTime)
     {
         const float value = clamp01 (zeroToOne);
-        if (value != time01_)
+        if (! std::equal_to<float>{} (value, time01_))   // exact: change detection only
         {
             time01_ = value;
             updateCoefficient();

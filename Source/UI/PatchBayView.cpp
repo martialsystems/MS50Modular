@@ -1940,7 +1940,7 @@ juce::String PatchBayView::jackHoverText (int jack) const
         const float volts = audioProcessor.jackVolts (module, port);
         line << juce::String::fromUTF8 ("  ") << juce::String::fromUTF8 (role.glyph) << " " << role.name
              << (rec.dir == 0 ? " in" : " out") << "  " << (volts >= 0.0f ? "+" : "") << juce::String (volts, 2) << " V";
-        if (std::fabs (volts) > 5.5f)   // JCS R15
+        if (audioProcessor.jackOverRange (module, port))   // JCS R15
             line << " OVER";
     }
     juce::StringArray far;

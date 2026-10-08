@@ -114,6 +114,8 @@ public:
     const Eg1& eg1Module() const noexcept { return eg1; }
     const Eg2& eg2Module() const noexcept { return eg2; }
     float jackVolts (int module, int port) const noexcept { return graph.portVolts (module, port); }
+    // JCS R15: |V| > 5.5 V for more than 10 ms (held 100 ms for the UI).
+    bool jackOverRange (int module, int port) const noexcept { return graph.portOverRange (module, port); }
     const PortDesc portDesc (int module, int port) const;
     float cpuPercent() const { return static_cast<float> (loadMeasurer_.getLoadAsPercentage()); }
 

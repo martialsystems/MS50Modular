@@ -4,6 +4,7 @@
 #include "EgLaw.h"
 
 #include <cmath>
+#include <functional>
 
 Eg1::Eg1()
 {
@@ -71,7 +72,7 @@ void Eg1::setKnob (int knob, float zeroToOne)
         slot = &sustain01_;
     else if (knob == kKnobRelease)
         slot = &release01_;
-    if (slot == nullptr || *slot == value)
+    if (slot == nullptr || std::equal_to<float>{} (*slot, value))   // exact: change detection only
         return;
     *slot = value;
     // Coefficients change only when a knob moves (the processor pushes knobs once per block).
