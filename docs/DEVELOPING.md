@@ -14,11 +14,13 @@ Source/
   PluginProcessor.h/.cpp
   PluginEditor.h/.cpp
   Modular/                graph and modules, no JUCE types in process()
-    Jcs.h                 JIDAI Cross-unit Signal rules (R2/R3/R3s/R10/R14/R15), local copy: shared-header swap point
-    PatchState.h/.cpp     format-2 jack ids (SECTION:LABEL) and the format-1 migration helpers (M-R1..M-R5)
-    Smoothing.h, EgLaw.h, Halfband.h   knob smoothing, EG real-time law, HQ 2x halfband
+    Jcs.h                 adapter: `#include <jidai/CableStandard.h>` + `namespace jcs = jidai::jcs` (JCS v1.1 rules)
+    PatchState.h/.cpp     format-2 jack ids (SECTION:LABEL, shared parser) and the format-1 migration (M-R1..M-R5)
+    Smoothing.h, EgLaw.h  knob smoothing, EG real-time law
+    HqPair.h              HQ 2x: one 2fs sub-sample per statement, earlier first, into the shared halfband
   UI/                     panel patch bay (MAIN), tab strip and VOICE / ENV / PATCH / SETUP pages, real-unit read-outs
   Tests/                  RoninTests (JUCE-free) and ProcessorTests.cpp (RoninProcessorTests, needs JUCE)
+third_party/jidai-common/ vendored shared JCS + DSP headers (commit in VENDOR.md; no local edits)
 panel/                    layout, SVG, geometry emitter
 tools/PanelProbe.cpp      standalone window check
 tools/vst3_load_check.cpp loads a built bundle and processes a dry block
@@ -52,7 +54,8 @@ FL Studio on macOS does not open the Debug bundle. After a VST3 change, quit FL 
 * `process()` and `processSample()` do not allocate, lock, or log.
 * Inputs sum. A second cable into an input stays in the graph. Stack order, cable color, and cable shape do not change the sound. The cable rule is in `docs/METHODOLOGY.md`.
 * The MAIN tab is `panel/assets/panel.svg`, unchanged (RONIN_Redesign §4.0). Do not add, move or resize anything on the face; new controls go on a tab. Only transient overlays (hover read-outs, right-click boxes and menus) and cable colours may draw over it. Run the pixel check in `docs/TESTPLAN.md` after touching `PatchBayView`.
-* Cross-unit signal rules come from `Source/Modular/Jcs.h` (`jcs::`). Do not hard-code a threshold, gate level or role colour elsewhere.
+* Cross-unit signal rules come from the vendored jidai-common through `Source/Modular/Jcs.h` (`jcs::`). Do not hard-code a threshold, gate level or role colour elsewhere, and do not edit `third_party/jidai-common/`: update it from upstream (see its VENDOR.md).
+* Never pass two stateful calls as arguments of one call (`f (a.process(), a.process())`): C++ leaves the order unspecified and g++ evaluates right to left. One sub-sample per statement (`testHqSubSampleOrder`).
 * Knob defaults live in one table, `Source/Modular/PanelDefaults.h`. A test checks that FaceKnobs, `panel/assets/layout.json` and the INIT program agree.
 * Do not commit DAW projects, samples, `.env` files, or schematic scans.
 * UI work that changes a control or a cable must be clicked through in a real plugin host or a standalone window (the panel probe counts) before it is called done. Say which host.

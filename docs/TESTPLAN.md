@@ -182,7 +182,7 @@ New tests in `RoninTests` (the numbers come from `jidai-audit/verify/verify_roni
 |---|---|
 | 1-3 EG | `testEgNoStallInFloat`, `testEgLabelsAreRealTime`, `testEgKnobLawAndMigration`, `testEgSnapAndSustainSlew`, `testEgTrigHysteresis` |
 | 4-5 VCO | `testTriDefaultIsTriangle` (H3 -19.1, H5 -28.0, H7 -33.9 dB, ±4.94 V, A7 alias -52.8 dB), `testParabolaSelectableModule`, `testSawPulsePolyBlepKept` (-36 / -29 dB), `testFootageSwitchesAtWrap` |
-| 6 HQ | `testHalfbandSpec` (93 taps, 23 samples) |
+| 6 HQ | `testHalfbandSpec` (shared 93-tap halfband, 23 samples), `testHqSubSampleOrder` (earlier sub-sample first; helper equals a sequenced reference, a swap is detected), `testHqLatencyIsTwentyThree` (getLatencySamples 23) |
 | 7 MG | `testMgPolyBlep` (200 Hz pulse alias -45.9 dB, was -25.8) |
 | 8 smoothing | `testKnobSmoothing` |
 | 9 integrator | `testIntegratorDoubleFlushCached` |
