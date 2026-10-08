@@ -45,6 +45,26 @@ set(RONIN_PLUGIN_SOURCES
   Source/UI/TabPages.cpp
   Source/UI/PatchBayView.cpp)
 
+# Compiler command-line family. clang-cl reports CXX_COMPILER_ID Clang but takes MSVC-style options.
+if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+  set(RONIN_MSVC_FRONTEND ON)
+else()
+  set(RONIN_MSVC_FRONTEND OFF)
+endif()
+set(RONIN_GNU_CLI "$<AND:$<CXX_COMPILER_ID:GNU,Clang,AppleClang>,$<NOT:$<BOOL:${RONIN_MSVC_FRONTEND}>>>")
+set(RONIN_CLANG_CL "$<AND:$<CXX_COMPILER_ID:Clang>,$<BOOL:${RONIN_MSVC_FRONTEND}>>")
+
+# Same numbers on every platform: no contraction of a*b+c into FMA (Apple arm64 clang and GCC contract by default),
+# as the JIDAI rack compiles RONIN_ENGINE_SOURCES. Linked into every target that compiles the engine (the plugin, the
+# probe and both test programs) so the test hashes are the shipped arithmetic. It applies to the whole target,
+# JUCE module sources included (harmless; they do not touch the audio path). Target options come after
+# CMAKE_CXX_FLAGS on the command line, so a user's -ffp-contract=fast there is overridden.
+add_library(RoninFloatFlags INTERFACE)
+target_compile_options(RoninFloatFlags INTERFACE
+  $<${RONIN_GNU_CLI}:-ffp-contract=off>
+  $<${RONIN_CLANG_CL}:/clang:-ffp-contract=off>
+  $<$<CXX_COMPILER_ID:MSVC>:/fp:precise>)
+
 juce_add_plugin(Ronin
   COMPANY_NAME "Martial Systems"
   BUNDLE_ID com.martialsystems.ronin
@@ -67,7 +87,7 @@ juce_add_binary_data(RoninPanelAssets
 target_sources(Ronin PRIVATE ${RONIN_PLUGIN_SOURCES} ${RONIN_ENGINE_SOURCES})
 
 target_include_directories(Ronin PRIVATE Source)
-target_link_libraries(Ronin PRIVATE jidai::common)
+target_link_libraries(Ronin PRIVATE jidai::common RoninFloatFlags)
 
 target_compile_definitions(Ronin PUBLIC
   JUCE_WEB_BROWSER=0
@@ -117,7 +137,7 @@ juce_add_gui_app(RoninPanelProbe PRODUCT_NAME "RoninPanelProbe")
 target_sources(RoninPanelProbe PRIVATE tools/PanelProbe.cpp ${RONIN_PLUGIN_SOURCES} ${RONIN_ENGINE_SOURCES})
 
 target_include_directories(RoninPanelProbe PRIVATE Source)
-target_link_libraries(RoninPanelProbe PRIVATE jidai::common)
+target_link_libraries(RoninPanelProbe PRIVATE jidai::common RoninFloatFlags)
 
 target_compile_definitions(RoninPanelProbe PRIVATE
   JUCE_WEB_BROWSER=0
@@ -130,7 +150,7 @@ target_link_libraries(RoninPanelProbe PRIVATE
   juce::juce_recommended_warning_flags)
 
 target_include_directories(RoninTests PRIVATE Source)
-target_link_libraries(RoninTests PRIVATE jidai::common)
+target_link_libraries(RoninTests PRIVATE jidai::common RoninFloatFlags)
 
 target_compile_features(RoninTests PRIVATE cxx_std_20)
 
@@ -139,7 +159,10 @@ target_compile_definitions(RoninTests PRIVATE
   RONIN_PROCESSOR_SOURCE="${CMAKE_SOURCE_DIR}/Source/PluginProcessor.cpp"
   RONIN_PATCH_BAY_VIEW_SOURCE="${CMAKE_SOURCE_DIR}/Source/UI/PatchBayView.cpp")
 
-target_compile_options(RoninTests PRIVATE -Wall -Wextra -Wpedantic)
+# GCC, Clang and AppleClang only (clang-cl reads -Wall as -Weverything); /W4 for MSVC and clang-cl.
+target_compile_options(RoninTests PRIVATE
+  "$<${RONIN_GNU_CLI}:-Wall;-Wextra;-Wpedantic>"
+  "$<$<OR:$<CXX_COMPILER_ID:MSVC>,${RONIN_CLANG_CL}>:/W4>")
 
 # Processor-level tests (JUCE): state v2, migration, TRI SHAPE by origin, HQ latency. Run ./build/RoninProcessorTests_artefacts/Release/RoninProcessorTests
 juce_add_console_app(RoninProcessorTests PRODUCT_NAME "RoninProcessorTests")
@@ -147,7 +170,7 @@ juce_add_console_app(RoninProcessorTests PRODUCT_NAME "RoninProcessorTests")
 target_sources(RoninProcessorTests PRIVATE Source/Tests/ProcessorTests.cpp ${RONIN_PLUGIN_SOURCES} ${RONIN_ENGINE_SOURCES})
 
 target_include_directories(RoninProcessorTests PRIVATE Source)
-target_link_libraries(RoninProcessorTests PRIVATE jidai::common)
+target_link_libraries(RoninProcessorTests PRIVATE jidai::common RoninFloatFlags)
 
 target_compile_definitions(RoninProcessorTests PRIVATE
   JUCE_WEB_BROWSER=0
