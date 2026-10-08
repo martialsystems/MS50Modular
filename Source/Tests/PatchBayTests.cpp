@@ -42,7 +42,8 @@ bool sameCable (const Cable& a, const Cable& b)
 int testPanelStackRule()
 {
     check (kPanelJackCount == 57, "panel jack count");
-    check (sizeof (Cable) == sizeof (int) * 4, "Cable stays four ids");
+    // Cable carries the four ids plus the state-v2 fields (legacyInvert, colour override). Neither changes the sum.
+    check (Cable {}.legacyInvert == false && Cable {}.colour == 0u, "a new Cable is not legacy and colours by role");
 
     ExtIn ext;
     OutputModule output;

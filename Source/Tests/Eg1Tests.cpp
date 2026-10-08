@@ -259,7 +259,7 @@ int testEg1PromotedGate()
             idle = false;
     }
     check (std::fabs (eg.portValue[Eg1::kTrig] - 5.0f) < 1.0e-4f, "a released gate promotes to +5 V");
-    check (std::fabs (audio.portValue[0] - 5.0f) < 1.0e-4f, "a released gate promotes into audio");
+    check (std::fabs (audio.portValue[0]) < 1.0e-4f, "JCS R3s: a released gate reaches audio raw (0 V)");
     check (std::fabs (gateIn.portValue[0]) < 1.0e-4f, "gate to gate stays raw");
     check (idle, "a released gate leaves the envelope idle");
 
@@ -267,7 +267,7 @@ int testEg1PromotedGate()
     for (int i = 0; i < static_cast<int> (0.2 * kRate); ++i)
         graph.process();
     check (std::fabs (eg.portValue[Eg1::kTrig]) < 1.0e-4f, "a held gate promotes to 0 V");
-    check (std::fabs (audio.portValue[0]) < 1.0e-4f, "a held gate promotes into audio as 0 V");
+    check (std::fabs (audio.portValue[0] - 1.0f) < 1.0e-4f, "JCS R3s: a held gate reaches audio raw");
     check (std::fabs (gateIn.portValue[0] - 1.0f) < 1.0e-4f, "a held gate stays 1 on a gate input");
     check (eg.portValue[Eg1::kOutA] > 2.0f, "a held gate opens the envelope");
     return finish ("testEg1PromotedGate");

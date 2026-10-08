@@ -154,12 +154,15 @@ int testFeedbackIsOneSample()
     check (stacked.connect (iLeft, 1, iRight, 0), "left into right");
     check (stacked.connect (iRight, 1, iLeft, 0), "older right into left");
     check (stacked.connect (iRight, 1, iLeft, 0), "newer right into left");
-    check (! stacked.cableIsDelayed (2), "older feedback cable is zero-delay");
+    // JCS R9: every feedback cable is delayed one sample, the older one too.
+    check (stacked.cableIsDelayed (2), "older feedback cable is delayed");
     check (stacked.cableIsDelayed (3), "newest feedback cable is delayed");
-    check (stacked.delayedCableCount() == 1, "stacked cycle delays one cable");
+    check (stacked.delayedCableCount() == 2, "stacked cycle delays both cables");
     stacked.prepare (48000.0);
     stacked.process();
-    check (left.portValue[1] == 2.0f, "older feedback cable contributes this sample");
+    check (left.portValue[1] == 1.0f, "first sample is the impulse alone");
+    stacked.process();
+    check (left.portValue[1] == 2.0f, "both feedback cables arrive one sample later");
 
     PatchGraph factory;
     ExtIn ext;

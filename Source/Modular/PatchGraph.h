@@ -44,8 +44,11 @@ public:
     // Copies the published snapshot. The caller supplies storage. No allocation.
     int copyPublishedCables (Cable* dest, int capacity) const;
 
-    // The newest cable that closes a cycle. Other cables stay zero-delay.
+    // JCS R9: every cable that closes a cycle (walking oldest to newest) is delayed one sample.
     int delayedCableCount() const;
+
+    // The volts one cable adds to its destination (JCS R3s, M3). Shared with the UI's jack monitor.
+    static float cableVolts (float raw, const PortDesc& sourceDesc, const PortDesc& destDesc, bool legacyInvert) noexcept;
     bool cableIsDelayed (int index) const;
 
     static constexpr int kStateVersion = 1;
@@ -85,7 +88,7 @@ private:
     void publish();
     void fillOrder (Snapshot& snapshot) const;
     void clearModuleInputs (int moduleIndex, const bool patched[kMaxModules][kMaxPorts]) const;
-    void contributeCables (int moduleIndex, const Snapshot& snapshot, bool includeZeroDelayFeedback) const;
+    void contributeCables (int moduleIndex, const Snapshot& snapshot) const;
 
     Module* modules_[kMaxModules] {};
     int moduleCount_ = 0;

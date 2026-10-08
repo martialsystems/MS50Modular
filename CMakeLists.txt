@@ -95,6 +95,7 @@ add_executable(RoninTests
   Source/Tests/EgRedesignTests.cpp
   Source/Tests/VcoRedesignTests.cpp
   Source/Tests/DspRedesignTests.cpp
+  Source/Tests/GraphRedesignTests.cpp
   Source/Modular/Module.cpp
   Source/Modular/PatchGraph.cpp
   Source/Modular/ExtIn.cpp

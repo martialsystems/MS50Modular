@@ -411,8 +411,8 @@ int testNoAllocInProcess()
     return finish ("testNoAllocInProcess");
 }
 
-// Two loops through B. Each closing cable is the newest when it lands, so the graph delays
-// only the newest (D Out to B In). The older loop keeps its zero-delay timing. Processing allocates nothing.
+// Two loops through B. JCS R9: every cable that closes a loop when it lands (B Out to A In, D Out to B In)
+// is delayed one sample, and no module runs twice. Processing allocates nothing.
 int testTwoLoopsDoNotAllocate()
 {
     PatchGraph graph;
@@ -430,8 +430,9 @@ int testTwoLoopsDoNotAllocate()
     check (graph.connect (ib, 1, id, 0), "B into D");
     check (graph.connect (id, 1, ib, 0), "D back into B closes the second loop");
     check (graph.cableCount() == 5, "five cables");
-    check (graph.delayedCableCount() == 1, "one delayed cable");
-    check (graph.cableIsDelayed (4), "the newest loop cable is the delayed one");
+    check (graph.delayedCableCount() == 2, "two delayed cables, one per loop");
+    check (graph.cableIsDelayed (2) && graph.cableIsDelayed (4), "both loop-closing cables are delayed");
+    check (! graph.cableIsDelayed (0) && ! graph.cableIsDelayed (1) && ! graph.cableIsDelayed (3), "the rest are zero-delay");
     graph.prepare (48000.0);
 
     gAllocations.store (0, std::memory_order_relaxed);
@@ -596,6 +597,9 @@ int testMgPolyBlep();
 int testKnobSmoothing();
 int testIntegratorDoubleFlushCached();
 int testSchmittInputs();
+int testGraphFeedbackOneSampleNoDoubleRun();
+int testGraphStrigScopeAndLegacyInvert();
+int testGraphTypedRestNoLatch();
 
 int main()
 {
@@ -722,5 +726,8 @@ int main()
     failed += testKnobSmoothing();
     failed += testIntegratorDoubleFlushCached();
     failed += testSchmittInputs();
+    failed += testGraphFeedbackOneSampleNoDoubleRun();
+    failed += testGraphStrigScopeAndLegacyInvert();
+    failed += testGraphTypedRestNoLatch();
     return failed == 0 ? 0 : 1;
 }

@@ -9,7 +9,8 @@
 #include <cstddef>
 
 // Visual cables for the panel. The graph stores electrical links only.
-// Color and the order of plugs on a jack are not fields on Cable.
+// The order of plugs on a jack is not a field on Cable. Cable.colour is only the saved per-cable override
+// (JCS R14, state v2); the graph never reads it.
 
 inline constexpr int kPatchBayMaxCables = 64;
 
