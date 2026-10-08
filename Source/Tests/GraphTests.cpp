@@ -594,6 +594,7 @@ int testFootageSwitchesAtWrap();
 int testHalfbandSpec();
 int testMgPolyBlep();
 int testKnobSmoothing();
+int testIntegratorDoubleFlushCached();
 
 int main()
 {
@@ -718,5 +719,6 @@ int main()
     failed += testHalfbandSpec();
     failed += testMgPolyBlep();
     failed += testKnobSmoothing();
+    failed += testIntegratorDoubleFlushCached();
     return failed == 0 ? 0 : 1;
 }

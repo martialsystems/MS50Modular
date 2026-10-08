@@ -24,5 +24,12 @@ public:
 private:
     // Schematic default is 50 ms. The faceplate host value is applied by the processor.
     float time01_;
-    float state_ = 0.0f;
+    // §3.6 (N9): double state, flushed below 1e-15 V; coefficient cached on a knob or rate change.
+    double state_ = 0.0;
+    double coeff_ = 0.0;
+    void updateCoefficient();
+
+public:
+    double coefficient() const noexcept { return coeff_; }
+    double state() const noexcept { return state_; }
 };

@@ -242,3 +242,40 @@ int testKnobSmoothing()
     check (std::fabs (vcf.effectiveHz() - 18000.0f) < 1.0f, "cutoff lands on 18 kHz");
     return finish ("testKnobSmoothing");
 }
+
+// ---- §5.9 integrator (N9) ---------------------------------------------------------------------
+
+#include "Modular/Integrator.h"
+
+int testIntegratorDoubleFlushCached()
+{
+    Integrator in;
+    in.setKnob (Integrator::kKnobTime, 1.0f);   // tau = 2 s, the slowest
+    in.prepare (48000.0);
+    const double expected = -std::expm1 (-1.0 / (2.0 * 48000.0));
+    check (std::fabs (in.coefficient() - expected) < 1.0e-15, "a = -expm1(-1/(tau sr)), cached");
+    in.prepare (96000.0);
+    check (std::fabs (in.coefficient() + std::expm1 (-1.0 / (2.0 * 96000.0))) < 1.0e-15, "re-cached on a rate change");
+    in.prepare (48000.0);
+
+    // A slow integrator tracks a tiny step (a float state with a ~1e-5 coefficient would stall short of it).
+    in.portValue[Integrator::kIn] = 1.0f;
+    for (int i = 0; i < 48000 * 30; ++i)
+        in.processSample();
+    check (std::fabs (in.state() - 1.0) < 1.0e-6, "the slowest setting settles on its input");
+
+    // Decay to 0 never sits subnormal: it is flushed below 1e-15 V and lands exactly on 0.
+    in.setKnob (Integrator::kKnobTime, 0.0f);   // tau = 1 ms
+    in.portValue[Integrator::kIn] = 0.0f;
+    bool subnormal = false;
+    for (int i = 0; i < 48000; ++i)
+    {
+        in.processSample();
+        const double s = in.state();
+        if (s != 0.0 && std::fabs (s) < 1.0e-15)
+            subnormal = true;
+    }
+    check (! subnormal, "no state below 1e-15 V");
+    check (in.state() == 0.0 && in.portValue[Integrator::kOut] == 0.0f, "decay lands exactly on 0");
+    return finish ("testIntegratorDoubleFlushCached");
+}
