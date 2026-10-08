@@ -69,6 +69,10 @@ public:
     bool setCables (const Cable* cables, int count);
 
     bool writePresetKnob (int module, int knob, float value);
+    // Edit one cable's saved fields (message thread). They never change the sum's routing; legacyInvert changes the
+    // conversion of that one cable (PATCH tab "Convert"). False for a bad index.
+    bool setCableColour (int index, std::uint32_t argb);
+    bool setCableLegacyInvert (int index, bool legacy);
     // True when connect() would accept this cable (indices, direction, type, not one jack to itself).
     bool cableIsLegal (const Cable& cable) const;
     const char* stateError() const noexcept { return stateError_; }

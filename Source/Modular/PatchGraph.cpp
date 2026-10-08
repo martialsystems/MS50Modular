@@ -694,6 +694,24 @@ bool PatchGraph::setCables (const Cable* cables, int count)
     return true;
 }
 
+bool PatchGraph::setCableColour (int index, std::uint32_t argb)
+{
+    if (index < 0 || index >= editCableCount_)
+        return false;
+    editCables_[index].colour = argb;
+    publish();
+    return true;
+}
+
+bool PatchGraph::setCableLegacyInvert (int index, bool legacy)
+{
+    if (index < 0 || index >= editCableCount_)
+        return false;
+    editCables_[index].legacyInvert = legacy;
+    publish();
+    return true;
+}
+
 bool PatchGraph::cableIsLegal (const Cable& cable) const
 {
     if (cable.sourceModule == cable.destModule && cable.sourcePort == cable.destPort)

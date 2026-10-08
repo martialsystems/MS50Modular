@@ -7,6 +7,8 @@
 #include "Modular/Eg1.h"
 #include "Modular/Eg2.h"
 #include "Modular/Jcs.h"
+#include "Modular/Vcf.h"
+#include "UI/KnobUnits.h"
 
 #include <cmath>
 #include <cstdint>
@@ -330,4 +332,22 @@ int testEg2LabelsAndDelayTrig()
                "EG 2 attack takes its label time");
     }
     return finish ("testEg2LabelsAndDelayTrig");
+}
+
+// RONIN_Redesign §4.1: MAIN hover / ENV LCD read-outs use the modules' own laws (verify eg_time_labels: 0.5846 ->
+// 0.621 s), and the tuner names C3 at 130.81 Hz (JCS R4).
+int testKnobUnits()
+{
+    check (knobunits::realUnits ("EG 1", "ATTACK", 0.5846f) == "621 ms", "EG 0.5846 reads 621 ms");
+    check (knobunits::realUnits ("EG 1", "ATTACK", 1.0f) == "60.0 s", "EG full scale reads 60.0 s");
+    check (knobunits::realUnits ("EG 1", "ATTACK", 1.0f, true) == "60000 ms", "ms display stays in ms");
+    check (knobunits::realUnits ("EG 1", "SUSTAIN", 1.0f) == "5.00 V", "sustain reads volts");
+    check (knobunits::realUnits ("VCF", "CUTOFF", 0.5846f) == knobunits::hz (Vcf::knobHzFor (0.5846f)),
+           "cutoff read-out is the VCF knob law");
+    check (knobunits::realUnits ("VCO", "FINE", 0.5f) == "+0 c", "fine centre reads +0 c");
+    check (knobunits::noteName (130.8128) == "C3 +0 c", "130.81 Hz is C3");
+    check (knobunits::noteName (440.0) == "A4 +0 c", "440 Hz is A4");
+    check (knobunits::noteName (32.70) == "C1 +0 c", "32.70 Hz is C1");
+    check (knobunits::noteName (0.0) == "--", "no pitch reads --");
+    return finish ("testKnobUnits");
 }

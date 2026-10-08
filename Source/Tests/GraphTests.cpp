@@ -603,6 +603,7 @@ int testGraphTypedRestNoLatch();
 int testDrivePull();
 int testHzvJackRoleLin();
 int testExtInGateHysteresis();
+int testKnobUnits();
 
 int main()
 {
@@ -735,5 +736,6 @@ int main()
     failed += testDrivePull();
     failed += testHzvJackRoleLin();
     failed += testExtInGateHysteresis();
+    failed += testKnobUnits();
     return failed == 0 ? 0 : 1;
 }

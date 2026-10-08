@@ -409,14 +409,35 @@ void RoninAudioProcessor::prepareEngine (double hostRate, bool hq)
     decimatorR_.reset();
 }
 
+const PortDesc RoninAudioProcessor::portDesc (int module, int port) const
+{
+    auto* m = const_cast<PatchGraph&> (graph).moduleAt (module);
+    if (m == nullptr || port < 0 || port >= m->numPorts())
+        return { "", PortType::CV, PortDir::In };
+    return m->port (port);
+}
+
+bool RoninAudioProcessor::setCableColour (int index, std::uint32_t argb)
+{
+    jassert (onMessageThread());
+    return onMessageThread() && graph.setCableColour (index, argb);
+}
+
+bool RoninAudioProcessor::setCableLegacyInvert (int index, bool legacy)
+{
+    jassert (onMessageThread());
+    return onMessageThread() && graph.setCableLegacyInvert (index, legacy);
+}
+
 void RoninAudioProcessor::handleAsyncUpdate()
 {
     setLatencySamples (latencyForHq (hqActive()));
 }
 
-void RoninAudioProcessor::prepareToPlay (double sampleRate, int)
+void RoninAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     const bool hq = hqMode_ != nullptr && hqMode_->get();
+    loadMeasurer_.reset (sampleRate, samplesPerBlock);
     prepareEngine (sampleRate, hq);
     applyHostControls();
     setLatencySamples (latencyForHq (hq));
@@ -452,6 +473,7 @@ void RoninAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
     float* left = buffer.getWritePointer (0);
     float* right = buffer.getWritePointer (1);
 
+    juce::AudioProcessLoadMeasurer::ScopedTimer cpuTimer (loadMeasurer_, numSamples);
     const bool hqWanted = hqMode_ != nullptr && hqMode_->get();
     if (hqWanted != hqActive())
     {
@@ -631,6 +653,9 @@ void RoninAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
     juce::XmlElement xml ("RONIN");
     xml.setAttribute ("format", patchstate::kFormat);
     xml.setAttribute ("unit", patchstate::kUnit);
+    xml.setAttribute ("uiCableColour", cableColourByRole() ? "ROLE" : "MANUAL");
+    xml.setAttribute ("uiEgTime", egTimeInMs() ? "ms" : "s");
+    xml.setAttribute ("uiScale", uiScalePercent());
     for (auto* parameter : getParameters())
     {
         if (auto* ranged = dynamic_cast<juce::RangedAudioParameter*> (parameter))
@@ -715,6 +740,9 @@ void RoninAudioProcessor::loadFormat2 (const juce::XmlElement& xml, int format)
     }
     graph.setCables (legal, legalCount);
     readParameters (xml);
+    setCableColourByRole (xml.getStringAttribute ("uiCableColour", "ROLE") != "MANUAL");
+    setEgTimeInMs (xml.getStringAttribute ("uiEgTime", "s") == "ms");
+    setUiScalePercent (juce::jlimit (75, 200, xml.getIntAttribute ("uiScale", 100)));
 }
 
 // Format 1: an index blob plus parameter attributes. Migrated per RONIN_Redesign §6 and reported.

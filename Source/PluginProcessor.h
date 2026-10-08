@@ -108,6 +108,27 @@ public:
     static int latencyForHq (bool hq) noexcept { return hq ? Halfband::kLatencyBaseSamples : 0; }
     double engineSampleRate() const noexcept;
 
+    // UI read-outs (relaxed reads of audio-thread state; RONIN_Redesign §4.1).
+    const Vco& vcoModule() const noexcept { return vco; }
+    const Vcf& vcfModule() const noexcept { return vcf; }
+    const Eg1& eg1Module() const noexcept { return eg1; }
+    const Eg2& eg2Module() const noexcept { return eg2; }
+    float jackVolts (int module, int port) const noexcept { return graph.portVolts (module, port); }
+    const PortDesc portDesc (int module, int port) const;
+    float cpuPercent() const { return static_cast<float> (loadMeasurer_.getLoadAsPercentage()); }
+
+    // PATCH tab edits (message thread only).
+    bool setCableColour (int index, std::uint32_t argb);
+    bool setCableLegacyInvert (int index, bool legacy);
+
+    // SETUP tab settings, saved with the patch (format 2 attributes uiCableColour / uiEgTime / uiScale).
+    bool cableColourByRole() const noexcept { return cableColourByRole_.load(); }
+    void setCableColourByRole (bool byRole) noexcept { cableColourByRole_.store (byRole); }
+    bool egTimeInMs() const noexcept { return egTimeMs_.load(); }
+    void setEgTimeInMs (bool ms) noexcept { egTimeMs_.store (ms); }
+    int uiScalePercent() const noexcept { return uiScale_.load(); }
+    void setUiScalePercent (int percent) noexcept { uiScale_.store (percent); }
+
     // Output Wet until a jack has been selected. Selecting does not patch.
     Meter& meter() noexcept { return meter_; }
     float meterVolts() const noexcept;
@@ -138,6 +159,10 @@ private:
     Mixer mixer;
     SampleHold sampleHold;
     juce::StringArray loadReport_;
+    juce::AudioProcessLoadMeasurer loadMeasurer_;
+    std::atomic<bool> cableColourByRole_ { true };   // JCS R14 default: BY ROLE
+    std::atomic<bool> egTimeMs_ { false };
+    std::atomic<int> uiScale_ { 100 };
     int loadedFormat_ = patchstate::kFormat;
     void loadFormat1 (const juce::XmlElement& xml);
     void loadFormat2 (const juce::XmlElement& xml, int format);
