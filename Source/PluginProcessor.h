@@ -4,6 +4,7 @@
 
 #include "Modular/Divider.h"
 #include "Modular/FactoryPresets.h"
+#include "Modular/Halfband.h"
 #include "Modular/Eg1.h"
 #include "Modular/Eg2.h"
 #include "Modular/ExtIn.h"
@@ -25,7 +26,8 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
-class RoninAudioProcessor : public juce::AudioProcessor
+class RoninAudioProcessor : public juce::AudioProcessor,
+                            private juce::AsyncUpdater
 {
 public:
     RoninAudioProcessor();
@@ -92,11 +94,22 @@ public:
     void setExtInButtonHeld (bool held);
     bool extInButtonHeld() const noexcept;
 
+    // VOICE tab. TRI SHAPE (M-R2) and HQ 2x (JCS R11, default OFF).
+    juce::AudioParameterChoice* triShapeParameter() noexcept { return vcoTriShape_; }
+    juce::AudioParameterBool* hqParameter() noexcept { return hqMode_; }
+    Vco::TriShape triShape() const noexcept;
+    bool hqActive() const noexcept { return hqActive_.load (std::memory_order_relaxed); }
+    // 0 with HQ off, Halfband::kLatencyBaseSamples (23) with HQ on.
+    static int latencyForHq (bool hq) noexcept { return hq ? Halfband::kLatencyBaseSamples : 0; }
+    double engineSampleRate() const noexcept;
+
     // Output Wet until a jack has been selected. Selecting does not patch.
     Meter& meter() noexcept { return meter_; }
     float meterVolts() const noexcept;
 
 private:
+    void handleAsyncUpdate() override;
+    void prepareEngine (double hostRate, bool hq);
     void addKnobParameter (const FaceKnobBinding& binding);
     void applyHostControls();
     void applyProgramParameters (int index);
@@ -170,6 +183,12 @@ private:
     juce::AudioParameterFloat* extInThreshold_ = nullptr;
     juce::AudioParameterFloat* extInRelease_ = nullptr;
     juce::AudioParameterFloat* dividerRatio_ = nullptr;
+    juce::AudioParameterChoice* vcoTriShape_ = nullptr;
+    juce::AudioParameterBool* hqMode_ = nullptr;
+    std::atomic<bool> hqActive_ { false };
+    double hostRate_ = 48000.0;
+    Halfband::Decimator2x decimatorL_;
+    Halfband::Decimator2x decimatorR_;
     Meter meter_;
     int currentProgram_ = kDefaultFactoryPreset;
     juce::String presetError_;

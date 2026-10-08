@@ -591,6 +591,8 @@ int testTriDefaultIsTriangle();
 int testParabolaSelectableModule();
 int testSawPulsePolyBlepKept();
 int testFootageSwitchesAtWrap();
+int testHalfbandSpec();
+int testMgPolyBlep();
 
 int main()
 {
@@ -712,5 +714,7 @@ int main()
     failed += testParabolaSelectableModule();
     failed += testSawPulsePolyBlepKept();
     failed += testFootageSwitchesAtWrap();
+    failed += testHalfbandSpec();
+    failed += testMgPolyBlep();
     return failed == 0 ? 0 : 1;
 }

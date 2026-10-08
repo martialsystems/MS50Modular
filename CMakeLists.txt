@@ -94,6 +94,7 @@ add_executable(RoninTests
   Source/Tests/FeedbackTests.cpp
   Source/Tests/EgRedesignTests.cpp
   Source/Tests/VcoRedesignTests.cpp
+  Source/Tests/DspRedesignTests.cpp
   Source/Modular/Module.cpp
   Source/Modular/PatchGraph.cpp
   Source/Modular/ExtIn.cpp
@@ -163,3 +164,43 @@ target_compile_definitions(RoninTests PRIVATE
   RONIN_PATCH_BAY_VIEW_SOURCE="${CMAKE_SOURCE_DIR}/Source/UI/PatchBayView.cpp")
 
 target_compile_options(RoninTests PRIVATE -Wall -Wextra -Wpedantic)
+
+# Processor-level tests (JUCE): state v2, migration, TRI SHAPE by origin, HQ latency. Run ./build/RoninProcessorTests_artefacts/Release/RoninProcessorTests
+juce_add_console_app(RoninProcessorTests PRODUCT_NAME "RoninProcessorTests")
+
+target_sources(RoninProcessorTests PRIVATE
+  Source/Tests/ProcessorTests.cpp
+  Source/PluginProcessor.cpp
+  Source/PluginEditor.cpp
+  Source/Modular/Module.cpp
+  Source/Modular/PatchGraph.cpp
+  Source/Modular/ExtIn.cpp
+  Source/Modular/OutputModule.cpp
+  Source/Modular/Noise.cpp
+  Source/Modular/Vcf.cpp
+  Source/Modular/Vca1.cpp
+  Source/Modular/Vca2.cpp
+  Source/Modular/Eg1.cpp
+  Source/Modular/Mg.cpp
+  Source/Modular/Vco.cpp
+  Source/Modular/Eg2.cpp
+  Source/Modular/Ring.cpp
+  Source/Modular/Divider.cpp
+  Source/Modular/Inverter.cpp
+  Source/Modular/Integrator.cpp
+  Source/Modular/Mixer.cpp
+  Source/Modular/SampleHold.cpp
+  Source/UI/PatchBayLogic.cpp
+  Source/UI/PatchBayView.cpp)
+
+target_include_directories(RoninProcessorTests PRIVATE Source)
+
+target_compile_definitions(RoninProcessorTests PRIVATE
+  JUCE_WEB_BROWSER=0
+  JUCE_USE_CURL=0)
+
+target_link_libraries(RoninProcessorTests PRIVATE
+  RoninPanelAssets
+  juce::juce_audio_utils
+  juce::juce_recommended_config_flags
+  juce::juce_recommended_warning_flags)

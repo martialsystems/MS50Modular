@@ -64,6 +64,17 @@ RoninAudioProcessor::RoninAudioProcessor()
     addKnobParameter (faceKnobBinding ("EXT IN", "RELEASE"));
     addKnobParameter (faceKnobBinding ("DIV", "RATIO SWITCH"));
 
+    // VOICE tab settings (RONIN_Redesign §4.1). Not on the front panel.
+    // TRI SHAPE: TRIANGLE for new patches / INIT / fresh instances; PARABOLA (legacy) for user format-1 states (M-R2).
+    vcoTriShape_ = new juce::AudioParameterChoice (juce::ParameterID { "vcoTriShape", 1 }, "VCO Tri Shape",
+                                                   juce::StringArray { "TRIANGLE", "PARABOLA (legacy)" }, 0);
+    addParameter (vcoTriShape_);
+    // HQ 2x (VCO + VCF): DECIDED (user) ships default OFF. 0 latency off, 23 samples on, reported (JCS R11).
+    hqMode_ = new juce::AudioParameterBool (juce::ParameterID { "hqMode", 1 }, "HQ 2x", false,
+                                            juce::AudioParameterBoolAttributes().withStringFromValueFunction (
+                                                [] (bool on, int) { return on ? juce::String ("HQ ON") : juce::String ("OFF"); }));
+    addParameter (hqMode_);
+
     extModuleIndex_ = graph.addModule (extIn);
     outputModuleIndex_ = graph.addModule (output);
     noiseModuleIndex_ = graph.addModule (noise);
@@ -297,6 +308,7 @@ void RoninAudioProcessor::applyHostControls()
     apply (sampleHoldRate_, sampleHold, SampleHold::kKnobRate);
     apply (extInThreshold_, extIn, ExtIn::kKnobThreshold);
     apply (extInRelease_, extIn, ExtIn::kKnobRelease);
+    vco.setTriShape (triShape());
     const float mixKnob = outputMix_ != nullptr ? outputMix_->convertTo0to1 (outputMix_->get()) : 1.0f;
     output.setMix (outputMixAfterSwitch (effectIsOn(), mixKnob));
     if (outputLevel_ != nullptr)
@@ -369,29 +381,45 @@ float RoninAudioProcessor::meterVolts() const noexcept
     return graph.portVolts (module, port);
 }
 
-RoninAudioProcessor::~RoninAudioProcessor() = default;
+RoninAudioProcessor::~RoninAudioProcessor()
+{
+    cancelPendingUpdate();
+}
+
+Vco::TriShape RoninAudioProcessor::triShape() const noexcept
+{
+    return vcoTriShape_ != nullptr && vcoTriShape_->getIndex() == 1 ? Vco::TriShape::Parabola : Vco::TriShape::Triangle;
+}
+
+double RoninAudioProcessor::engineSampleRate() const noexcept
+{
+    return hostRate_ * (hqActive() ? 2.0 : 1.0);
+}
+
+// HQ 2x (RONIN_Redesign §3.2, DESIGN CHOICE): the whole graph runs in one 2fs domain, as SHOGUN v2.2 §3.4 does,
+// so the VCO and VCF (and everything they feed) are oversampled and latencies never stack. Host input enters
+// through a zero-latency sample-and-hold; each host output leaves through the 93-tap half-band decimator.
+// Latency: 0 off, 23 base samples on, reported to the host (JCS R11). Default OFF (decided by the user).
+void RoninAudioProcessor::prepareEngine (double hostRate, bool hq)
+{
+    hostRate_ = hostRate > 0.0 ? hostRate : 48000.0;
+    hqActive_.store (hq, std::memory_order_relaxed);
+    graph.prepare (engineSampleRate());
+    decimatorL_.reset();
+    decimatorR_.reset();
+}
+
+void RoninAudioProcessor::handleAsyncUpdate()
+{
+    setLatencySamples (latencyForHq (hqActive()));
+}
 
 void RoninAudioProcessor::prepareToPlay (double sampleRate, int)
 {
-    graph.prepare (sampleRate);
-    extIn.prepare (sampleRate);
-    output.prepare (sampleRate);
-    noise.prepare (sampleRate);
-    vcf.prepare (sampleRate);
-    vca1.prepare (sampleRate);
-    vca2.prepare (sampleRate);
-    eg1.prepare (sampleRate);
-    mg.prepare (sampleRate);
-    vco.prepare (sampleRate);
-    eg2.prepare (sampleRate);
-    ring.prepare (sampleRate);
-    divider.prepare (sampleRate);
-    inverter.prepare (sampleRate);
-    integrator.prepare (sampleRate);
-    mixer.prepare (sampleRate);
-    sampleHold.prepare (sampleRate);
+    const bool hq = hqMode_ != nullptr && hqMode_->get();
+    prepareEngine (sampleRate, hq);
     applyHostControls();
-    setLatencySamples (0);
+    setLatencySamples (latencyForHq (hq));
 }
 
 void RoninAudioProcessor::releaseResources()
@@ -423,16 +451,38 @@ void RoninAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
 
     float* left = buffer.getWritePointer (0);
     float* right = buffer.getWritePointer (1);
+
+    const bool hqWanted = hqMode_ != nullptr && hqMode_->get();
+    if (hqWanted != hqActive())
+    {
+        // The engine rate changes: every module re-prepares (no allocation). The host hears the new latency
+        // from the message thread.
+        prepareEngine (hostRate_, hqWanted);
+        triggerAsyncUpdate();
+    }
     applyHostControls();
+
+    if (! hqActive())
+    {
+        for (int i = 0; i < numSamples; ++i)
+        {
+            extIn.setHostSample (left[i], right[i]);
+            graph.process();
+            left[i] = output.hostLeft();
+            right[i] = output.hostRight();
+        }
+        return;
+    }
 
     for (int i = 0; i < numSamples; ++i)
     {
-        const float inLeft = left[i];
-        const float inRight = right[i];
-        extIn.setHostSample (inLeft, inRight);
+        extIn.setHostSample (left[i], right[i]);
         graph.process();
-        left[i] = output.hostLeft();
-        right[i] = output.hostRight();
+        const float l0 = output.hostLeft();
+        const float r0 = output.hostRight();
+        graph.process();
+        left[i] = decimatorL_.process (l0, output.hostLeft());
+        right[i] = decimatorR_.process (r0, output.hostRight());
     }
 }
 
@@ -537,9 +587,11 @@ void RoninAudioProcessor::setCurrentProgram (int index)
     currentProgram_ = index;
     applyProgramParameters (index);
     output.setLevel (1.0f);
+    // A new patch starts on the true TRIANGLE (M-R2, decided by the user).
+    if (vcoTriShape_ != nullptr)
+        vcoTriShape_->setValueNotifyingHost (0.0f);
     applyHostControls();
-    const double rate = getSampleRate();
-    graph.prepare (rate > 0.0 ? rate : 48000.0);
+    graph.prepare (engineSampleRate());
 }
 
 const juce::String RoninAudioProcessor::getProgramName (int index)
