@@ -595,6 +595,7 @@ int testHalfbandSpec();
 int testMgPolyBlep();
 int testKnobSmoothing();
 int testIntegratorDoubleFlushCached();
+int testSchmittInputs();
 
 int main()
 {
@@ -720,5 +721,6 @@ int main()
     failed += testMgPolyBlep();
     failed += testKnobSmoothing();
     failed += testIntegratorDoubleFlushCached();
+    failed += testSchmittInputs();
     return failed == 0 ? 0 : 1;
 }

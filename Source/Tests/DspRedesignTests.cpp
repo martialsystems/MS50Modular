@@ -279,3 +279,84 @@ int testIntegratorDoubleFlushCached()
     check (in.state() == 0.0 && in.portValue[Integrator::kOut] == 0.0f, "decay lands exactly on 0");
     return finish ("testIntegratorDoubleFlushCached");
 }
+
+// ---- §5.10 S&H ext clock and Divider In Schmitt (N10) -----------------------------------------
+
+#include "Modular/Divider.h"
+#include "Modular/SampleHold.h"
+
+#include <random>
+#include <vector>
+
+namespace {
+
+// verify_crossunit.py §5: a 2 Hz sine, 2.5 V + 0.8 V offset, plus 50 mV gaussian noise, 1 s at 48 kHz.
+std::vector<float> noisyRamp()
+{
+    std::mt19937 rng (1);
+    std::normal_distribution<double> noise (0.0, 0.05);
+    std::vector<float> sig (48000);
+    for (size_t i = 0; i < sig.size(); ++i)
+    {
+        double v = std::sin (2.0 * 3.14159265358979323846 * 2.0 * static_cast<double> (i) / 48000.0) * 2.5 + 0.8;
+        v = std::fmax (-5.0, std::fmin (5.0, v));
+        sig[i] = static_cast<float> (v + noise (rng));
+    }
+    return sig;
+}
+
+}
+
+int testSchmittInputs()
+{
+    const auto sig = noisyRamp();
+
+    // S&H: count samples taken (held value changes) on the ext clock.
+    SampleHold sh;
+    sh.prepare (48000.0);
+    sh.inputConnected[SampleHold::kExtClock] = true;
+    int takes = 0;
+    int clockEdges = 0;
+    bool lastClock = false;
+    for (size_t i = 0; i < sig.size(); ++i)
+    {
+        sh.portValue[SampleHold::kIn] = static_cast<float> (i);   // a new value every sample
+        sh.portValue[SampleHold::kExtClock] = sig[i];
+        const float before = sh.portValue[SampleHold::kOut];
+        sh.processSample();
+        if (sh.portValue[SampleHold::kOut] != before)
+            ++takes;
+        const bool clock = sh.portValue[SampleHold::kClockOut] > 2.5f;
+        if (clock && ! lastClock)
+            ++clockEdges;
+        lastClock = clock;
+    }
+    std::printf ("  S&H takes on the noisy ramp: %d (was 176)\n", takes);
+    check (takes == 2, "S&H ext clock: 2 edges on the noisy ramp");
+    check (clockEdges == 2, "S&H clock out follows the Schmitt");
+
+    // Divider: 2 input edges -> Div2 toggles twice.
+    Divider div;
+    div.prepare (48000.0);
+    int toggles = 0;
+    float last = 0.0f;
+    for (float v : sig)
+    {
+        div.portValue[Divider::kIn] = v;
+        div.processSample();
+        if (div.portValue[Divider::kDiv2] != last)
+            ++toggles;
+        last = div.portValue[Divider::kDiv2];
+    }
+    check (toggles == 2, "Divider: 2 edges on the noisy ramp");
+
+    // Thresholds: 1.0 V is not enough, just above is; release below 0.5 V.
+    Divider d;
+    d.prepare (48000.0);
+    auto feed = [&d] (float v) { d.portValue[Divider::kIn] = v; d.processSample(); return d.portValue[Divider::kDiv2]; };
+    check (feed (1.0f) == 0.0f, "1.0 V does not trigger");
+    check (feed (1.01f) == 5.0f, "> 1.0 V triggers, Div2 goes to 5 V");
+    check (feed (0.6f) == 5.0f && feed (1.5f) == 5.0f, "no retrigger above 0.5 V");
+    check (feed (0.49f) == 5.0f && feed (1.5f) == 0.0f, "below 0.5 V re-arms");
+    return finish ("testSchmittInputs");
+}

@@ -82,7 +82,7 @@ int testDividerSquareCounts()
     for (int edge = 0; edge < 100; ++edge)
     {
         clock (divider, 0.0f);
-        clock (divider, 1.0f);
+        clock (divider, 5.0f);   // a JCS 0/5 V gate (§3.7: exactly 1.0 V no longer clocks, > 1.0 V does)
         const float div2 = divider.portValue[Divider::kDiv2];
         const float div4 = divider.portValue[Divider::kDiv4];
         if ((div2 != 0.0f && div2 != 5.0f) || (div4 != 0.0f && div4 != 5.0f))

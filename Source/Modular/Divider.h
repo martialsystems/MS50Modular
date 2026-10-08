@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "Jcs.h"
 #include "Module.h"
 
 // S-18. Clock divider, /2 and /4 only. The panel has no /16 jack.
@@ -20,6 +21,7 @@ public:
 
 private:
     bool schmittHigh_ = false;
+    jcs::Schmitt schmitt_;
     bool div2High_ = false;
     bool div4High_ = false;
 };

@@ -39,10 +39,10 @@ PortDesc SampleHold::port (int index) const
     if (index == kIn)
         return { "In", PortType::Audio, PortDir::In };
     if (index == kExtClock)
-        return { "Ext Clock", PortType::CV, PortDir::In };
+        return { "Ext Clock", PortType::CV, PortDir::In, 0.0f, false, false, PortRole::GateClk };
     if (index == kClockOut)
-        return { "Clock Out", PortType::CV, PortDir::Out };
-    return { "Out", PortType::CV, PortDir::Out };
+        return { "Clock Out", PortType::CV, PortDir::Out, 0.0f, false, false, PortRole::GateClk };
+    return { "Out", PortType::CV, PortDir::Out, 0.0f, false, false, PortRole::Cv };
 }
 
 int SampleHold::numKnobs() const
@@ -73,6 +73,7 @@ void SampleHold::prepare (double rate)
     sampleRate = rate;
     held_ = 0.0f;
     lastExt_ = 0.0f;
+    extClock_.reset();
     phase_ = 0.5;
     clockHigh_ = false;
 }
@@ -85,8 +86,8 @@ void SampleHold::processSample()
     if (inputConnected[kExtClock])
     {
         const float ext = std::isfinite (portValue[kExtClock]) ? portValue[kExtClock] : 0.0f;
-        high = ext >= 1.0f;
-        rising = high && lastExt_ < 1.0f;
+        rising = extClock_.rising (ext);
+        high = extClock_.high;
         lastExt_ = ext;
     }
     else
@@ -98,6 +99,7 @@ void SampleHold::processSample()
         high = phase_ < 0.5;
         rising = high && ! clockHigh_;
         lastExt_ = 0.0f;
+        extClock_.reset();
     }
 
     clockHigh_ = high;
