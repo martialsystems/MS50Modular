@@ -246,12 +246,11 @@ void PatchGraph::disconnect (int sourceModule, int sourcePort, int destModule, i
 void PatchGraph::prepare (double sampleRate)
 {
     preparedRate_ = sampleRate;
-    overNeed_ = std::max (1, static_cast<int> (std::lround (jcs::kOverRangeSeconds * sampleRate)));
     overHoldSamples_ = std::max (1, static_cast<int> (std::lround (0.1 * sampleRate)));
     for (int m = 0; m < kMaxModules; ++m)
         for (int p = 0; p < kMaxPorts; ++p)
         {
-            overRun_[m][p] = 0;
+            overLed_[m][p].prepare (sampleRate);
             overHold_[m][p] = 0;
             overFlag_[m][p].store (false, std::memory_order_relaxed);
         }
@@ -534,20 +533,10 @@ void PatchGraph::process()
         const int ports = std::min (module->numPorts(), static_cast<int> (kMaxPorts));
         for (int p = 0; p < ports; ++p)
         {
-            const float v = module->portValue[p];
-            if (std::fabs (v) > jcs::kOverRangeVolts)
-            {
-                if (overRun_[m][p] < overNeed_)
-                    ++overRun_[m][p];
-                if (overRun_[m][p] >= overNeed_)
-                    overHold_[m][p] = overHoldSamples_;
-            }
-            else
-            {
-                overRun_[m][p] = 0;
-                if (overHold_[m][p] > 0)
-                    --overHold_[m][p];
-            }
+            if (overLed_[m][p].process (module->portValue[p]))
+                overHold_[m][p] = overHoldSamples_;
+            else if (overHold_[m][p] > 0)
+                --overHold_[m][p];
             const bool lit = overHold_[m][p] > 0;
             if (overFlag_[m][p].load (std::memory_order_relaxed) != lit)
                 overFlag_[m][p].store (lit, std::memory_order_relaxed);

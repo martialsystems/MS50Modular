@@ -7,6 +7,8 @@
 
 #include "Modular/EgLaw.h"
 
+#include <jidai/jcs/Pitch.h>
+
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
@@ -108,15 +110,16 @@ inline std::string noteName (double hzValue)
 {
     if (! (hzValue > 0.0))
         return "--";
-    const double midi = 69.0 + 12.0 * std::log2 (hzValue / 440.0);
+    // Shared JCS R4 law and names (jidai-common Pitch.h): MIDI 48 = C3 = 130.8128 Hz.
+    using jidai::jcs::pitch::Law;
+    const double midi = jidai::jcs::pitch::note (Law::VOct, jidai::jcs::pitch::hzToVolts (Law::VOct, hzValue));
     const long nearest = std::lround (midi);
     double cents = std::round ((midi - static_cast<double> (nearest)) * 100.0);
     cents += 0.0;   // -0 + 0 = +0: no "-0 c"
-    static const char* names[12] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
-    const int pc = static_cast<int> (((nearest % 12) + 12) % 12);
-    const long octave = static_cast<long> (std::floor (static_cast<double> (nearest) / 12.0)) - 1;   // MIDI 48 = C3
-    char text[32];
-    std::snprintf (text, sizeof text, "%s%ld %+.0f c", names[pc], octave, cents);
+    char name[16];
+    jidai::jcs::pitch::noteName (static_cast<int> (nearest), name, static_cast<int> (sizeof name));
+    char text[40];
+    std::snprintf (text, sizeof text, "%s %+.0f c", name, cents);
     return text;
 }
 

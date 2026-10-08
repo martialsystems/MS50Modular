@@ -109,10 +109,10 @@ private:
     std::atomic<int> published_ { 0 };
     double preparedRate_ = 0.0;
     const char* stateError_ = "";
-    // JCS R15 tracking (audio thread writes, UI reads relaxed). Counts in graph samples.
-    int overRun_[kMaxModules][kMaxPorts] {};
+    // JCS R15 tracking: the shared jcs::OverRangeLed per port (audio thread), a 100 ms UI hold, and a relaxed
+    // atomic flag the UI reads.
+    jcs::OverRangeLed overLed_[kMaxModules][kMaxPorts] {};
     int overHold_[kMaxModules][kMaxPorts] {};
     std::atomic<bool> overFlag_[kMaxModules][kMaxPorts] {};
-    int overNeed_ = 480;
     int overHoldSamples_ = 4800;
 };

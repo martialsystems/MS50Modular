@@ -29,8 +29,8 @@ static_assert (outputLevelGain (1.0f) == 2.0f, "output level 1 is twice as loud"
 
 class OutputModule : public Module {
 public:
-    static constexpr float kHostToVolts = 5.0f;
-    static constexpr float kVoltsToHost = 0.2f;
+    static constexpr float kHostToVolts = jcs::hostToVolts (1.0f);   // JCS R1: 5 V per host unit
+    static constexpr float kVoltsToHost = jcs::voltsToHost (1.0f);   // JCS R1 / S-01: 0.2
 
     int numPorts() const override;
     PortDesc port (int index) const override;

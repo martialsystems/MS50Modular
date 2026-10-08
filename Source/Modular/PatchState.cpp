@@ -33,23 +33,22 @@ std::string jackId (const RackIndices& rack, int module, int port)
     return {};
 }
 
+const jcs::AliasTable& roninAliases()
+{
+    static const jcs::AliasTable table;   // JCS R6: {old id -> canonical id}; empty, no RONIN jack was renamed
+    return table;
+}
+
 bool jackAddress (const RackIndices& rack, const std::string& rawId, int& module, int& port)
 {
-    std::string id = rawId;
-    // JCS R6 file forms: PREFIX/SECTION:LABEL and PREFIX#N/SECTION:LABEL rebind to this device.
-    const auto slash = id.find ('/');
-    if (slash != std::string::npos)
-    {
-        const std::string prefix = id.substr (0, slash);
-        const std::string device = prefix.substr (0, prefix.find ('#'));
-        if (device == "RONIN" || device == "MS-50")
-            id = id.substr (slash + 1);
-    }
-    const auto colon = id.find (':');
-    if (colon == std::string::npos)
+    // JCS R6 (shared parser): SECTION:LABEL, RONIN/SECTION:LABEL and RONIN#N/SECTION:LABEL bind to this device.
+    // Another device's prefix is not ours. The per-device alias table is applied first (RONIN renames no jacks,
+    // so it is empty). No legacy model-name prefix aliases, as in jidai-common.
+    const auto parsed = jcs::parseJackId (roninAliases().apply (rawId));
+    if (! parsed || (! parsed->prefix.empty() && parsed->prefix != "RONIN"))
         return false;
-    const std::string section = id.substr (0, colon);
-    const std::string label = id.substr (colon + 1);
+    const std::string& section = parsed->section;
+    const std::string& label = parsed->label;
     for (int jack = 0; jack < kPanelJackCount; ++jack)
     {
         if (section == kPanelJacks[jack].section && label == kPanelJacks[jack].label)

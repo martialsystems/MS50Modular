@@ -186,8 +186,9 @@ void Vco::processSample()
     if (inputConnected[kHzPerVolt])
     {
         float volts = portValue[kHzPerVolt];
-        if (volts < 0.05f)
-            volts = 0.05f;
+        constexpr float floorVolts = static_cast<float> (jcs::pitch::kRoninLinFloor);   // JCS R4.2 / S-03: 0.05 V
+        if (volts < floorVolts)
+            volts = floorVolts;
         linear = footage * volts;
     }
 

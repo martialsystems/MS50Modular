@@ -30,6 +30,8 @@ inline constexpr const char* kUnit = "RONIN";
 std::string jackId (const RackIndices& rack, int module, int port);
 // Graph port for a jack id. Accepts the bare form and the "RONIN/" / "RONIN#N/" prefixed forms (JCS R6).
 bool jackAddress (const RackIndices& rack, const std::string& id, int& module, int& port);
+// JCS R6 per-device alias table, applied on load before binding. Empty: no RONIN jack has been renamed.
+const jcs::AliasTable& roninAliases();
 
 // M-R3 (JCS M3): a format-1 cable from a Gate output that is not S-trig into an input that is not an S-trig
 // input (and not a Gate input) gets legacyInvert, so it keeps its old S-15 inverted sound. Returns the count.
