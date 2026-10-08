@@ -45,14 +45,18 @@ float measureHz (MgModule& mg, float fm, int samples)
     int wraps = 0;
     double rise = 0.0;
     int riseCount = 0;
+    bool inWrap = false;
     for (int i = 1; i < samples; ++i)
     {
         step (mg, fm, 0.0f);
         const float saw = mg.portValue[MgModule::kSawUp];
         const float delta = saw - previous;
-        if (delta < -1.0f)
+        // The polyBLEP spreads one wrap over two samples (RONIN_Redesign §3.3): count it once.
+        const bool wrapping = delta < -1.0f;
+        if (wrapping && ! inWrap)
             ++wraps;
-        else
+        inWrap = wrapping;
+        if (! wrapping)
         {
             rise += static_cast<double> (delta);
             ++riseCount;
