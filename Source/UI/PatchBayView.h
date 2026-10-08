@@ -41,6 +41,10 @@ public:
     int knobCount() const noexcept { return kPanelKnobCount; }
     float knobValue (int index) const;
     const juce::String& knobReadout() const noexcept { return knobReadout_; }
+    // MAIN right-click on a knob -> type a value in real units (RONIN_Redesign §4.1). Transient overlay.
+    bool valueEditorOpen() const noexcept { return valueEditor_ != nullptr; }
+    juce::String valueEditorText() const;
+    bool typeKnobValue (int knob, const juce::String& text);
     // The PATCH tab unplugged or edited a cable: redraw the bay from the published graph.
     void reloadCablesFromGraph() { reloadPublishedCables(); repaint(); }
     juce::String hoverTextForJack (int jack) const { return jack >= 0 && jack < kPanelJackCount ? jackHoverText (jack) : juce::String(); }
@@ -87,6 +91,8 @@ private:
     bool jackGraphPort (int jack, int& module, int& port) const;
     juce::String jackHoverText (int jack) const;
     juce::String knobText (int index) const;
+    void openValueEditor (int knob);
+    void closeValueEditor();
     juce::AudioProcessorParameter* parameterForKnob (int index) const;
     void endGesture();
     void syncHostKnobs();
@@ -106,6 +112,8 @@ private:
     RoninAudioProcessor& audioProcessor;
     std::unique_ptr<juce::Drawable> panel_;
     std::unique_ptr<StackMenu> menu_;
+    std::unique_ptr<juce::TextEditor> valueEditor_;
+    int valueKnob_ = -1;
     VisualCable cables_[kPatchBayMaxCables] {};
     Rope ropes_[kPatchBayMaxCables] {};
     juce::Path stroke_;

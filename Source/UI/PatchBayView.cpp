@@ -593,6 +593,7 @@ PatchBayView::PatchBayView (RoninAudioProcessor& processor)
 PatchBayView::~PatchBayView()
 {
     stopTimer();
+    closeValueEditor();
 }
 
 float PatchBayView::panelScale() const
@@ -1478,7 +1479,13 @@ void PatchBayView::paint (juce::Graphics& g)
     if (hoverJack_ >= 0)
     {
         const auto centre = screenPoint (kPanelJacks[hoverJack_].x, kPanelJacks[hoverJack_].y);
-        g.setColour (juce::Colours::white.withAlpha (0.7f));
+        // Transient hover ring in the jack's JCS R14 role colour (RONIN_Redesign §5 item 13c).
+        int ringModule = -1;
+        int ringPort = -1;
+        juce::Colour ring = juce::Colours::white;
+        if (jackGraphPort (hoverJack_, ringModule, ringPort))
+            ring = juce::Colour (jcs::roleArgb (portRole (audioProcessor.portDesc (ringModule, ringPort))));
+        g.setColour (ring.withAlpha (0.8f));
         g.drawEllipse (centre.x - 16.0f * scale, centre.y - 16.0f * scale, 32.0f * scale, 32.0f * scale, 1.5f * scale);
     }
 
@@ -1649,6 +1656,12 @@ void PatchBayView::mouseDown (const juce::MouseEvent& event)
     {
         if (extInButtonAt (design.x, design.y))
             return;
+        const int typedKnob = knobAt (design.x, design.y);
+        if (typedKnob >= 0 && kPanelKnobs[typedKnob].kind != 1 && parameterForKnob (typedKnob) != nullptr)
+        {
+            openValueEditor (typedKnob);
+            return;
+        }
         if (knobAt (design.x, design.y) < 0 && jackAt (design.x, design.y) < 0)
             unplugIndex (cableNear (design.x, design.y));
         return;
@@ -1954,6 +1967,74 @@ juce::String PatchBayView::knobText (int index) const
     if (std::strcmp (knob.section, "MIX") == 0)
         line << juce::String::fromUTF8 ("  (\u2212\u03a3 inverting mixer)");
     return line;
+}
+
+void PatchBayView::openValueEditor (int knob)
+{
+    closeValueEditor();
+    valueKnob_ = knob;
+    valueEditor_ = std::make_unique<juce::TextEditor>();
+    auto& editor = *valueEditor_;
+    const float scale = panelScale();
+    const auto at = designToLocal (kPanelKnobs[knob].cx, kPanelKnobs[knob].cy);
+    const float w = 120.0f * scale;
+    const float h = 24.0f * scale;
+    editor.setBounds (juce::Rectangle<float> (at.x - w * 0.5f, at.y + 20.0f * scale, w, h).toNearestInt());
+    editor.setFont (juce::Font (juce::FontOptions (13.0f * scale)));
+    editor.setJustification (juce::Justification::centred);
+    editor.setColour (juce::TextEditor::backgroundColourId, juce::Colour (0xffb9c39c));
+    editor.setColour (juce::TextEditor::textColourId, juce::Colour (0xff1e2419));
+    editor.setColour (juce::TextEditor::outlineColourId, juce::Colour (0xff0a0a0b));
+    editor.setText (juce::String::fromUTF8 (knobunits::realUnits (kPanelKnobs[knob].section, kPanelKnobs[knob].label,
+                                                                  knobValue_[knob], audioProcessor.egTimeInMs()).c_str()),
+                    false);
+    juce::Component::SafePointer<PatchBayView> safe (this);
+    editor.onReturnKey = [safe]
+    {
+        if (safe == nullptr || safe->valueEditor_ == nullptr)
+            return;
+        if (! safe->typeKnobValue (safe->valueKnob_, safe->valueEditor_->getText()))
+            safe->showStatus ("Type a value such as 1.2 kHz, 250 ms, 2.5 s, +10 c or 40 %.");
+        juce::MessageManager::callAsync ([safe] { if (safe != nullptr) safe->closeValueEditor(); });
+    };
+    auto cancel = [safe] { juce::MessageManager::callAsync ([safe] { if (safe != nullptr) safe->closeValueEditor(); }); };
+    editor.onEscapeKey = cancel;
+    editor.onFocusLost = cancel;
+    addAndMakeVisible (editor);
+    editor.selectAll();
+    if (isShowing())
+        editor.grabKeyboardFocus();
+}
+
+void PatchBayView::closeValueEditor()
+{
+    if (valueEditor_ != nullptr)
+        removeChildComponent (valueEditor_.get());
+    valueEditor_ = nullptr;
+    valueKnob_ = -1;
+}
+
+juce::String PatchBayView::valueEditorText() const
+{
+    return valueEditor_ != nullptr ? valueEditor_->getText() : juce::String();
+}
+
+bool PatchBayView::typeKnobValue (int knob, const juce::String& text)
+{
+    if (knob < 0 || knob >= kPanelKnobCount || kPanelKnobs[knob].kind == 1)
+        return false;
+    auto* parameter = parameterForKnob (knob);
+    double value = 0.0;
+    if (parameter == nullptr
+        || ! knobunits::parseKnob (kPanelKnobs[knob].section, kPanelKnobs[knob].label, text.toStdString(),
+                                   audioProcessor.egTimeInMs(), value))
+        return false;
+    const float v = static_cast<float> (value);
+    parameter->beginChangeGesture();
+    parameter->setValueNotifyingHost (v);
+    parameter->endChangeGesture();
+    setKnobValue (knob, v);
+    return true;
 }
 
 void PatchBayView::setKnobValue (int index, float value)

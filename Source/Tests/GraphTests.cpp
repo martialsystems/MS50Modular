@@ -604,6 +604,7 @@ int testDrivePull();
 int testHzvJackRoleLin();
 int testExtInGateHysteresis();
 int testKnobUnits();
+int testKnobTypeValue();
 
 int main()
 {
@@ -737,5 +738,6 @@ int main()
     failed += testHzvJackRoleLin();
     failed += testExtInGateHysteresis();
     failed += testKnobUnits();
+    failed += testKnobTypeValue();
     return failed == 0 ? 0 : 1;
 }

@@ -7,7 +7,9 @@
 
 #include "Modular/EgLaw.h"
 
+#include <cctype>
 #include <cmath>
+#include <cstdlib>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -69,7 +71,7 @@ inline std::string realUnits (const char* section, const char* label, float knob
         if (is (label, "CUTOFF"))
             return hz (20.0 * std::pow (900.0, v));
         if (is (label, "PEAK"))
-            return fmt ("Q %.1f", 0.5 + 7.5 * v);
+            return fmt ("Q %.2f", 0.5 + 7.5 * v);
         if (is (label, "MOD"))
             return fmt ("%.2f oct / 5 V", 4.0 * v);
     }
@@ -116,6 +118,127 @@ inline std::string noteName (double hzValue)
     char text[32];
     std::snprintf (text, sizeof text, "%s%ld %+.0f c", names[pc], octave, cents);
     return text;
+}
+
+// MAIN right-click -> type a value (RONIN_Redesign §4.1). Accepts what realUnits prints: "1.07 kHz", "621 ms",
+// "2.5 s", "+34 c", "Q 4", "3 V", "58 %", "8'". A bare number takes the display's own unit (Hz, s or ms per
+// alwaysMs, cents, V, %). False when the text does not parse or the knob is the DIV switch.
+inline bool parseKnob (const char* section, const char* label, const std::string& text, bool alwaysMs, double& knob)
+{
+    std::string t;
+    for (char ch : text)
+        if (ch != ' ' && ch != '\t')
+            t += static_cast<char> (std::tolower (static_cast<unsigned char> (ch)));
+    if (t.empty() || is (section, "DIV"))
+        return false;
+    if (t[0] == 'q')
+        t.erase (0, 1);
+    const char* begin = t.c_str();
+    char* end = nullptr;
+    const double number = std::strtod (begin, &end);
+    if (end == begin || ! std::isfinite (number))
+        return false;
+    const std::string unit (end);
+    auto ends = [&unit] (const char* u) { return unit == u; };
+    auto logKnob = [] (double value, double lo, double ratio) {
+        return value > lo ? std::log (value / lo) / std::log (ratio) : 0.0;
+    };
+    auto secondsFrom = [&] (double& s) {
+        if (ends ("ms")) { s = number / 1000.0; return true; }
+        if (ends ("s")) { s = number; return true; }
+        if (unit.empty()) { s = alwaysMs ? number / 1000.0 : number; return true; }
+        return false;
+    };
+    auto hzFrom = [&] (double& h) {
+        if (ends ("khz") || ends ("k")) { h = number * 1000.0; return true; }
+        if (ends ("hz") || unit.empty()) { h = number; return true; }
+        return false;
+    };
+    double k = 0.0;
+    double v = 0.0;
+    bool ok = false;
+    if (is (section, "VCO") && is (label, "RANGE"))
+    {
+        const int feet = static_cast<int> (std::lround (number));
+        const int index = feet == 32 ? 0 : (feet == 16 ? 1 : (feet == 8 ? 2 : (feet == 4 ? 3 : -1)));
+        ok = index >= 0 && (unit.empty() || unit[0] == '\'');
+        k = index / 3.0;
+    }
+    else if (is (section, "VCO") && is (label, "FINE"))
+    {
+        ok = unit.empty() || ends ("c");
+        k = (number / 200.0 + 1.0) * 0.5;
+    }
+    else if (is (section, "VCF") && is (label, "CUTOFF"))
+    {
+        ok = hzFrom (v);
+        k = logKnob (v, 20.0, 900.0);
+    }
+    else if (is (section, "VCF") && is (label, "PEAK"))
+    {
+        ok = unit.empty();
+        k = (number - 0.5) / 7.5;
+    }
+    else if (is (section, "VCF") && is (label, "MOD"))
+    {
+        ok = unit.empty() || unit.rfind ("oct", 0) == 0;
+        k = number / 4.0;
+    }
+    else if (is (section, "VCA 1") && is (label, "LOW CUT"))
+    {
+        ok = hzFrom (v);
+        k = logKnob (v, 10.0, 200.0);
+    }
+    else if (is (section, "MG") && is (label, "RATE"))
+    {
+        ok = hzFrom (v);
+        k = logKnob (v, 0.01, 20000.0);
+    }
+    else if (is (section, "S&H") && is (label, "RATE"))
+    {
+        ok = hzFrom (v);
+        k = logKnob (v, 0.1, 1000.0);
+    }
+    else if ((is (section, "EG 1") || is (section, "EG 2")) && is (label, "SUSTAIN"))
+    {
+        ok = unit.empty() || ends ("v");
+        k = number / EgLaw::kPeak;
+    }
+    else if ((is (section, "EG 1") || is (section, "EG 2")) && (is (label, "HOLD") || is (label, "DELAY")))
+    {
+        ok = secondsFrom (v);
+        k = logKnob (v, 0.001, 10000.0);
+    }
+    else if (is (section, "EG 1") || is (section, "EG 2"))
+    {
+        ok = secondsFrom (v);
+        k = EgLaw::knobForSeconds (v);
+    }
+    else if (is (section, "INT") && is (label, "TIME"))
+    {
+        // INT TIME always displays in ms.
+        ok = ends ("s") ? (v = number, true) : ((ends ("ms") || unit.empty()) ? (v = number / 1000.0, true) : false);
+        k = logKnob (v, 0.001, 2000.0);
+    }
+    else if (is (section, "EXT IN") && is (label, "THRESHOLD"))
+    {
+        ok = unit.empty() || ends ("v");
+        k = logKnob (number, 0.05, 40.0);
+    }
+    else if (is (section, "EXT IN") && is (label, "RELEASE"))
+    {
+        ok = secondsFrom (v);
+        k = logKnob (v, 0.010, 50.0);
+    }
+    else
+    {
+        ok = unit.empty() || ends ("%");
+        k = number / 100.0;
+    }
+    if (! ok || ! std::isfinite (k))
+        return false;
+    knob = k < 0.0 ? 0.0 : (k > 1.0 ? 1.0 : k);
+    return true;
 }
 
 }

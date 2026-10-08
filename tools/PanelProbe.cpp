@@ -980,6 +980,27 @@ private:
         expect (mixText.contains ("inverting mixer"), "MIX hover explains the inverting sum");
         const auto trigText = bay.hoverTextForJack (panelJackIndex ("EG 1", "TRIG"));
         expect (trigText.contains ("S-TRIG"), "EG 1 TRIG reads as an S-trig input");
+
+        // Right-click a knob -> type a value in real units.
+        const int cutoff = panelKnobIndex ("VCF", "CUTOFF");
+        auto* cutoffParam = processor->parameterForPanelKnob ("VCF", "CUTOFF");
+        if (cutoff >= 0 && cutoffParam != nullptr)
+        {
+            gesture (bay, kPanelKnobs[cutoff].cx, kPanelKnobs[cutoff].cy, kPanelKnobs[cutoff].cx, kPanelKnobs[cutoff].cy,
+                     false, true);
+            expect (bay.valueEditorOpen(), "right-click on a knob opens the value box");
+            expect (bay.valueEditorText().endsWith ("Hz"), "the value box shows real units");
+            expect (bay.typeKnobValue (cutoff, "1 kHz"), "typing 1 kHz is accepted");
+            expect (std::fabs (Vcf::knobHzFor (cutoffParam->getValue()) - 1000.0) < 1.0, "1 kHz lands on the knob law");
+            expect (bay.knobReadout().contains ("1.00 kHz"), "the read-out follows the typed value");
+            expect (! bay.typeKnobValue (cutoff, "fast"), "nonsense is refused");
+        }
+        const auto egKnob = panelKnobIndex ("EG 1", "ATTACK");
+        if (egKnob >= 0 && processor->parameterForPanelKnob ("EG 1", "ATTACK") != nullptr)
+        {
+            expect (bay.typeKnobValue (egKnob, "621.5 ms"), "typing an EG time is accepted");
+            expect (bay.knobReadout().contains ("621 ms") || bay.knobReadout().contains ("622 ms"), "EG reads real time");
+        }
         std::printf ("tabs: %s\n", gFails == 0 ? "clicked through" : "failures above");
     }
 

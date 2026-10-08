@@ -351,3 +351,38 @@ int testKnobUnits()
     check (knobunits::noteName (0.0) == "--", "no pitch reads --");
     return finish ("testKnobUnits");
 }
+
+// Right-click -> type value: what the read-out prints parses back to the same knob (display rounding only).
+int testKnobTypeValue()
+{
+    static const char* knobs[][2] = {
+        { "VCO", "FINE" }, { "VCO", "PW" }, { "VCF", "CUTOFF" }, { "VCF", "PEAK" }, { "VCF", "MOD" },
+        { "VCA 1", "LOW CUT" }, { "VCA 1", "INITIAL" }, { "MG", "RATE" }, { "EG 1", "ATTACK" }, { "EG 1", "DECAY" },
+        { "EG 1", "SUSTAIN" }, { "EG 1", "RELEASE" }, { "EG 2", "HOLD" }, { "EG 2", "DELAY" }, { "EG 2", "ATTACK" },
+        { "S&H", "RATE" }, { "INT", "TIME" }, { "EXT IN", "THRESHOLD" }, { "EXT IN", "RELEASE" }, { "MIX", "LEVEL 1" },
+    };
+    for (auto& k : knobs)
+        for (bool ms : { false, true })
+            for (double v : { 0.1, 0.37, 0.5846, 0.9 })
+            {
+                double back = -1.0;
+                const auto shown = knobunits::realUnits (k[0], k[1], static_cast<float> (v), ms);
+                const bool ok = knobunits::parseKnob (k[0], k[1], shown, ms, back);
+                if (! ok || std::fabs (back - v) > 0.006)
+                    std::printf ("    %s %s %.4f '%s' -> %d %.4f\n", k[0], k[1], v, shown.c_str(), ok ? 1 : 0, back);
+                check (ok && std::fabs (back - v) <= 0.006, "read-out parses back to the knob");
+            }
+    double k = -1.0;
+    check (knobunits::parseKnob ("VCO", "RANGE", "8'", false, k) && std::fabs (k - 2.0 / 3.0) < 1e-9, "8' is footage 2");
+    check (knobunits::parseKnob ("EG 1", "ATTACK", "0.6215", false, k) && std::fabs (k - 0.5846) < 0.0005,
+           "bare EG number is seconds in s mode");
+    check (knobunits::parseKnob ("EG 1", "ATTACK", "621.5", true, k) && std::fabs (k - 0.5846) < 0.0005,
+           "bare EG number is ms in ms mode");
+    check (knobunits::parseKnob ("VCF", "CUTOFF", "1k", false, k) && std::fabs (Vcf::knobHzFor (k) - 1000.0) < 0.01,
+           "1k is 1000 Hz");
+    check (knobunits::parseKnob ("VCF", "CUTOFF", "99 kHz", false, k) && k >= 1.0, "out of range clamps");
+    check (! knobunits::parseKnob ("VCF", "CUTOFF", "abc", false, k), "garbage is rejected");
+    check (! knobunits::parseKnob ("VCF", "CUTOFF", "5 ms", false, k), "wrong unit is rejected");
+    check (! knobunits::parseKnob ("DIV", "RATIO SWITCH", "2", false, k), "the switch is not typed");
+    return finish ("testKnobTypeValue");
+}
