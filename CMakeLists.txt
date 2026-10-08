@@ -33,6 +33,7 @@ juce_add_binary_data(RoninPanelAssets
 target_sources(Ronin PRIVATE
   Source/PluginProcessor.cpp
   Source/PluginEditor.cpp
+  Source/UI/TabPages.cpp
   Source/Modular/Module.cpp
   Source/Modular/PatchGraph.cpp
   Source/Modular/PatchState.cpp
@@ -124,6 +125,7 @@ target_sources(RoninPanelProbe PRIVATE
   tools/PanelProbe.cpp
   Source/PluginProcessor.cpp
   Source/PluginEditor.cpp
+  Source/UI/TabPages.cpp
   Source/Modular/Module.cpp
   Source/Modular/PatchGraph.cpp
   Source/Modular/PatchState.cpp
@@ -176,6 +178,7 @@ target_sources(RoninProcessorTests PRIVATE
   Source/Tests/ProcessorTests.cpp
   Source/PluginProcessor.cpp
   Source/PluginEditor.cpp
+  Source/UI/TabPages.cpp
   Source/Modular/Module.cpp
   Source/Modular/PatchGraph.cpp
   Source/Modular/PatchState.cpp

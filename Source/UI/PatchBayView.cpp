@@ -3,19 +3,23 @@
 #include "UI/PatchBayView.h"
 
 #include "Modular/EffectSwitch.h"
+#include "Modular/PatchState.h"
+#include "Modular/Port.h"
 #include "PanelAssets.h"
+#include "UI/KnobUnits.h"
+#include "UI/TabPages.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstring>
-
-namespace {
 
 struct CablePaint {
     juce::Colour base;
     juce::Colour dark;
     juce::Colour light;
 };
+
+namespace {
 
 CablePaint paintFor (int color)
 {
@@ -26,6 +30,12 @@ CablePaint paintFor (int color)
         case 3: return { juce::Colour (0xff33a352), juce::Colour (0xff10521f), juce::Colour (0xff98e6aa) };
         default: return { juce::Colour (0xffd23a30), juce::Colour (0xff6e100c), juce::Colour (0xffff9a8a) };
     }
+}
+
+// JCS R14 role colour or a PATCH-tab override, shaded like the palette cables.
+CablePaint paintForColour (juce::Colour c)
+{
+    return { c, c.darker (0.9f), c.brighter (0.8f) };
 }
 
 // Momentary square key. The HOLD legend and the lamp bezel are already drawn on the plate.
@@ -1404,6 +1414,8 @@ void PatchBayView::paint (juce::Graphics& g)
 
     paintExtInHold (g, origin, scale, audioProcessor.extInButtonHeld());
 
+    Cable published[kPatchBayMaxCables] {};
+    const int publishedCount = audioProcessor.copyPublishedCables (published, kPatchBayMaxCables);
     for (int cable = 0; cable < count_; ++cable)
     {
         if (! ropes_[cable].ready)
@@ -1420,7 +1432,7 @@ void PatchBayView::paint (juce::Graphics& g)
         }
         stroke_.lineTo (screenPoint (ropes_[cable].p[kNodes - 1][0], ropes_[cable].p[kNodes - 1][1]));
 
-        const CablePaint colors = paintFor (cables_[cable].color);
+        const CablePaint colors = cablePaintFor (cable, published, publishedCount);
         g.setColour (juce::Colours::black.withAlpha (0.45f));
         g.strokePath (stroke_, juce::PathStrokeType (7.0f * scale, juce::PathStrokeType::curved, juce::PathStrokeType::rounded),
                       juce::AffineTransform::translation (3.0f * scale, 5.0f * scale));
@@ -1506,7 +1518,7 @@ void PatchBayView::paint (juce::Graphics& g)
         else if (grabActive_)
             line = "Drop on a jack to plug in. Empty space unplugs. Esc cancels.";
         else if (hoverJack_ >= 0)
-            line = juce::String (kPanelJacks[hoverJack_].section) + ": " + kPanelJacks[hoverJack_].label;
+            line = jackHoverText (hoverJack_);
         else
             line = knobReadout_;
     }
@@ -1574,7 +1586,16 @@ void PatchBayView::mouseMove (const juce::MouseEvent& event)
     pointerY_ = design.y;
     pointerIn_ = true;
     if (! knobDrag_)
+    {
         knobReadout_.clear();
+        // RONIN_Redesign §4.1: transient hover read-out in real units.
+        const int knob = knobAt (design.x, design.y);
+        if (knob >= 0)
+            knobReadout_ = kPanelKnobs[knob].kind == 1
+                               ? juce::String (kPanelKnobs[knob].section) + juce::String::fromUTF8 (" · ÷ ")
+                                     + (knobValue_[knob] < 0.5f ? "2" : "4")
+                               : knobText (knob);
+    }
     hoverJack_ = jackAt (design.x, design.y);
     hoverLabel_ = labelAt (design.x, design.y);
     repaint();
@@ -1861,6 +1882,80 @@ int PatchBayView::knobAt (float x, float y) const
     return -1;
 }
 
+// JCS R14: BY ROLE (default) colours a cable by its source port's role, a PATCH-tab override wins.
+// MANUAL keeps the four-swatch palette. A cable still in the hand has no source port yet: palette.
+CablePaint PatchBayView::cablePaintFor (int index, const Cable* published, int publishedCount) const
+{
+    const VisualCable& v = cables_[index];
+    if (! audioProcessor.cableColourByRole() || v.sourceModule < 0 || v.destModule < 0)
+        return paintFor (v.color);
+    for (int i = 0; i < publishedCount; ++i)
+    {
+        const Cable& c = published[i];
+        if (c.sourceModule == v.sourceModule && c.sourcePort == v.sourcePort
+            && c.destModule == v.destModule && c.destPort == v.destPort)
+            return paintForColour (ronin_ui::cableColour (audioProcessor, c));
+    }
+    return paintForColour (juce::Colour (jcs::roleArgb (portRole (audioProcessor.portDesc (v.sourceModule, v.sourcePort)))));
+}
+
+bool PatchBayView::jackGraphPort (int jack, int& module, int& port) const
+{
+    return panelJackAddress (jack,
+                             audioProcessor.extInGraphIndex(), audioProcessor.outputGraphIndex(),
+                             audioProcessor.noiseGraphIndex(), audioProcessor.vcfGraphIndex(),
+                             audioProcessor.vca1GraphIndex(), audioProcessor.vca2GraphIndex(),
+                             audioProcessor.eg1GraphIndex(), audioProcessor.mgGraphIndex(),
+                             audioProcessor.vcoGraphIndex(), audioProcessor.eg2GraphIndex(),
+                             audioProcessor.ringGraphIndex(), audioProcessor.dividerGraphIndex(),
+                             audioProcessor.inverterGraphIndex(), audioProcessor.integratorGraphIndex(),
+                             audioProcessor.mixerGraphIndex(), audioProcessor.sampleHoldGraphIndex(),
+                             module, port);
+}
+
+// RONIN_Redesign §4.1 jack hover: id (SECTION:LABEL), role glyph and name, live volts, far end(s).
+juce::String PatchBayView::jackHoverText (int jack) const
+{
+    const PanelJackRec& rec = kPanelJacks[jack];
+    juce::String line = juce::String::fromUTF8 (rec.section) + ":" + juce::String::fromUTF8 (rec.label);
+    int module = -1;
+    int port = -1;
+    if (jackGraphPort (jack, module, port))
+    {
+        const auto desc = audioProcessor.portDesc (module, port);
+        const auto& role = jcs::roleInfo (portRole (desc));
+        const float volts = audioProcessor.jackVolts (module, port);
+        line << juce::String::fromUTF8 ("  ") << juce::String::fromUTF8 (role.glyph) << " " << role.name
+             << (rec.dir == 0 ? " in" : " out") << "  " << (volts >= 0.0f ? "+" : "") << juce::String (volts, 2) << " V";
+        if (std::fabs (volts) > 5.5f)   // JCS R15
+            line << " OVER";
+    }
+    juce::StringArray far;
+    for (int i = 0; i < count_; ++i)
+    {
+        const int other = cables_[i].a == jack ? cables_[i].b : (cables_[i].b == jack ? cables_[i].a : -2);
+        if (other >= 0 && other < kPanelJackCount)
+            far.add (juce::String::fromUTF8 (kPanelJacks[other].section) + ":" + juce::String::fromUTF8 (kPanelJacks[other].label));
+    }
+    if (! far.isEmpty())
+        line << juce::String::fromUTF8 ("  \u2194 ") << far.joinIntoString (", ");
+    if (std::strcmp (rec.section, "MIX") == 0)
+        line << juce::String::fromUTF8 ("  (\u2212\u03a3 inverting mixer: OUT = \u2212(L1\u00b7IN1 + L2\u00b7IN2 + L3\u00b7IN3))");
+    return line;
+}
+
+juce::String PatchBayView::knobText (int index) const
+{
+    const PanelKnobRec& knob = kPanelKnobs[index];
+    juce::String line = juce::String::fromUTF8 (knob.section) + juce::String::fromUTF8 (" · ")
+                        + juce::String::fromUTF8 (knob.label) + " "
+                        + juce::String::fromUTF8 (knobunits::realUnits (knob.section, knob.label, knobValue_[index],
+                                                                        audioProcessor.egTimeInMs()).c_str());
+    if (std::strcmp (knob.section, "MIX") == 0)
+        line << juce::String::fromUTF8 ("  (\u2212\u03a3 inverting mixer)");
+    return line;
+}
+
 void PatchBayView::setKnobValue (int index, float value)
 {
     if (index < 0 || index >= kPanelKnobCount)
@@ -1877,8 +1972,7 @@ void PatchBayView::setKnobValue (int index, float value)
     }
     else
     {
-        knobReadout_ = juce::String (knob.section) + juce::String::fromUTF8 (" · ")
-                       + knob.label + " " + juce::String (shown, 2);
+        knobReadout_ = knobText (index);
     }
     repaint();
 }
