@@ -398,3 +398,50 @@ int testDrivePull()
     check (std::fabs (fast.effectiveHz() - vcf.effectiveHz()) < 1.0f, "the follower and law are rate-independent");
     return finish ("testDrivePull");
 }
+
+// ---- §5.14 EXT IN gate hysteresis (N15) -------------------------------------------------------
+
+#include "Modular/ExtIn.h"
+
+int testExtInGateHysteresis()
+{
+    // A 40 Hz bass whose follower ripples 0.24 .. 0.33 V across a 0.316 V threshold (knob 0.5, release 10 ms).
+    ExtIn ext;
+    ext.setKnob (ExtIn::kKnobThreshold, 0.5f);
+    ext.setKnob (ExtIn::kKnobRelease, 0.0f);
+    ext.prepare (48000.0);
+    int opens = 0;
+    bool open = false;
+    for (int i = 0; i < 48000; ++i)
+    {
+        const float volts = static_cast<float> (0.4 * std::sin (2.0 * 3.14159265358979323846 * 40.0 * i / 48000.0));
+        ext.setHostSample (volts / ExtIn::kHostToVolts, volts / ExtIn::kHostToVolts);
+        ext.processSample();
+        const bool nowOpen = ext.portValue[3] < 1.0f;
+        if (nowOpen && ! open)
+            ++opens;
+        open = nowOpen;
+    }
+    std::printf ("  EXT IN gate opens on a rippling 40 Hz bass: %d (was 79)\n", opens);
+    check (opens == 1, "the gate opens once and stays open (no chatter)");
+
+    // It closes below 0.7 x threshold, not at the threshold.
+    ExtIn quiet;
+    quiet.setKnob (ExtIn::kKnobThreshold, 0.5f);
+    quiet.setKnob (ExtIn::kKnobRelease, 0.0f);
+    quiet.prepare (48000.0);
+    const float th = 0.05f * std::pow (40.0f, 0.5f);
+    auto run = [&quiet] (float volts, int samples) {
+        for (int i = 0; i < samples; ++i)
+        {
+            quiet.setHostSample (volts / ExtIn::kHostToVolts, volts / ExtIn::kHostToVolts);
+            quiet.processSample();
+        }
+        return quiet.portValue[3];
+    };
+    check (run (1.1f * th, 4800) == 0.0f, "opens above the threshold (0 V held)");
+    check (run (0.8f * th, 4800) == 0.0f, "stays open at 0.8 x threshold");
+    check (run (0.6f * th, 4800) == 5.0f, "closes below 0.7 x threshold (+5 V released)");
+    check (run (0.9f * th, 4800) == 5.0f, "does not reopen below the threshold");
+    return finish ("testExtInGateHysteresis");
+}

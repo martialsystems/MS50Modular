@@ -602,6 +602,7 @@ int testGraphStrigScopeAndLegacyInvert();
 int testGraphTypedRestNoLatch();
 int testDrivePull();
 int testHzvJackRoleLin();
+int testExtInGateHysteresis();
 
 int main()
 {
@@ -733,5 +734,6 @@ int main()
     failed += testGraphTypedRestNoLatch();
     failed += testDrivePull();
     failed += testHzvJackRoleLin();
+    failed += testExtInGateHysteresis();
     return failed == 0 ? 0 : 1;
 }
