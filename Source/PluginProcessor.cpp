@@ -398,7 +398,8 @@ double RoninAudioProcessor::engineSampleRate() const noexcept
 
 // HQ 2x (RONIN_Redesign §3.2, DESIGN CHOICE): the whole graph runs in one 2fs domain, as SHOGUN v2.2 §3.4 does,
 // so the VCO and VCF (and everything they feed) are oversampled and latencies never stack. Host input enters
-// through a zero-latency sample-and-hold; each host output leaves through the 93-tap half-band decimator.
+// through a zero-latency sample-and-hold; each host output leaves through the shared 93-tap half-band decimator
+// (jidai::dsp::Downsampler2x from jidai-common; u0 = the earlier 2fs sample, u1 = the later one).
 // Latency: 0 off, 23 base samples on, reported to the host (JCS R11). Default OFF (decided by the user).
 void RoninAudioProcessor::prepareEngine (double hostRate, bool hq)
 {
@@ -499,12 +500,9 @@ void RoninAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
     for (int i = 0; i < numSamples; ++i)
     {
         extIn.setHostSample (left[i], right[i]);
-        graph.process();
-        const float l0 = output.hostLeft();
-        const float r0 = output.hostRight();
-        graph.process();
-        left[i] = decimatorL_.process (l0, output.hostLeft());
-        right[i] = decimatorR_.process (r0, output.hostRight());
+        const hq::StereoPair pair = hq::renderPair (graph, output);   // earlier sub-sample first, one per statement
+        left[i] = hq::decimate (decimatorL_, pair.earlierLeft, pair.laterLeft);
+        right[i] = hq::decimate (decimatorR_, pair.earlierRight, pair.laterRight);
     }
 }
 

@@ -5,7 +5,9 @@
 #include "Modular/PatchState.h"
 #include "Modular/Divider.h"
 #include "Modular/FactoryPresets.h"
-#include "Modular/Halfband.h"
+#include "Modular/HqPair.h"
+
+#include <jidai/dsp/Halfband.h>
 #include "Modular/Eg1.h"
 #include "Modular/Eg2.h"
 #include "Modular/ExtIn.h"
@@ -104,8 +106,8 @@ public:
     juce::AudioParameterBool* hqParameter() noexcept { return hqMode_; }
     Vco::TriShape triShape() const noexcept;
     bool hqActive() const noexcept { return hqActive_.load (std::memory_order_relaxed); }
-    // 0 with HQ off, Halfband::kLatencyBaseSamples (23) with HQ on.
-    static int latencyForHq (bool hq) noexcept { return hq ? Halfband::kLatencyBaseSamples : 0; }
+    // 0 with HQ off, jidai::dsp::Halfband93::kLatencyPerDirection (23) with HQ on (only the down direction is used).
+    static int latencyForHq (bool hq) noexcept { return hq ? jidai::dsp::Halfband93::kLatencyPerDirection : 0; }
     double engineSampleRate() const noexcept;
 
     // UI read-outs (relaxed reads of audio-thread state; RONIN_Redesign §4.1).
@@ -225,8 +227,8 @@ private:
     juce::AudioParameterBool* hqMode_ = nullptr;
     std::atomic<bool> hqActive_ { false };
     double hostRate_ = 48000.0;
-    Halfband::Decimator2x decimatorL_;
-    Halfband::Decimator2x decimatorR_;
+    jidai::dsp::Downsampler2x decimatorL_;   // shared jidai-common halfband (third_party/jidai-common)
+    jidai::dsp::Downsampler2x decimatorR_;
     Meter meter_;
     int currentProgram_ = kDefaultFactoryPreset;
     juce::String presetError_;

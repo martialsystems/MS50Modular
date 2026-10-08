@@ -593,6 +593,7 @@ int testParabolaSelectableModule();
 int testSawPulsePolyBlepKept();
 int testFootageSwitchesAtWrap();
 int testHalfbandSpec();
+int testHqSubSampleOrder();
 int testMgPolyBlep();
 int testKnobSmoothing();
 int testIntegratorDoubleFlushCached();
@@ -728,6 +729,7 @@ int main()
     failed += testSawPulsePolyBlepKept();
     failed += testFootageSwitchesAtWrap();
     failed += testHalfbandSpec();
+    failed += testHqSubSampleOrder();
     failed += testMgPolyBlep();
     failed += testKnobSmoothing();
     failed += testIntegratorDoubleFlushCached();

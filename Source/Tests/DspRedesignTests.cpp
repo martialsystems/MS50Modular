@@ -2,10 +2,11 @@
 // RONIN_Redesign §5 items 6-10, 13-14: HQ decimator, MG polyBLEP, smoothing, integrator, Schmitt inputs,
 // VCF caching and drive pull, EXT IN gate hysteresis.
 
-#include "Modular/Halfband.h"
+#include <jidai/dsp/Halfband.h>
 
 #include <cmath>
 #include <cstdio>
+#include <functional>
 
 namespace {
 
@@ -28,13 +29,27 @@ int finish (const char* name)
     return failed == 0 ? 0 : 1;
 }
 
+// Tap k of the shared 93-tap halfband: h[46] = 0.5, h[46 +- (2j+1)] = odd()[j], every other tap 0.
+constexpr int kHbTaps = jidai::dsp::Halfband93::kTaps;
+constexpr int kHbCentre = (kHbTaps - 1) / 2;
+double hbTap (int k)
+{
+    if (k == kHbCentre)
+        return 0.5;
+    const int d = k < kHbCentre ? kHbCentre - k : k - kHbCentre;
+    if (k < 0 || k >= kHbTaps || (d % 2) == 0)
+        return 0.0;
+    const int j = (d - 1) / 2;
+    return j < jidai::dsp::Halfband93::kSide ? jidai::dsp::Halfband93::odd()[j] : 0.0;
+}
+
 double halfbandMagnitude (double f)   // f in cycles per 2fs sample
 {
     double re = 0.0;
     double im = 0.0;
-    for (int k = 0; k < Halfband::kTaps; ++k)
+    for (int k = 0; k < kHbTaps; ++k)
     {
-        const double h = Halfband::Decimator2x::tap (k);
+        const double h = hbTap (k);
         re += h * std::cos (2.0 * 3.14159265358979323846 * f * k);
         im -= h * std::sin (2.0 * 3.14159265358979323846 * f * k);
     }
@@ -65,36 +80,38 @@ int testHalfbandSpec()
     check (20.0 * std::log10 (passMax / passMin) <= 1.0e-4, "passband ripple <= 1e-4 dB");
     // Exact half-band: every even tap except the centre is zero; symmetric (linear phase).
     bool exact = true;
-    for (int k = 0; k < Halfband::kTaps; ++k)
+    for (int k = 0; k < kHbTaps; ++k)
     {
-        if (k != Halfband::kCentre && (k % 2) == 0 && Halfband::Decimator2x::tap (k) != 0.0)
+        if (k != kHbCentre && (k % 2) == 0 && hbTap (k) != 0.0)
             exact = false;
-        if (Halfband::Decimator2x::tap (k) != Halfband::Decimator2x::tap (Halfband::kTaps - 1 - k))
+        if (std::not_equal_to<double>() (hbTap (k), hbTap (kHbTaps - 1 - k)))
             exact = false;
     }
+    check (kHbTaps == 93 && kHbCentre == 46, "93 taps, centre 46");
     check (exact, "exact half-band, linear phase");
 
-    // Latency: a sample generated in the 2fs domain comes out 23 base samples later.
-    Halfband::Decimator2x dec;
+    // Latency: a sample generated in the 2fs domain (even phase, u0) comes out 23 base samples later.
+    jidai::dsp::Downsampler2x dec;
     dec.reset();
     int peak = -1;
     float best = 0.0f;
     for (int n = 0; n < 64; ++n)
     {
-        const float y = dec.process (0.0f, n == 0 ? 1.0f : 0.0f);
+        const float y = static_cast<float> (dec.process (n == 0 ? 1.0 : 0.0, 0.0));
         if (std::fabs (y) > best)
         {
             best = std::fabs (y);
             peak = n;
         }
     }
-    check (peak == Halfband::kLatencyBaseSamples && Halfband::kLatencyBaseSamples == 23, "latency is 23 base samples");
+    check (peak == jidai::dsp::Halfband93::kLatencyPerDirection && jidai::dsp::Halfband93::kLatencyPerDirection == 23,
+           "latency is 23 base samples");
     // DC passes at unity.
-    Halfband::Decimator2x dc;
+    jidai::dsp::Downsampler2x dc;
     dc.reset();
     float y = 0.0f;
     for (int n = 0; n < 100; ++n)
-        y = dc.process (1.0f, 1.0f);
+        y = static_cast<float> (dc.process (1.0, 1.0));
     check (std::fabs (y - 1.0f) < 1.0e-5f, "DC gain 1");
     return finish ("testHalfbandSpec");
 }
@@ -444,4 +461,108 @@ int testExtInGateHysteresis()
     check (run (0.6f * th, 4800) == 5.0f, "closes below 0.7 x threshold (+5 V released)");
     check (run (0.9f * th, 4800) == 5.0f, "does not reopen below the threshold");
     return finish ("testExtInGateHysteresis");
+}
+
+// ---- HQ 2x sub-sample order (argument evaluation order audit) ------------------------------------------------
+#include "Modular/HqPair.h"
+#include "Modular/OutputModule.h"
+#include "Modular/PatchGraph.h"
+
+namespace {
+
+// A stateful 2fs source: a 7 kHz sine whose phase advances once per process() call.
+class SineSource : public Module {
+public:
+    int numPorts() const override { return 1; }
+    PortDesc port (int) const override { return { "Out", PortType::Audio, PortDir::Out }; }
+    void setKnob (int, float) override {}
+    void prepare (double rate) override { sampleRate = rate; phase_ = 0.0; }
+    void processSample() override
+    {
+        portValue[0] = static_cast<float> (5.0 * std::sin (phase_));
+        phase_ += 2.0 * 3.14159265358979323846 * 7000.0 / sampleRate;
+    }
+
+private:
+    double phase_ = 0.0;
+};
+
+struct OrderRack {
+    PatchGraph graph;
+    SineSource sine;
+    OutputModule output;
+
+    OrderRack()
+    {
+        const int outIndex = graph.addModule (output);
+        const int sineIndex = graph.addModule (sine);
+        check (graph.connect (sineIndex, 0, outIndex, 0), "sine -> output L");
+        check (graph.connect (sineIndex, 0, outIndex, 1), "sine -> output R");
+        output.setLevel (1.0f);
+        output.setOutputLevel (0.7f);
+        output.setMix (0.0f);
+        graph.prepare (96000.0);
+    }
+};
+
+struct CountingEngine {
+    int count = 0;
+    void process() noexcept { ++count; }
+    float hostLeft() const noexcept { return static_cast<float> (count); }
+    float hostRight() const noexcept { return static_cast<float> (-count); }
+};
+
+struct RecordingDecimator {
+    double first = 0.0;
+    double second = 0.0;
+    double process (double u0, double u1) noexcept { first = u0; second = u1; return u0; }
+};
+
+}
+
+int testHqSubSampleOrder()
+{
+    // 1. The helper renders the earlier sub-sample first and passes it as u0, whatever the compiler's argument order.
+    CountingEngine engine;
+    const hq::StereoPair pair = hq::renderPair (engine, engine);
+    check (engine.count == 2, "two 2fs steps per base sample");
+    check (std::equal_to<float>() (pair.earlierLeft, 1.0f) && std::equal_to<float>() (pair.laterLeft, 2.0f),
+           "earlier sub-sample is the first step (left)");
+    check (std::equal_to<float>() (pair.earlierRight, -1.0f) && std::equal_to<float>() (pair.laterRight, -2.0f),
+           "earlier sub-sample is the first step (right)");
+    RecordingDecimator rec;
+    hq::decimate (rec, pair.earlierLeft, pair.laterLeft);
+    check (std::equal_to<double>() (rec.first, 1.0) && std::equal_to<double>() (rec.second, 2.0),
+           "decimator gets u0 = earlier, u1 = later");
+
+    // 2. A real graph through the shared halfband: the helper path matches an explicitly sequenced reference
+    //    bit for bit, and the reversed order is measurably different (so this test would catch a swap).
+    OrderRack a;
+    OrderRack b;
+    jidai::dsp::Downsampler2x decA;
+    jidai::dsp::Downsampler2x decRef;
+    jidai::dsp::Downsampler2x decSwap;
+    double worstRef = 0.0;
+    double worstSwap = 0.0;
+    for (int n = 0; n < 4096; ++n)
+    {
+        const hq::StereoPair p = hq::renderPair (a.graph, a.output);
+        const float y = hq::decimate (decA, p.earlierLeft, p.laterLeft);
+
+        b.graph.process();
+        const double e = static_cast<double> (b.output.hostLeft());
+        b.graph.process();
+        const double l = static_cast<double> (b.output.hostLeft());
+        const double ref = decRef.process (e, l);
+        const double swapped = decSwap.process (l, e);
+        if (n >= 256)
+        {
+            worstRef = std::fmax (worstRef, std::fabs (static_cast<double> (y) - static_cast<double> (static_cast<float> (ref))));
+            worstSwap = std::fmax (worstSwap, std::fabs (ref - swapped));
+        }
+    }
+    std::printf ("  HQ order: helper vs sequenced %.3g, swapped vs sequenced %.3g\n", worstRef, worstSwap);
+    check (std::equal_to<double>() (worstRef, 0.0), "HQ helper equals the explicitly sequenced reference");
+    check (worstSwap > 1.0e-3, "a swapped sub-sample order is detected");
+    return finish ("testHqSubSampleOrder");
 }

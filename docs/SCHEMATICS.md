@@ -249,7 +249,7 @@ When `Hz/V` is unpatched it reads 0 V, and the clamp makes the linear term `foot
 
 Anti-alias: PolyBLEP saw, pulse by comparing the saw phase to the duty (KEPT). The triangle has two shapes, chosen on the VOICE tab (TRI SHAPE, host parameter `vcoTriShape`): TRIANGLE (default for new patches, INIT and a fresh instance) is a true triangle with PolyBLAMP corners, odd harmonics only, ±4.94 V, alias -52.8 dB at A7 / 48 kHz; PARABOLA (legacy) is the old integrated saw, kept unchanged and loaded for user-saved format-1 states (RONIN_Redesign N5, M-R2). A RANGE (footage) change takes effect at the next saw wrap. This anti-alias method is part of S-02, not a confirmed circuit.
 
-HQ 2x (VOICE tab, host parameter `hqMode`, JCS R11) is OFF by default. When on, the graph runs at twice the host rate behind a 93-tap halfband (input zero-order hold, output decimation) and the plugin reports 23 samples of latency; off reports 0. The spec asks for VCO + VCF; this build oversamples the whole graph (see the PR notes).
+HQ 2x (VOICE tab, host parameter `hqMode`, JCS R11) is OFF by default. When on, the graph runs at twice the host rate behind the shared jidai-common 93-tap halfband (`jidai::dsp::Downsampler2x`; input zero-order hold, output decimation, the earlier 2fs sub-sample first) and the plugin reports 23 samples of latency; off reports 0. The spec asks for VCO + VCF; this build oversamples the whole graph (see the PR notes).
 
 Duty:
 
