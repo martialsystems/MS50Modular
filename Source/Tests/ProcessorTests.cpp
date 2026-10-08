@@ -2,6 +2,8 @@
 // Processor-level tests (JUCE): RONIN_Redesign §6 tests that need the real plugin state and latency reporting.
 
 #include "PluginProcessor.h"
+#include "Modular/PatchState.h"
+#include "UI/PatchBayLogic.h"
 
 #include <cmath>
 #include <cstdio>
@@ -367,6 +369,97 @@ void testFormat2Xml()
     finish ("testFormat2Xml");
 }
 
+namespace {
+
+bool sameCables (const Cable* a, int na, const Cable* b, int nb)
+{
+    if (na != nb)
+        return false;
+    for (int i = 0; i < na; ++i)
+        if (a[i].sourceModule != b[i].sourceModule || a[i].sourcePort != b[i].sourcePort
+            || a[i].destModule != b[i].destModule || a[i].destPort != b[i].destPort)
+            return false;
+    return true;
+}
+
+juce::MemoryBlock withPrefix (const juce::MemoryBlock& state, const juce::String& prefix)
+{
+    auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
+    juce::MemoryBlock out;
+    if (xml == nullptr)
+        return out;
+    if (auto* cables = xml->getChildByName ("CABLES"))
+        for (auto* cable : cables->getChildIterator())
+            for (const char* attr : { "from", "to" })
+                cable->setAttribute (attr, prefix + cable->getStringAttribute (attr));
+    juce::AudioProcessor::copyXmlToBinary (*xml, out);
+    return out;
+}
+
+}
+
+void testSlashJackIdsStateRoundTrip()
+{
+    // JCS R6 ids whose LABEL contains '/' (VCO:HZ/V, VCO:V/OCT, DIV:/2, DIV:/4) save and load through the shared
+    // jidai-common parser in the bare, RONIN/ and RONIN#N/ forms.
+    RoninAudioProcessor p;
+    const RackIndices rack = p.rackIndices();
+    std::vector<std::string> slashIds;
+    for (int jack = 0; jack < kPanelJackCount; ++jack)
+    {
+        const std::string id = std::string (kPanelJacks[jack].section) + ":" + kPanelJacks[jack].label;
+        if (id.find ('/') == std::string::npos)
+            continue;
+        slashIds.push_back (id);
+        int m = -1;
+        int port = -1;
+        check (patchstate::jackAddress (rack, id, m, port), "a slash id binds");
+        bool connected = false;
+        for (int other = 0; other < kPanelJackCount && ! connected; ++other)
+        {
+            if (other == jack)
+                continue;
+            const std::string otherId = std::string (kPanelJacks[other].section) + ":" + kPanelJacks[other].label;
+            int m2 = -1;
+            int p2 = -1;
+            if (! patchstate::jackAddress (rack, otherId, m2, p2))
+                continue;
+            connected = p.connectJacks (m, port, m2, p2) == PatchGraph::ConnectResult::Ok
+                        || p.connectJacks (m2, p2, m, port) == PatchGraph::ConnectResult::Ok;
+        }
+        check (connected, "every slash jack takes a cable");
+    }
+    check (slashIds.size() == 4, "four slash ids");
+
+    const auto state = saveState (p);
+    auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
+    check (xml != nullptr, "state parses");
+    if (xml != nullptr)
+        for (const auto& id : slashIds)
+        {
+            bool found = false;
+            if (auto* cables = xml->getChildByName ("CABLES"))
+                for (auto* cable : cables->getChildIterator())
+                    found = found || cable->getStringAttribute ("from").toStdString() == id
+                            || cable->getStringAttribute ("to").toStdString() == id;
+            check (found, "the saved state carries the slash id verbatim");
+        }
+
+    Cable original[kPatchBayMaxCables];
+    const int n = p.copyPublishedCables (original, kPatchBayMaxCables);
+    for (const char* prefix : { "", "RONIN/", "RONIN#3/" })
+    {
+        RoninAudioProcessor q;
+        const auto block = withPrefix (state, prefix);
+        q.setStateInformation (block.getData(), static_cast<int> (block.getSize()));
+        Cable loaded[kPatchBayMaxCables];
+        const int nq = q.copyPublishedCables (loaded, kPatchBayMaxCables);
+        check (sameCables (original, n, loaded, nq), "every cable, slash ids included, loads back to the same ports");
+        check (q.presetError().isEmpty(), "no load error");
+    }
+    finish ("testSlashJackIdsStateRoundTrip");
+}
+
 int main()
 {
     juce::ScopedJuceInitialiser_GUI juce;
@@ -378,6 +471,7 @@ int main()
     testUserPatchCutoffCompensation();
     testFormat1MigrationEgAndLegacyInvert();
     testFormat2Xml();
+    testSlashJackIdsStateRoundTrip();
     std::printf ("ProcessorTests: %d passed, %d failed\n", gPassed, gFailed);
     return gFailed == 0 ? 0 : 1;
 }

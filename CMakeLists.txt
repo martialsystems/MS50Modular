@@ -103,6 +103,7 @@ add_executable(RoninTests
   Source/Tests/VcoRedesignTests.cpp
   Source/Tests/DspRedesignTests.cpp
   Source/Tests/GraphRedesignTests.cpp
+  Source/Tests/JackIdTests.cpp
   Source/Modular/Module.cpp
   Source/Modular/PatchGraph.cpp
   Source/Modular/PatchState.cpp

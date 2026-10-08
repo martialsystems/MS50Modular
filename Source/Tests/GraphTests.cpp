@@ -594,6 +594,7 @@ int testSawPulsePolyBlepKept();
 int testFootageSwitchesAtWrap();
 int testHalfbandSpec();
 int testHqSubSampleOrder();
+int testJackIdSlashRoundTrip();
 int testMgPolyBlep();
 int testKnobSmoothing();
 int testIntegratorDoubleFlushCached();
@@ -730,6 +731,7 @@ int main()
     failed += testFootageSwitchesAtWrap();
     failed += testHalfbandSpec();
     failed += testHqSubSampleOrder();
+    failed += testJackIdSlashRoundTrip();
     failed += testMgPolyBlep();
     failed += testKnobSmoothing();
     failed += testIntegratorDoubleFlushCached();
