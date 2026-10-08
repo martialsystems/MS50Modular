@@ -55,7 +55,9 @@ PortDesc ExtIn::port (int index) const
         return { "R", PortType::Audio, PortDir::Out };
     if (index == 2)
         return { "Mono", PortType::Audio, PortDir::Out };
-    return { "Gate", PortType::Gate, PortDir::Out, 5.0f, true };
+    // S-trig volts (0 V held, +5 V released) with the follower's hysteresis (opens above THRESHOLD, closes below
+    // 0.7 x THRESHOLD), so its role is S-TRIG. A cable from it into EG TRIG passes as written: no conversion.
+    return { "Gate", PortType::Gate, PortDir::Out, jcs::kStrigRest, true, false, PortRole::STrig };
 }
 
 void ExtIn::setKnob (int knob, float zeroToOne)
@@ -85,6 +87,7 @@ void ExtIn::prepare (double rate)
 {
     sampleRate = rate;
     env_ = 0.0f;
+    followerOpen_ = false;
 }
 
 void ExtIn::setHostSample (float leftUnit, float rightUnit)
@@ -118,7 +121,15 @@ void ExtIn::processSample()
     if (! std::isfinite (env_) || (env_ < 1.0e-15f && env_ > -1.0e-15f))
         env_ = 0.0f;
 
-    // S-trig. Held is 0 V. Released rests at +5 V. EG 1 treats below 1.5 V as held.
-    const bool open = buttonHeld() || env_ > thresholdVolts();
+    // §3.8 (N15): the follower compare has hysteresis. It opens when env > th and closes when env < 0.7 th,
+    // so a low bass rippling across the threshold no longer chatters the gate. The follower is KEPT.
+    const float th = thresholdVolts();
+    if (! followerOpen_ && env_ > th)
+        followerOpen_ = true;
+    else if (followerOpen_ && env_ < kCloseRatio * th)
+        followerOpen_ = false;
+
+    // S-trig. Held is 0 V. Released rests at +5 V. EG 1 treats below 1.0 V as held (JCS R3s).
+    const bool open = buttonHeld() || followerOpen_;
     portValue[3] = open ? 0.0f : 5.0f;
 }

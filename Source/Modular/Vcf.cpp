@@ -15,7 +15,8 @@ constexpr double kIs = 2.52e-9;
 constexpr double kN = 1.752;
 constexpr double kVt = 0.02585;
 constexpr double kBridgeC = 22.0e-9;
-constexpr double kInputPull = 0.012;
+// RONIN_Redesign §5.13b (N13, DECIDED by the user): Vcf::kInputPull 0.012 -> 0.004. A 1 kHz knob with a 2.5 V mean input now
+// droops to 801.8 Hz (was 515.4 Hz). User-saved format-1 patches get cutoff compensation on load (M-R5).
 constexpr double kDiodeVolts = 5.0;
 
 void flushState (double& state)
@@ -82,7 +83,10 @@ void Vcf::setKnob (int knob, float zeroToOne)
 {
     const float value = clamp01 (zeroToOne);
     if (knob == kKnobCutoff)
+    {
         cutoff01_ = value;
+        cutoffSmooth_.setTarget (value);
+    }
     else if (knob == kKnobPeak)
         peak01_ = value;
     else if (knob == kKnobAmount)
@@ -113,6 +117,19 @@ void Vcf::prepare (double rate)
     env_ = 0.0;
     hpX_ = 0.0;
     hpY_ = 0.0;
+    cutoffSmooth_.prepare (rate);
+    // §5.13 (N14): rate-only coefficients are computed here, not per sample.
+    const double r = rate > 1.0 ? rate : 48000.0;
+    envA_ = -std::expm1 (-1.0 / (0.03 * r));
+    hpA_ = std::exp (-2.0 * kPi * 5.0 / r);
+}
+
+double Vcf::effectiveHzFor (double knobHz, double envVolts, double pull) noexcept
+{
+    double hz = hzFromBias (biasForHz (knobHz) - pull * envVolts);
+    if (! std::isfinite (hz) || hz < 15.0)
+        hz = 15.0;
+    return hz;
 }
 
 float Vcf::knobHz() const
@@ -125,7 +142,8 @@ float Vcf::cutoffHz() const
 {
     // S-08: cv = jack volts * amount. ±5 V maps to ±4 octaves around the knob.
     const float cv = portValue[kCutoff] * amount01_;
-    float hz = knobHz() * std::pow (2.0f, (cv / 5.0f) * 4.0f);
+    // The DSP follows the smoothed knob (§3.5); knobHz() is the knob's own readout.
+    float hz = 20.0f * std::pow (900.0f, cutoffSmooth_.current()) * std::pow (2.0f, (cv / 5.0f) * 4.0f);
     if (! std::isfinite (hz))
         return 15.0f;
     if (hz < 15.0f)
@@ -152,10 +170,10 @@ void Vcf::processSample()
     if (! std::isfinite (input))
         input = 0.0f;
 
+    cutoffSmooth_.next();
     const float q = resonance();
     const double rate = sampleRate > 1.0 ? sampleRate : 48000.0;
-    const double envA = 1.0 - std::exp (-1.0 / (0.03 * rate));
-    env_ += (std::fabs (static_cast<double> (input)) - env_) * envA;
+    env_ += (std::fabs (static_cast<double> (input)) - env_) * envA_;
     flushState (env_);
 
     // S-07 and S-08 set the unpulled bias. S-10 turns that bias into bridge current.
@@ -168,6 +186,7 @@ void Vcf::processSample()
         hz = 20000.0;
     if (hz > rate * 0.45)
         hz = rate * 0.45;
+    effectiveHz_.store (static_cast<float> (hz), std::memory_order_relaxed);
 
     const double g = std::tan (kPi * hz / rate);
     const double k = 1.0 / static_cast<double> (q);
@@ -186,8 +205,7 @@ void Vcf::processSample()
     flushState (z2_);
 
     // S-10b. Output coupling, one pole at 5 Hz.
-    const double hpA = std::exp (-2.0 * kPi * 5.0 / rate);
-    const double hp = hpA * (hpY_ + v2 - hpX_);
+    const double hp = hpA_ * (hpY_ + v2 - hpX_);
     hpX_ = v2;
     hpY_ = hp;
     flushState (hpX_);

@@ -51,9 +51,15 @@ void Vca1::setKnob (int knob, float zeroToOne)
     if (knob == kKnobLowCut)
         lowCut01_ = clamp01 (zeroToOne);
     else if (knob == kKnobIntensity)
+    {
         intensity_ = clamp01 (zeroToOne);
+        intensitySmooth_.setTarget (intensity_);
+    }
     else if (knob == kKnobInitial)
+    {
         initial01_ = clamp01 (zeroToOne);
+        initialSmooth_.setTarget (initial01_);
+    }
 }
 
 int Vca1::presetKnobCount() const
@@ -79,6 +85,8 @@ void Vca1::prepare (double rate)
 {
     sampleRate = rate;
     low_ = 0.0f;
+    intensitySmooth_.prepare (rate);
+    initialSmooth_.prepare (rate);
 }
 
 float Vca1::lowCutHz() const
@@ -97,9 +105,9 @@ void Vca1::processSample()
     low_ += (input - low_) * coeff;
     flushState (low_);
 
-    float envGain = portValue[kEnv] / 5.0f + initial01_;
+    float envGain = portValue[kEnv] / 5.0f + initialSmooth_.next();
     envGain = clamp01 (envGain);
-    float output = (input - low_) * envGain * intensity_;
+    float output = (input - low_) * envGain * intensitySmooth_.next();
     if (! std::isfinite (output))
         output = 0.0f;
     portValue[kOut] = output;

@@ -1,30 +1,18 @@
 // Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
 #include "Eg1.h"
+#include "EgLaw.h"
 
 #include <cmath>
-
-namespace {
-
-constexpr float kHeldBelow = 1.5f;
-constexpr float kAttackDone = 4.99f;
-constexpr float kSettle = 0.01f;
-constexpr float kSpan = 5.0f;
-
-void flushState (float& state)
-{
-    if (! std::isfinite (state) || (state < 1.0e-15f && state > -1.0e-15f))
-        state = 0.0f;
-}
-
-}
+#include <functional>
 
 Eg1::Eg1()
 {
-    attack01_ = knobForSeconds (0.01f);
-    decay01_ = knobForSeconds (0.25f);
+    attack01_ = static_cast<float> (EgLaw::knobForSeconds (0.01));
+    decay01_ = static_cast<float> (EgLaw::knobForSeconds (0.25));
     sustain01_ = 0.6f;
-    release01_ = knobForSeconds (0.30f);
+    release01_ = static_cast<float> (EgLaw::knobForSeconds (0.30));
+    updateCoefficients();
 }
 
 float Eg1::clamp01 (float value)
@@ -36,14 +24,9 @@ float Eg1::clamp01 (float value)
     return value;
 }
 
-float Eg1::knobForSeconds (float seconds)
+double Eg1::secondsForKnob (float knob01)
 {
-    return std::log (seconds / 0.001f) / std::log (10000.0f);
-}
-
-float Eg1::secondsFor (float knob01) const
-{
-    return 0.001f * std::pow (10000.0f, clamp01 (knob01));
+    return EgLaw::secondsFor (static_cast<double> (knob01));
 }
 
 int Eg1::numPorts() const
@@ -53,8 +36,9 @@ int Eg1::numPorts() const
 
 PortDesc Eg1::port (int index) const
 {
+    // JCS R3s: the only S-trig input type. Unpatched rest +5 V (released, S-15 KEPT).
     if (index == kTrig)
-        return { "Trig", PortType::CV, PortDir::In, 5.0f };
+        return { "Trig", PortType::CV, PortDir::In, jcs::kStrigRest, false, true, PortRole::STrig };
     if (index == kOutA)
         return { "OutA", PortType::CV, PortDir::Out };
     if (index == kOutB)
@@ -67,17 +51,33 @@ int Eg1::numKnobs() const
     return 4;
 }
 
+void Eg1::updateCoefficients()
+{
+    const double rate = sampleRate > 1.0 ? sampleRate : 48000.0;
+    aAttack_ = EgLaw::coefficient (EgLaw::attackC(), EgLaw::secondsFor (static_cast<double> (attack01_)), rate);
+    aDecay_ = EgLaw::coefficient (EgLaw::decayC(), EgLaw::secondsFor (static_cast<double> (decay01_)), rate);
+    aRelease_ = EgLaw::coefficient (EgLaw::decayC(), EgLaw::secondsFor (static_cast<double> (release01_)), rate);
+    aSustain_ = EgLaw::coefficient (1.0, EgLaw::kSustainSlewSeconds, rate);
+}
+
 void Eg1::setKnob (int knob, float zeroToOne)
 {
     const float value = clamp01 (zeroToOne);
+    float* slot = nullptr;
     if (knob == kKnobAttack)
-        attack01_ = value;
+        slot = &attack01_;
     else if (knob == kKnobDecay)
-        decay01_ = value;
+        slot = &decay01_;
     else if (knob == kKnobSustain)
-        sustain01_ = value;
+        slot = &sustain01_;
     else if (knob == kKnobRelease)
-        release01_ = value;
+        slot = &release01_;
+    if (slot == nullptr || std::equal_to<float>{} (*slot, value))   // exact: change detection only
+        return;
+    *slot = value;
+    // Coefficients change only when a knob moves (the processor pushes knobs once per block).
+    if (knob != kKnobSustain)
+        updateCoefficients();
 }
 
 int Eg1::presetKnobCount() const
@@ -101,69 +101,76 @@ float Eg1::presetKnob (int knob) const
 void Eg1::prepare (double rate)
 {
     sampleRate = rate;
-    outA_ = 0.0f;
-    wasHeld_ = false;
+    x_ = 0.0;
+    trig_.reset (false);
     stage_ = Stage::Idle;
-}
-
-void Eg1::follow (float target, float seconds)
-{
-    const float rate = static_cast<float> (sampleRate > 1.0 ? sampleRate : 48000.0);
-    const float tau = seconds > 1.0e-6f ? seconds : 1.0e-6f;
-    const float coeff = 1.0f - std::exp (-1.0f / (tau * rate));
-    outA_ += (target - outA_) * coeff;
-    flushState (outA_);
+    updateCoefficients();
+    stageView_.store (0, std::memory_order_relaxed);
+    heldView_.store (false, std::memory_order_relaxed);
 }
 
 void Eg1::processSample()
 {
-    const bool held = portValue[kTrig] < kHeldBelow;
-    const bool rising = held && ! wasHeld_;
-    wasHeld_ = held;
+    const float v = std::isfinite (portValue[kTrig]) ? portValue[kTrig] : jcs::kStrigRest;
+    const jcs::Edge edge = trig_.process (v);
+    const bool held = trig_.held;
 
-    if (rising)
+    // S-15: a new trigger restarts the attack from the current level.
+    if (edge == jcs::Edge::Rising)
         stage_ = Stage::Attack;
     else if (! held && stage_ != Stage::Idle && stage_ != Stage::Release)
         stage_ = Stage::Release;
 
-    const float sustainVolts = sustain01_ * kSpan;
+    const double sustainVolts = static_cast<double> (sustain01_) * EgLaw::kPeak;
 
-    if (stage_ == Stage::Attack)
+    switch (stage_)
     {
-        follow (kSpan, secondsFor (attack01_));
-        if (outA_ >= kAttackDone)
-            stage_ = Stage::Decay;
-    }
-    else if (stage_ == Stage::Decay)
-    {
-        follow (sustainVolts, secondsFor (decay01_));
-        if (std::fabs (outA_ - sustainVolts) <= kSettle)
+        case Stage::Attack:
+            x_ += (EgLaw::kAttackTarget - x_) * aAttack_;
+            if (x_ >= EgLaw::kPeak)
+            {
+                x_ = EgLaw::kPeak;
+                stage_ = Stage::Decay;
+            }
+            break;
+        case Stage::Decay:
         {
-            outA_ = sustainVolts;
-            stage_ = Stage::Sustain;
+            // Distance to target, in double.
+            const double e = (x_ - sustainVolts) * (1.0 - aDecay_);
+            x_ = sustainVolts + e;
+            if (std::fabs (e) < EgLaw::kSnap)
+            {
+                x_ = sustainVolts;
+                stage_ = Stage::Sustain;
+            }
+            break;
         }
-    }
-    else if (stage_ == Stage::Sustain)
-    {
-        outA_ = sustainVolts;
-    }
-    else if (stage_ == Stage::Release)
-    {
-        follow (0.0f, secondsFor (release01_));
-        if (outA_ <= kSettle)
-        {
-            outA_ = 0.0f;
-            stage_ = Stage::Idle;
-        }
+        case Stage::Sustain:
+            // A moving S knob does not step: 5 ms one-pole toward 5 S.
+            x_ += (sustainVolts - x_) * aSustain_;
+            break;
+        case Stage::Release:
+            x_ *= 1.0 - aRelease_;
+            if (x_ < EgLaw::kSnap)
+            {
+                x_ = 0.0;
+                stage_ = Stage::Idle;
+            }
+            break;
+        case Stage::Idle:
+            break;
     }
 
-    if (! std::isfinite (outA_))
+    if (! std::isfinite (x_))
     {
-        outA_ = 0.0f;
+        x_ = 0.0;
         stage_ = Stage::Idle;
     }
 
-    portValue[kOutA] = outA_;
-    portValue[kOutB] = -outA_;
-    portValue[kOutC] = outA_ - sustainVolts;
+    const float outA = static_cast<float> (x_);
+    portValue[kOutA] = outA;
+    portValue[kOutB] = -outA;
+    portValue[kOutC] = static_cast<float> (x_ - sustainVolts);
+    stageView_.store (static_cast<int> (stage_), std::memory_order_relaxed);
+    heldView_.store (held, std::memory_order_relaxed);
 }

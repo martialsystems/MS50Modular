@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
+#include "Modular/FloatCompare.h"
+#include "Tests/TestSuite.h"
 #include "Modular/DefaultPatch.h"
 #include "Modular/EffectSwitch.h"
 #include "Modular/ExtIn.h"
@@ -235,19 +237,19 @@ int testVcaPanelJacks()
 
     const FaceKnobBinding lowCut = faceKnobBinding ("VCA 1", "LOW CUT");
     check (lowCut.knob == FaceKnob::Vca1LowCut && std::strcmp (lowCut.parameterName, "VCA 1 Low Cut") == 0, "low cut name");
-    check (lowCut.minimum == 0.0f && lowCut.maximum == 1.0f && lowCut.fallback == 0.0f, "low cut range");
+    check (ronin::exactlyEqual (lowCut.minimum, 0.0f) && ronin::exactlyEqual (lowCut.maximum, 1.0f) && ronin::exactlyEqual (lowCut.fallback, 0.0f), "low cut range");
     const FaceKnobBinding initial = faceKnobBinding ("VCA 1", "INITIAL");
     const FaceKnobBinding mod = faceKnobBinding ("VCA 1", "MOD");
     const FaceKnobBinding initial2 = faceKnobBinding ("VCA 2", "INITIAL");
     const FaceKnobBinding mod2 = faceKnobBinding ("VCA 2", "MOD");
-    check (initial.knob == FaceKnob::Vca1Initial && initial.index == Vca1::kKnobInitial && initial.fallback == 0.0f
+    check (initial.knob == FaceKnob::Vca1Initial && initial.index == Vca1::kKnobInitial && ronin::exactlyEqual (initial.fallback, 0.0f)
                && std::strcmp (initial.parameterId, "vca1Initial") == 0,
            "VCA 1 Initial is a host knob on the module Initial, default 0");
-    check (mod.knob == FaceKnob::Vca1Mod && mod.index == Vca1::kKnobIntensity && mod.fallback == 0.85f,
+    check (mod.knob == FaceKnob::Vca1Mod && mod.index == Vca1::kKnobIntensity && ronin::exactlyEqual (mod.fallback, 0.85f),
            "VCA 1 Mod is the module Intensity, default 0.85");
-    check (initial2.knob == FaceKnob::Vca2Initial && initial2.index == Vca2::kKnobInitial && initial2.fallback == 0.0f,
+    check (initial2.knob == FaceKnob::Vca2Initial && initial2.index == Vca2::kKnobInitial && ronin::exactlyEqual (initial2.fallback, 0.0f),
            "VCA 2 Initial is a host knob, default 0");
-    check (mod2.knob == FaceKnob::Vca2Mod && mod2.index == Vca2::kKnobMod && mod2.fallback == 1.0f,
+    check (mod2.knob == FaceKnob::Vca2Mod && mod2.index == Vca2::kKnobMod && ronin::exactlyEqual (mod2.fallback, 1.0f),
            "VCA 2 Mod is a host knob, default 1");
 
     // Initial 0 leaves Env in charge. Initial above 0 passes audio with no gate.
@@ -265,7 +267,7 @@ int testVcaPanelJacks()
     {
         vca.portValue[Vca1::kSigIn] = (i / 24) % 2 == 0 ? 3.0f : -3.0f;
         vca.processSample();
-        sum += std::fabs (vca.portValue[Vca1::kOut]);
+        sum += static_cast<double> (std::fabs (vca.portValue[Vca1::kOut]));
     }
     check (sum / 4800.0 > 0.5, "Initial 0.7 passes audio with no gate");
     return finish ("testVcaPanelJacks");
@@ -315,7 +317,8 @@ int testVcaFactoryWetIsSilent()
 
     output.setMix (outputMixForEffect (false));
     ext.setHostSample (0.25f, -0.5f);
-    graph.process();
+    for (int settle = 0; settle < 9600; ++settle)   // §3.5: let the 10 ms knob ramp settle
+        graph.process();
     check (std::fabs (output.hostLeft() - 0.25f) < 1.0e-5f, "effect off keeps dry left");
     check (std::fabs (output.hostRight() + 0.5f) < 1.0e-5f, "effect off keeps dry right");
     return finish ("testVcaFactoryWetIsSilent");

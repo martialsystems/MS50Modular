@@ -1,6 +1,9 @@
 // Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
+#include "Modular/FloatCompare.h"
+#include "Tests/TestSuite.h"
 #include "Modular/PatchGraph.h"
+#include "Modular/Jcs.h"
 #include "Modular/Vco.h"
 #include "UI/FaceKnobs.h"
 #include "UI/PatchBayLogic.h"
@@ -12,7 +15,7 @@
 namespace {
 
 constexpr double kRate = 48000.0;
-constexpr float kEightFoot = 130.813f;
+constexpr float kEightFoot = static_cast<float> (jcs::pitch::kC3Hz);   // 8' = C3 (JCS R4, exact)
 
 int gChecks = 0;
 
@@ -78,7 +81,7 @@ float measureHz (Vco& vco, int samples, float hzv, float oct, float freqA, float
 
 float ratioClose (float actual, float expected)
 {
-    if (expected == 0.0f)
+    if (ronin::exactlyEqual (expected, 0.0f))
         return 1.0f;
     return std::fabs (actual - expected) / std::fabs (expected);
 }
@@ -95,7 +98,7 @@ int testScaleDoesNotChangeOctJack()
     high.setKnob (Vco::kKnobScale, 1.0f);
     const float eight = measureHz (low, 48000, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, false);
     const float four = measureHz (high, 48000, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, false);
-    const float footageRatio = 261.626f / kEightFoot;
+    const float footageRatio = Vco::footageHzFor (3) / kEightFoot;   // 4' / 8' = 2
     check (ratioClose (four / eight, footageRatio) < 0.02f, "scale ratio follows footage, with the same Oct/V");
     check (ratioClose (eight / (kEightFoot * 2.0f), 1.0f) < 0.02f, "8' with +1 V Oct/V is two times footage");
     return finish ("testScaleDoesNotChangeOctJack");
@@ -279,10 +282,10 @@ int testVcoPanelJacks()
     const FaceKnobBinding fm1 = faceKnobBinding ("VCO", "FM 1");
     const FaceKnobBinding fm2 = faceKnobBinding ("VCO", "FM 2");
     check (range.knob == FaceKnob::VcoRange && std::strcmp (range.parameterName, "VCO Range") == 0, "range name");
-    check (range.fallback == 0.50f, "range faceplate");
-    check (fine.knob == FaceKnob::VcoFine && fine.fallback == 0.50f, "fine faceplate");
-    check (pw.knob == FaceKnob::VcoPw && pw.fallback == 0.50f, "pw faceplate");
-    check (fm1.knob == FaceKnob::VcoFm1 && fm1.fallback == 0.0f, "fm 1 faceplate");
-    check (fm2.knob == FaceKnob::VcoFm2 && fm2.fallback == 0.0f, "fm 2 faceplate");
+    check (ronin::exactlyEqual (range.fallback, 0.50f), "range faceplate");
+    check (fine.knob == FaceKnob::VcoFine && ronin::exactlyEqual (fine.fallback, 0.50f), "fine faceplate");
+    check (pw.knob == FaceKnob::VcoPw && ronin::exactlyEqual (pw.fallback, 0.50f), "pw faceplate");
+    check (fm1.knob == FaceKnob::VcoFm1 && ronin::exactlyEqual (fm1.fallback, 0.0f), "fm 1 faceplate");
+    check (fm2.knob == FaceKnob::VcoFm2 && ronin::exactlyEqual (fm2.fallback, 0.0f), "fm 2 faceplate");
     return finish ("testVcoPanelJacks");
 }

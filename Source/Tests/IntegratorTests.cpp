@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
+#include "Modular/FloatCompare.h"
+#include "Tests/TestSuite.h"
 #include "Modular/Integrator.h"
 #include "Modular/Vco.h"
 #include "UI/FaceKnobs.h"
@@ -117,7 +119,7 @@ int testIntegratorIsItsOwnModule()
     const FaceKnobBinding time = faceKnobBinding ("INT", "TIME");
     check (time.knob == FaceKnob::IntegratorTime, "time is a host parameter");
     check (std::strcmp (time.parameterName, "Integrator Time") == 0, "time name");
-    check (time.fallback == 0.50f && time.index == 0, "time faceplate");
+    check (ronin::exactlyEqual (time.fallback, 0.50f) && time.index == 0, "time faceplate");
 
     Integrator lag;
     check (lag.numKnobs() == 1, "the integrator has its own time knob");

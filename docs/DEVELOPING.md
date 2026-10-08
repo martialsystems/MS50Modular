@@ -2,7 +2,7 @@ Copyright (c) 2026 Martial Systems LLC. All rights reserved. RONIN is part of th
 
 # Developing RONIN
 
-Read this before changing code. The DSP behaviour is specified in `docs/SCHEMATICS.md`, the stand-in rules in `docs/METHODOLOGY.md`, the build order in `docs/BUILD_GUIDE.md` and the tests in `docs/TESTPLAN.md`. The factory program (INIT only for now) and the default knob table are in `docs/presets.md`.
+Read this before changing code. The DSP behaviour is specified in `docs/SCHEMATICS.md`, the stand-in rules in `docs/METHODOLOGY.md`, the build order in `docs/BUILD_GUIDE.md` and the tests in `docs/TESTPLAN.md`. The factory bank (22 programs) and the default knob table are in `docs/presets.md`.
 
 ## Repo map
 
@@ -14,26 +14,45 @@ Source/
   PluginProcessor.h/.cpp
   PluginEditor.h/.cpp
   Modular/                graph and modules, no JUCE types in process()
-  UI/                     panel patch bay
-  Tests/                  RoninTests
+    Jcs.h                 adapter: `#include <jidai/CableStandard.h>` + `namespace jcs = jidai::jcs` (JCS v1.1 rules)
+    PatchState.h/.cpp     format-2 jack ids (SECTION:LABEL, shared parser) and the format-1 migration (M-R1..M-R5)
+    Smoothing.h, EgLaw.h  knob smoothing, EG real-time law
+    HqPair.h              HQ 2x: one 2fs sub-sample per statement, earlier first, into the shared halfband
+    FactoryPresets.h      the factory bank: knobs by host parameter id, cables by jack id, compiled in
+    FloatCompare.h        ronin::exactlyEqual, the one place an exact float compare is allowed (-Wfloat-equal)
+  UI/                     panel patch bay (MAIN), tab strip and VOICE / ENV / PATCH / SETUP pages, real-unit read-outs
+  Tests/                  RoninTests (JUCE-free) and ProcessorTests.cpp (RoninProcessorTests, needs JUCE); TestSuite.h declares the RoninTests entry points
+third_party/jidai-common/ vendored shared JCS + DSP headers (commit in VENDOR.md; no local edits)
 panel/                    layout, SVG, geometry emitter
 tools/PanelProbe.cpp      standalone window check
-tools/vst3_load_check.cpp loads a built bundle and processes a dry block
+tools/vst3_load_check.cpp loads a built bundle as a host: vendor, Fx class, INIT wet first block, dry after Effect off
 scripts/install_fl_plugin.sh   macOS: build the universal Release VST3 and point FL Studio at it
 scripts/sine_through_fx.py     plays a sine through a built bundle at mix 0
 docs/                     the developer documents above
 ```
 
-Internal names follow the product name: the CMake targets (`Ronin`, `RoninTests`, `RoninPanelProbe`), `RoninAudioProcessor`, and the `RONIN/` jack-id prefix in the web rack. The state blob magic is `RNIN`.
+Internal names follow the product name: the CMake targets (`Ronin`, `RoninTests`, `RoninProcessorTests`, `RoninPanelProbe`), `RoninAudioProcessor`, and the `RONIN/` jack-id prefix in the web rack. The plugin code stays `Rnin`. Saved state is format 2 XML (`<RONIN format="2">`, JCS R7); the old `RNIN` format-1 blob still loads and is migrated.
 
 ## Build and test
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --target RoninTests Ronin_VST3 RoninPanelProbe
+cmake --build build --target RoninTests RoninProcessorTests Ronin_VST3 RoninPanelProbe
 ./build/RoninTests              # exit 0; look for SINE_DRY PASS
+xvfb-run -a ./build/RoninProcessorTests_artefacts/Release/RoninProcessorTests   # processor-level tests (HQ, TRI, state)
 xvfb-run -a build/RoninPanelProbe_artefacts/Release/RoninPanelProbe   # Linux; prints PROBE PASS
 ```
+
+### Strict warnings (the JIDAI rack build)
+
+The JIDAI rack compiles RONIN's sources with JUCE's recommended warning flags plus `-Wfloat-equal -Wimplicit-int-float-conversion -Wshadow -Wconversion -Wdouble-promotion -Werror`. Check it with:
+
+```bash
+cmake -S . -B build-strict -DCMAKE_BUILD_TYPE=Release -DRONIN_STRICT_WARNINGS=ON      # needs CMake 3.25+
+cmake --build build-strict --target Ronin_VST3 RoninTests RoninProcessorTests RoninPanelProbe
+```
+
+Run it with g++ and with clang (`-DCMAKE_CXX_COMPILER=clang++`; `-Wimplicit-int-float-conversion` is clang-only). JUCE modules and the vendored jidai-common are SYSTEM includes in this mode, so only RONIN code is held to the flags. The engine files the rack compiles are `RONIN_ENGINE_SOURCES` in `CMakeLists.txt` (JUCE-free); the plugin adds `RONIN_PLUGIN_SOURCES`. Exact float compares go through `ronin::exactlyEqual` (`Source/Modular/FloatCompare.h`). Narrowing is written as an explicit `static_cast` that keeps the old arithmetic, so the sound stays bit-identical.
 
 Requirements: CMake 3.22 or newer, a C++20 compiler and git. JUCE 8.0.4 is fetched by CMake, not vendored. Format: VST3. `IS_SYNTH` false. MIDI input off.
 
@@ -47,6 +66,9 @@ FL Studio on macOS does not open the Debug bundle. After a VST3 change, quit FL 
 * DSP modules do not include JUCE headers. The processor copies buffers in and out.
 * `process()` and `processSample()` do not allocate, lock, or log.
 * Inputs sum. A second cable into an input stays in the graph. Stack order, cable color, and cable shape do not change the sound. The cable rule is in `docs/METHODOLOGY.md`.
+* The MAIN tab is `panel/assets/panel.svg`, unchanged (RONIN_Redesign §4.0). Do not add, move or resize anything on the face; new controls go on a tab. Only transient overlays (hover read-outs, right-click boxes and menus) and cable colours may draw over it. Run the pixel check in `docs/TESTPLAN.md` after touching `PatchBayView`.
+* Cross-unit signal rules come from the vendored jidai-common through `Source/Modular/Jcs.h` (`jcs::`). Do not hard-code a threshold, gate level or role colour elsewhere, and do not edit `third_party/jidai-common/`: update it from upstream (see its VENDOR.md).
+* Never pass two stateful calls as arguments of one call (`f (a.process(), a.process())`): C++ leaves the order unspecified and g++ evaluates right to left. One sub-sample per statement (`testHqSubSampleOrder`).
 * Knob defaults live in one table, `Source/Modular/PanelDefaults.h`. A test checks that FaceKnobs, `panel/assets/layout.json` and the INIT program agree.
 * Do not commit DAW projects, samples, `.env` files, or schematic scans.
 * UI work that changes a control or a cable must be clicked through in a real plugin host or a standalone window (the panel probe counts) before it is called done. Say which host.

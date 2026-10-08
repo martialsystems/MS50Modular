@@ -29,15 +29,18 @@ inline constexpr float kVca2Mod = 1.0f;
 inline constexpr float kMgRate = 0.50f;
 inline constexpr float kMgPw = 0.50f;
 
-inline constexpr float kEg1Attack = 0.05f;
-inline constexpr float kEg1Decay = 0.30f;
+// EG time knobs are on the real-time law (1 ms .. 60 s, RONIN_Redesign §3.1). These are the old 0.05 / 0.30
+// defaults passed through M-R1 (EgLaw.h), so INIT keeps its envelope timing: attack 9.85 ms, decay and
+// release 73 ms to within 1 %. EG 2 HOLD and DELAY keep their old law and values.
+inline constexpr float kEg1Attack = 0.2079f;
+inline constexpr float kEg1Decay = 0.3900f;
 inline constexpr float kEg1Sustain = 0.60f;
-inline constexpr float kEg1Release = 0.30f;
+inline constexpr float kEg1Release = 0.3900f;
 
 inline constexpr float kEg2Hold = 0.30f;
 inline constexpr float kEg2Delay = 0.0f;
-inline constexpr float kEg2Attack = 0.05f;
-inline constexpr float kEg2Release = 0.30f;
+inline constexpr float kEg2Attack = 0.2079f;
+inline constexpr float kEg2Release = 0.3900f;
 
 inline constexpr float kSampleHoldRate = 0.50f;
 inline constexpr float kIntegratorTime = 0.50f;

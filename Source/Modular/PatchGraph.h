@@ -40,12 +40,25 @@ public:
 
     // Live jack voltage for the meter. Not used by process().
     float portVolts (int module, int port) const noexcept;
+    // JCS R15: true once |V| > 5.5 V has lasted more than 10 ms on that port, held for 100 ms after it ends so a
+    // 20 Hz UI cannot miss it. Written by process() (relaxed), read by the UI.
+    bool portOverRange (int module, int port) const noexcept;
 
     // Copies the published snapshot. The caller supplies storage. No allocation.
     int copyPublishedCables (Cable* dest, int capacity) const;
 
-    // The newest cable that closes a cycle. Other cables stay zero-delay.
+    // JCS R9: every cable that closes a cycle (walking oldest to newest) is delayed one sample.
     int delayedCableCount() const;
+
+    // The volts one cable adds to its destination (JCS R3s, M3). Shared with the UI's jack monitor.
+    static float cableVolts (float raw, const PortDesc& sourceDesc, const PortDesc& destDesc, bool legacyInvert) noexcept;
+    // True exactly where cableVolts converts a gate to S-trig on a non-migrated cable: a Gate-type output that is not
+    // already S-trig, landing on an S-trig input (EG 1/EG 2 TRIG). A GATE/CLK-role output of CV type (DIV /2 and /4)
+    // passes its volts as written.
+    static bool convertsToStrig (const PortDesc& sourceDesc, const PortDesc& destDesc) noexcept;
+    // The patch bay's cable badge: jcs::cableBadge on the two roles, except that "gate converted to S-trig" shows
+    // exactly where convertsToStrig is true (the same rule as the rack's badge).
+    static jcs::Badge cableBadge (const PortDesc& sourceDesc, const PortDesc& destDesc) noexcept;
     bool cableIsDelayed (int index) const;
 
     static constexpr int kStateVersion = 1;
@@ -66,6 +79,12 @@ public:
     bool setCables (const Cable* cables, int count);
 
     bool writePresetKnob (int module, int knob, float value);
+    // Edit one cable's saved fields (message thread). They never change the sum's routing; legacyInvert changes the
+    // conversion of that one cable (PATCH tab "Convert"). False for a bad index.
+    bool setCableColour (int index, std::uint32_t argb);
+    bool setCableLegacyInvert (int index, bool legacy);
+    // True when connect() would accept this cable (indices, direction, type, not one jack to itself).
+    bool cableIsLegal (const Cable& cable) const;
     const char* stateError() const noexcept { return stateError_; }
 
 private:
@@ -85,7 +104,7 @@ private:
     void publish();
     void fillOrder (Snapshot& snapshot) const;
     void clearModuleInputs (int moduleIndex, const bool patched[kMaxModules][kMaxPorts]) const;
-    void contributeCables (int moduleIndex, const Snapshot& snapshot, bool includeZeroDelayFeedback) const;
+    void contributeCables (int moduleIndex, const Snapshot& snapshot) const;
 
     Module* modules_[kMaxModules] {};
     int moduleCount_ = 0;
@@ -97,4 +116,10 @@ private:
     std::atomic<int> published_ { 0 };
     double preparedRate_ = 0.0;
     const char* stateError_ = "";
+    // JCS R15 tracking: the shared jcs::OverRangeLed per port (audio thread), a 100 ms UI hold, and a relaxed
+    // atomic flag the UI reads.
+    jcs::OverRangeLed overLed_[kMaxModules][kMaxPorts] {};
+    int overHold_[kMaxModules][kMaxPorts] {};
+    std::atomic<bool> overFlag_[kMaxModules][kMaxPorts] {};
+    int overHoldSamples_ = 4800;
 };

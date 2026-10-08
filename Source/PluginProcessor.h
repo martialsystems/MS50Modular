@@ -2,8 +2,12 @@
 
 #pragma once
 
+#include "Modular/PatchState.h"
 #include "Modular/Divider.h"
 #include "Modular/FactoryPresets.h"
+#include "Modular/HqPair.h"
+
+#include <jidai/dsp/Halfband.h>
 #include "Modular/Eg1.h"
 #include "Modular/Eg2.h"
 #include "Modular/ExtIn.h"
@@ -25,7 +29,8 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
-class RoninAudioProcessor : public juce::AudioProcessor
+class RoninAudioProcessor : public juce::AudioProcessor,
+                            private juce::AsyncUpdater
 {
 public:
     RoninAudioProcessor();
@@ -36,6 +41,7 @@ public:
 
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
 
+    using juce::AudioProcessor::processBlock;
     void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
 
     juce::AudioProcessorEditor* createEditor() override;
@@ -57,6 +63,10 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
     const juce::String& presetError() const noexcept { return presetError_; }
+    // Migration / load report of the last setStateInformation (SETUP tab, RONIN_Redesign §4.1, M-R1..M-R5).
+    const juce::StringArray& loadReport() const noexcept { return loadReport_; }
+    int loadedFormat() const noexcept { return loadedFormat_; }
+    RackIndices rackIndices() const noexcept;
 
     // Graph indices from addModule. Panel jack ids live in PanelGeometry.inc.
     int extInGraphIndex() const noexcept { return extModuleIndex_; }
@@ -92,11 +102,45 @@ public:
     void setExtInButtonHeld (bool held);
     bool extInButtonHeld() const noexcept;
 
+    // VOICE tab. TRI SHAPE (M-R2) and HQ 2x (JCS R11, default OFF).
+    juce::AudioParameterChoice* triShapeParameter() noexcept { return vcoTriShape_; }
+    juce::AudioParameterBool* hqParameter() noexcept { return hqMode_; }
+    Vco::TriShape triShape() const noexcept;
+    bool hqActive() const noexcept { return hqActive_.load (std::memory_order_relaxed); }
+    // 0 with HQ off, jidai::dsp::Halfband93::kLatencyPerDirection (23) with HQ on (only the down direction is used).
+    static int latencyForHq (bool hq) noexcept { return hq ? jidai::dsp::Halfband93::kLatencyPerDirection : 0; }
+    double engineSampleRate() const noexcept;
+
+    // UI read-outs (relaxed reads of audio-thread state; RONIN_Redesign §4.1).
+    const Vco& vcoModule() const noexcept { return vco; }
+    const Vcf& vcfModule() const noexcept { return vcf; }
+    const Eg1& eg1Module() const noexcept { return eg1; }
+    const Eg2& eg2Module() const noexcept { return eg2; }
+    float jackVolts (int module, int port) const noexcept { return graph.portVolts (module, port); }
+    // JCS R15: |V| > 5.5 V for more than 10 ms (held 100 ms for the UI).
+    bool jackOverRange (int module, int port) const noexcept { return graph.portOverRange (module, port); }
+    const PortDesc portDesc (int module, int port) const;
+    float cpuPercent() const { return static_cast<float> (loadMeasurer_.getLoadAsPercentage()); }
+
+    // PATCH tab edits (message thread only).
+    bool setCableColour (int index, std::uint32_t argb);
+    bool setCableLegacyInvert (int index, bool legacy);
+
+    // SETUP tab settings, saved with the patch (format 2 attributes uiCableColour / uiEgTime / uiScale).
+    bool cableColourByRole() const noexcept { return cableColourByRole_.load(); }
+    void setCableColourByRole (bool byRole) noexcept { cableColourByRole_.store (byRole); }
+    bool egTimeInMs() const noexcept { return egTimeMs_.load(); }
+    void setEgTimeInMs (bool ms) noexcept { egTimeMs_.store (ms); }
+    int uiScalePercent() const noexcept { return uiScale_.load(); }
+    void setUiScalePercent (int percent) noexcept { uiScale_.store (percent); }
+
     // Output Wet until a jack has been selected. Selecting does not patch.
     Meter& meter() noexcept { return meter_; }
     float meterVolts() const noexcept;
 
 private:
+    void handleAsyncUpdate() override;
+    void prepareEngine (double hostRate, bool hq);
     void addKnobParameter (const FaceKnobBinding& binding);
     void applyHostControls();
     void applyProgramParameters (int index);
@@ -119,6 +163,16 @@ private:
     Integrator integrator;
     Mixer mixer;
     SampleHold sampleHold;
+    juce::StringArray loadReport_;
+    juce::AudioProcessLoadMeasurer loadMeasurer_;
+    std::atomic<bool> cableColourByRole_ { true };   // JCS R14 default: BY ROLE
+    std::atomic<bool> egTimeMs_ { false };
+    std::atomic<int> uiScale_ { 100 };
+    int loadedFormat_ = patchstate::kFormat;
+    void loadFormat1 (const juce::XmlElement& xml);
+    void loadFormat2 (const juce::XmlElement& xml, int format);
+    void readParameters (const juce::XmlElement& xml);
+
     int extModuleIndex_ = -1;
     int outputModuleIndex_ = -1;
     int noiseModuleIndex_ = -1;
@@ -170,6 +224,12 @@ private:
     juce::AudioParameterFloat* extInThreshold_ = nullptr;
     juce::AudioParameterFloat* extInRelease_ = nullptr;
     juce::AudioParameterFloat* dividerRatio_ = nullptr;
+    juce::AudioParameterChoice* vcoTriShape_ = nullptr;
+    juce::AudioParameterBool* hqMode_ = nullptr;
+    std::atomic<bool> hqActive_ { false };
+    double hostRate_ = 48000.0;
+    jidai::dsp::Downsampler2x decimatorL_;   // shared jidai-common halfband (third_party/jidai-common)
+    jidai::dsp::Downsampler2x decimatorR_;
     Meter meter_;
     int currentProgram_ = kDefaultFactoryPreset;
     juce::String presetError_;

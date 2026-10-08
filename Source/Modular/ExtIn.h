@@ -10,10 +10,11 @@
 // S-22: absolute mono into a one-pole follower. The momentary button ORs the gate.
 class ExtIn : public Module {
 public:
-    static constexpr float kHostToVolts = 5.0f;
-    static constexpr float kVoltsToHost = 0.2f;
+    static constexpr float kHostToVolts = jcs::hostToVolts (1.0f);   // JCS R1: 5 V per host unit
+    static constexpr float kVoltsToHost = jcs::voltsToHost (1.0f);   // JCS R1 / S-01: 0.2
     static constexpr int kKnobThreshold = 0;
     static constexpr int kKnobRelease = 1;
+    static constexpr float kCloseRatio = 0.7f;   // §3.8: closes below 0.7 x threshold
 
     ExtIn();
 
@@ -37,6 +38,7 @@ private:
     float inLVolts_ = 0.0f;
     float inRVolts_ = 0.0f;
     float env_ = 0.0f;
+    bool followerOpen_ = false;
     // Schematic defaults: 0.2 V and 80 ms. Set in the constructor from those voltages.
     float threshold01_ = 0.0f;
     float release01_ = 0.0f;

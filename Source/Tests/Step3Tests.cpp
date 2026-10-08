@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
+#include "Modular/FloatCompare.h"
+#include "Tests/TestSuite.h"
 #include "Modular/ExtIn.h"
 #include "Modular/OutputModule.h"
 #include "Modular/PatchGraph.h"
@@ -81,8 +83,8 @@ int testExtInMonoAveragesStereo()
     rack.drive (1.0f, -0.5f);
 
     const float mono = rack.extIn.portValue[2];
-    check (mono == 0.5f * (5.0f + -2.5f), "mono volts");
-    check (mono == 1.25f, "mono is 1.25 V");
+    check (ronin::exactlyEqual (mono, 0.5f * (5.0f + -2.5f)), "mono volts");
+    check (ronin::exactlyEqual (mono, 1.25f), "mono is 1.25 V");
     check (near (rack.output.hostLeft(), 1.0f), "dry left image");
     check (near (rack.output.hostRight(), -0.5f), "dry right image");
     return finish ("testExtInMonoAveragesStereo");

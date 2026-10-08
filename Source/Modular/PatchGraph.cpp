@@ -2,6 +2,7 @@
 
 #include "PatchGraph.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -171,6 +172,7 @@ bool PatchGraph::connect (int sourceModule, int sourcePort, int destModule, int 
         return false;
 
     Cable& cable = editCables_[editCableCount_];
+    cable = Cable {};   // a new cable: colour by role, never legacyInvert (JCS M3)
     cable.sourceModule = sourceModule;
     cable.sourcePort = sourcePort;
     cable.destModule = destModule;
@@ -244,6 +246,14 @@ void PatchGraph::disconnect (int sourceModule, int sourcePort, int destModule, i
 void PatchGraph::prepare (double sampleRate)
 {
     preparedRate_ = sampleRate;
+    overHoldSamples_ = std::max (1, static_cast<int> (std::lround (0.1 * sampleRate)));
+    for (int m = 0; m < kMaxModules; ++m)
+        for (int p = 0; p < kMaxPorts; ++p)
+        {
+            overLed_[m][p].prepare (sampleRate);
+            overHold_[m][p] = 0;
+            overFlag_[m][p].store (false, std::memory_order_relaxed);
+        }
     for (int i = 0; i < moduleCount_; ++i)
     {
         modules_[i]->sampleRate = sampleRate;
@@ -340,20 +350,18 @@ void PatchGraph::publish()
     for (int i = 0; i < editCableCount_; ++i)
         snapshot.cables[i] = editCables_[i];
 
-    // Walk oldest to newest. An edge is feedback when it closes on the edges kept so far.
-    // Only the newest feedback edge is delayed. The kept edges stay a DAG.
+    // JCS R9: walk oldest to newest. A cable is feedback when its destination already reaches its source over
+    // the cables kept so far, or when it is a self-patch. Every feedback cable is delayed exactly one sample;
+    // all other cables are zero-delay. The kept edges stay a DAG, so no module ever runs twice per sample.
     bool kept[kMaxCables] {};
-    int newestFeedback = -1;
     for (int i = 0; i < snapshot.cableCount; ++i)
     {
         const int source = snapshot.cables[i].sourceModule;
         const int dest = snapshot.cables[i].destModule;
         const bool closes = source == dest || keptReaches (dest, source, snapshot, kept);
         snapshot.feedback[i] = closes;
-        snapshot.delayed[i] = false;
+        snapshot.delayed[i] = closes;
         kept[i] = ! closes;
-        if (closes)
-            newestFeedback = i;
     }
     for (int i = snapshot.cableCount; i < kMaxCables; ++i)
     {
@@ -361,8 +369,6 @@ void PatchGraph::publish()
         snapshot.delayed[i] = false;
         snapshot.held[i] = 0.0f;
     }
-    if (newestFeedback >= 0)
-        snapshot.delayed[newestFeedback] = true;
 
     for (int i = 0; i < snapshot.cableCount; ++i)
     {
@@ -420,18 +426,39 @@ void PatchGraph::clearModuleInputs (int moduleIndex, const bool patched[kMaxModu
         if (desc.dir != PortDir::In)
             continue;
         module->inputConnected[portIndex] = patched[moduleIndex][portIndex];
-        if (! patched[moduleIndex][portIndex])
-        {
-            if (desc.type == PortType::Gate)
-                continue;
-            module->portValue[portIndex] = desc.rest;
-            continue;
-        }
-        module->portValue[portIndex] = 0.0f;
+        // JCS R10: an unpatched input sits at its typed rest every sample (Gate inputs too). Nothing latches.
+        module->portValue[portIndex] = patched[moduleIndex][portIndex] ? 0.0f : desc.rest;
     }
 }
 
-void PatchGraph::contributeCables (int moduleIndex, const Snapshot& snapshot, bool includeZeroDelayFeedback) const
+float PatchGraph::cableVolts (float raw, const PortDesc& sourceDesc, const PortDesc& destDesc, bool legacyInvert) noexcept
+{
+    // JCS R3s: only a cable that lands on an S-trig input (EG 1/EG 2 TRIG) is polarity-converted. A Gate source
+    // that is not S-trig writes high ? 0 V : 5 V; an S-trig source (EXT IN GATE) passes as written.
+    // Every other input receives the raw volts, except a migrated format-1 cable flagged legacyInvert (JCS M3),
+    // which keeps the old S-15 inversion into any non-Gate input.
+    const bool gateSource = sourceDesc.type == PortType::Gate && ! sourceDesc.strigVolts;
+    if (! gateSource)
+        return raw;
+    if (destDesc.strigInput || (legacyInvert && destDesc.type != PortType::Gate))
+        return raw >= 0.5f ? 0.0f : jcs::kStrigRest;
+    return raw;
+}
+
+bool PatchGraph::convertsToStrig (const PortDesc& sourceDesc, const PortDesc& destDesc) noexcept
+{
+    return sourceDesc.type == PortType::Gate && ! sourceDesc.strigVolts && destDesc.strigInput;
+}
+
+jcs::Badge PatchGraph::cableBadge (const PortDesc& sourceDesc, const PortDesc& destDesc) noexcept
+{
+    if (convertsToStrig (sourceDesc, destDesc))
+        return jcs::Badge::GateToStrig;
+    const jcs::Badge badge = jcs::cableBadge (portRole (sourceDesc), portRole (destDesc));
+    return badge == jcs::Badge::GateToStrig ? jcs::Badge::None : badge;
+}
+
+void PatchGraph::contributeCables (int moduleIndex, const Snapshot& snapshot) const
 {
     Module* module = modules_[moduleIndex];
     for (int i = 0; i < snapshot.cableCount; ++i)
@@ -439,19 +466,12 @@ void PatchGraph::contributeCables (int moduleIndex, const Snapshot& snapshot, bo
         const Cable& cable = snapshot.cables[i];
         if (cable.destModule != moduleIndex)
             continue;
-        const bool zeroDelayFeedback = snapshot.feedback[i] && ! snapshot.delayed[i];
-        if (zeroDelayFeedback && ! includeZeroDelayFeedback)
-            continue;
 
         const Module* source = modules_[cable.sourceModule];
-        float contributed = snapshot.delayed[i] ? snapshot.held[i] : source->portValue[cable.sourcePort];
-        const PortDesc sourceDesc = source->port (cable.sourcePort);
-        const PortDesc destDesc = module->port (cable.destPort);
-        // S-15: logic 1 is held and contributes 0 V. Logic 0 is released and contributes +5 V.
-        // Gate-to-gate stays the raw level. Ext In Gate is already 0 V held and +5 V released.
-        if (sourceDesc.type == PortType::Gate && destDesc.type != PortType::Gate && ! sourceDesc.strigVolts)
-            contributed = contributed >= 0.5f ? 0.0f : 5.0f;
-        module->portValue[cable.destPort] += contributed;
+        const float raw = snapshot.delayed[i] ? snapshot.held[i] : source->portValue[cable.sourcePort];
+        // JCS R8: per-cable conversion before the sum.
+        module->portValue[cable.destPort] += cableVolts (raw, source->port (cable.sourcePort),
+                                                         module->port (cable.destPort), cable.legacyInvert);
     }
 }
 
@@ -503,28 +523,11 @@ void PatchGraph::process()
     for (int moduleIndex = 0; moduleIndex < moduleCount_; ++moduleIndex)
         clearModuleInputs (moduleIndex, patched);
 
-    // Destinations of an older feedback cable run once more so that cable stays zero-delay.
-    bool again[kMaxModules] {};
-    for (int i = 0; i < snapshot.cableCount; ++i)
-    {
-        if (snapshot.feedback[i] && ! snapshot.delayed[i])
-            again[snapshot.cables[i].destModule] = true;
-    }
-
+    // JCS R9: one pass. Each module runs exactly once; feedback cables read last sample's held value.
     for (int orderIndex = 0; orderIndex < snapshot.orderCount; ++orderIndex)
     {
         const int moduleIndex = snapshot.order[orderIndex];
-        contributeCables (moduleIndex, snapshot, false);
-        modules_[moduleIndex]->processSample();
-    }
-
-    for (int orderIndex = 0; orderIndex < snapshot.orderCount; ++orderIndex)
-    {
-        const int moduleIndex = snapshot.order[orderIndex];
-        if (! again[moduleIndex])
-            continue;
-        clearModuleInputs (moduleIndex, patched);
-        contributeCables (moduleIndex, snapshot, true);
+        contributeCables (moduleIndex, snapshot);
         modules_[moduleIndex]->processSample();
     }
 
@@ -535,6 +538,30 @@ void PatchGraph::process()
         const Cable& cable = snapshot.cables[i];
         snapshot.held[i] = modules_[cable.sourceModule]->portValue[cable.sourcePort];
     }
+
+    // JCS R15: over-range when |V| > 5.5 V for more than 10 ms. No allocation, no lock.
+    for (int m = 0; m < moduleCount_; ++m)
+    {
+        const Module* module = modules_[m];
+        const int ports = std::min (module->numPorts(), static_cast<int> (kMaxPorts));
+        for (int p = 0; p < ports; ++p)
+        {
+            if (overLed_[m][p].process (module->portValue[p]))
+                overHold_[m][p] = overHoldSamples_;
+            else if (overHold_[m][p] > 0)
+                --overHold_[m][p];
+            const bool lit = overHold_[m][p] > 0;
+            if (overFlag_[m][p].load (std::memory_order_relaxed) != lit)
+                overFlag_[m][p].store (lit, std::memory_order_relaxed);
+        }
+    }
+}
+
+bool PatchGraph::portOverRange (int module, int port) const noexcept
+{
+    if (module < 0 || module >= kMaxModules || port < 0 || port >= kMaxPorts)
+        return false;
+    return overFlag_[module][port].load (std::memory_order_relaxed);
 }
 
 int PatchGraph::getState (void* dest, int capacity) const
@@ -711,6 +738,31 @@ bool PatchGraph::setCables (const Cable* cables, int count)
     publish();
     stateError_ = "";
     return true;
+}
+
+bool PatchGraph::setCableColour (int index, std::uint32_t argb)
+{
+    if (index < 0 || index >= editCableCount_)
+        return false;
+    editCables_[index].colour = argb;
+    publish();
+    return true;
+}
+
+bool PatchGraph::setCableLegacyInvert (int index, bool legacy)
+{
+    if (index < 0 || index >= editCableCount_)
+        return false;
+    editCables_[index].legacyInvert = legacy;
+    publish();
+    return true;
+}
+
+bool PatchGraph::cableIsLegal (const Cable& cable) const
+{
+    if (cable.sourceModule == cable.destModule && cable.sourcePort == cable.destPort)
+        return false;
+    return indicesLegal (cable.sourceModule, cable.sourcePort, cable.destModule, cable.destPort);
 }
 
 Module* PatchGraph::moduleAt (int index) noexcept

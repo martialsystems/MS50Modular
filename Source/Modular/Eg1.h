@@ -4,7 +4,11 @@
 
 #include "Module.h"
 
+#include <atomic>
+
 // S-13, S-14, S-15. ADSR with three outputs. Separate from EG 2.
+// RONIN_Redesign §3.1: double state, real-time labels (1 ms .. 60 s), 6 V attack target, -134 dB snap,
+// S-trig input with JCS R3s hysteresis (held below 1.0 V, released above 1.5 V).
 class Eg1 : public Module {
 public:
     static constexpr int kTrig = 0;
@@ -15,6 +19,8 @@ public:
     static constexpr int kKnobDecay = 1;
     static constexpr int kKnobSustain = 2;
     static constexpr int kKnobRelease = 3;
+
+    enum class Stage { Idle = 0, Attack, Decay, Sustain, Release };
 
     Eg1();
 
@@ -27,20 +33,27 @@ public:
     void prepare (double sampleRate) override;
     void processSample() override;
 
+    // UI readouts (ENV tab). Relaxed atomics: no lock on the audio thread.
+    Stage stage() const noexcept { return static_cast<Stage> (stageView_.load (std::memory_order_relaxed)); }
+    bool triggerHeld() const noexcept { return heldView_.load (std::memory_order_relaxed); }
+    static double secondsForKnob (float knob01);
+
 private:
-    enum class Stage { Idle, Attack, Decay, Sustain, Release };
-
     static float clamp01 (float value);
-    static float knobForSeconds (float seconds);
-    float secondsFor (float knob01) const;
-    void follow (float target, float seconds);
+    void updateCoefficients();
 
-    // Schematic defaults: attack 0.01 s, decay 0.25 s, sustain 0.6, release 0.30 s.
-    float attack01_ = 0.25f;
-    float decay01_ = 0.59948425f;
+    // Schematic defaults: attack 0.01 s, decay 0.25 s, sustain 0.6, release 0.30 s (real times).
+    float attack01_ = 0.0f;
+    float decay01_ = 0.0f;
     float sustain01_ = 0.6f;
-    float release01_ = 0.61928095f;
-    float outA_ = 0.0f;
-    bool wasHeld_ = false;
+    float release01_ = 0.0f;
+    double x_ = 0.0;
+    double aAttack_ = 1.0;
+    double aDecay_ = 1.0;
+    double aRelease_ = 1.0;
+    double aSustain_ = 1.0;
+    jcs::StrigDetector trig_;
     Stage stage_ = Stage::Idle;
+    std::atomic<int> stageView_ { 0 };
+    std::atomic<bool> heldView_ { false };
 };

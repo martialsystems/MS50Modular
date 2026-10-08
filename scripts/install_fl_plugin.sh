@@ -102,7 +102,7 @@ fi
 if printf '%s\n' "$sine_out" | grep -qx 'SINE_HOST PASS'; then
   :
 elif printf '%s\n' "$sine_out" | grep -qx 'SINE_HOST SKIP'; then
-  echo "Pedalboard sine check skipped. The slice check above still processed a dry block." >&2
+  echo "Pedalboard sine check skipped. The slice check above still processed the INIT wet block and a dry block after Effect off." >&2
 else
   echo "Sine host check failed." >&2
   exit 1

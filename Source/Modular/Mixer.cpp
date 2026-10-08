@@ -2,6 +2,8 @@
 
 #include "Mixer.h"
 
+#include "FloatCompare.h"
+
 #include <cmath>
 
 namespace {
@@ -48,7 +50,10 @@ int Mixer::numKnobs() const
 void Mixer::setKnob (int knob, float zeroToOne)
 {
     if (knob >= kKnobLevel1 && knob <= kKnobLevel3)
+    {
         level_[knob] = clamp01 (zeroToOne);
+        levelSmooth_[knob].setTarget (level_[knob]);
+    }
 }
 
 int Mixer::presetKnobCount() const
@@ -66,6 +71,8 @@ float Mixer::presetKnob (int knob) const
 void Mixer::prepare (double rate)
 {
     sampleRate = rate;
+    for (auto& smooth : levelSmooth_)
+        smooth.prepare (rate);
 }
 
 void Mixer::processSample()
@@ -74,10 +81,11 @@ void Mixer::processSample()
     const float input[3] = { portValue[kIn1], portValue[kIn2], portValue[kIn3] };
     for (int i = 0; i < 3; ++i)
     {
-        if (level_[i] == 0.0f)
+        const float level = levelSmooth_[i].next();
+        if (ronin::exactlyEqual (level, 0.0f))
             continue;
         const float sample = std::isfinite (input[i]) ? input[i] : 0.0f;
-        sum += sample * level_[i];
+        sum += sample * level;
     }
     const float inverted = -sum;
     portValue[kOut] = std::isfinite (inverted) ? inverted : 0.0f;

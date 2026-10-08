@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
+#include "Modular/FloatCompare.h"
+#include "Tests/TestSuite.h"
 #include "Modular/ExtIn.h"
 #include "Modular/Noise.h"
 #include "Modular/OutputModule.h"
@@ -42,7 +44,8 @@ bool sameCable (const Cable& a, const Cable& b)
 int testPanelStackRule()
 {
     check (kPanelJackCount == 57, "panel jack count");
-    check (sizeof (Cable) == sizeof (int) * 4, "Cable stays four ids");
+    // Cable carries the four ids plus the state-v2 fields (legacyInvert, colour override). Neither changes the sum.
+    check (Cable {}.legacyInvert == false && Cable {}.colour == 0u, "a new Cable is not legacy and colours by role");
 
     ExtIn ext;
     OutputModule output;
@@ -155,8 +158,8 @@ int testPanelKnobs()
     check (vco >= 0 && extL >= 0 && outL >= 0, "VCO, Ext In, and Output jacks exist");
     check (kPanelJacks[vco].x < kPanelJacks[extL].x, "VCO stays left of Ext In");
     check (kPanelJacks[extL].x < kPanelJacks[outL].x, "Ext In sits left of Output");
-    check (kPowerW == 40.0f && kPowerH == 20.0f, "power rocker is the on off control");
-    check (kHoldHitW == 34.0f && kHoldHitH == 34.0f, "hold key is the square cap");
+    check (ronin::exactlyEqual (kPowerW, 40.0f) && ronin::exactlyEqual (kPowerH, 20.0f), "power rocker is the on off control");
+    check (ronin::exactlyEqual (kHoldHitW, 34.0f) && ronin::exactlyEqual (kHoldHitH, 34.0f), "hold key is the square cap");
     check (kPresetChars == 16, "preset screen is 16 characters");
 
     float leftOfOutput = -1.0f;
@@ -179,7 +182,7 @@ int testPanelKnobs()
            "drag up 40px adds 0.2");
     check (std::fabs (panelKnobDrag (start, 200.0f, true, false) - (start + 0.2f)) < 1.0e-4f,
            "shift drag is five times finer");
-    check (panelKnobDrag (start, 5000.0f, false, false) == 1.0f, "drag clamps at 1");
+    check (ronin::exactlyEqual (panelKnobDrag (start, 5000.0f, false, false), 1.0f), "drag clamps at 1");
     check (std::fabs (panelKnobWheel (start + 0.4f, 100.0f, false, false) - (start + 0.3f)) < 1.0e-4f,
            "wheel down removes 0.1");
     check (std::fabs (panelKnobFromWheel (0.5f, 1.0f, false, false, false) - 0.6f) < 1.0e-4f,
@@ -188,15 +191,15 @@ int testPanelKnobs()
            "reversed wheel up is a downward push");
 
     check (kPanelKnobs[ratio].kind == 1, "divider control is the switch");
-    check (kPanelKnobs[ratio].valueDefault == 0.0f, "switch default is 2");
-    check (panelKnobSwitchClick (0.0f) == 1.0f, "click steps 2 to 4");
-    check (panelKnobSwitchClick (1.0f) == 0.0f, "click steps 4 to 2");
-    check (panelKnobClamp (0.5f, true) == 1.0f && panelKnobClamp (0.4f, true) == 0.0f, "switch has two positions");
-    check (panelKnobDrag (1.0f, -40.0f, false, true) == 0.0f, "switch drag snaps");
-    check (panelKnobFromWheel (0.0f, 1.0f, false, false, true) == 1.0f, "wheel up steps the switch");
-    check (panelKnobAngleDegrees (false, 0.0f) == -135.0f, "rotary start angle");
-    check (panelKnobAngleDegrees (false, 1.0f) == 135.0f, "rotary end angle");
-    check (panelKnobAngleDegrees (true, 0.5f) == 0.0f, "switch centre angle");
+    check (ronin::exactlyEqual (kPanelKnobs[ratio].valueDefault, 0.0f), "switch default is 2");
+    check (ronin::exactlyEqual (panelKnobSwitchClick (0.0f), 1.0f), "click steps 2 to 4");
+    check (ronin::exactlyEqual (panelKnobSwitchClick (1.0f), 0.0f), "click steps 4 to 2");
+    check (ronin::exactlyEqual (panelKnobClamp (0.5f, true), 1.0f) && ronin::exactlyEqual (panelKnobClamp (0.4f, true), 0.0f), "switch has two positions");
+    check (ronin::exactlyEqual (panelKnobDrag (1.0f, -40.0f, false, true), 0.0f), "switch drag snaps");
+    check (ronin::exactlyEqual (panelKnobFromWheel (0.0f, 1.0f, false, false, true), 1.0f), "wheel up steps the switch");
+    check (ronin::exactlyEqual (panelKnobAngleDegrees (false, 0.0f), -135.0f), "rotary start angle");
+    check (ronin::exactlyEqual (panelKnobAngleDegrees (false, 1.0f), 135.0f), "rotary end angle");
+    check (ronin::exactlyEqual (panelKnobAngleDegrees (true, 0.5f), 0.0f), "switch centre angle");
 
     return finish ("testPanelKnobs");
 }

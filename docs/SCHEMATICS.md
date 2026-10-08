@@ -57,17 +57,17 @@ Phase 2 columns are drawn on the panel and have no ports in the graph. The divid
 ## PatchGraph rules
 
 *   Fixed module list. No add-module command in phase 1.
-*   Each module owns a fixed `float portValue[]`. Unpatched Audio and CV inputs are set to 0 V before the sample, except EG `Trig` jacks. An unpatched `Trig` is set to +5 V so it rests released. 0 V on a trigger means "shorted," and a missing cable must not hold the envelope forever (S-15). A Gate input that received a promoted Gate uses the promotion rule below.
+*   Each module owns a fixed `float portValue[]`. Every input starts each sample at its typed rest (JCS R10, `PortDesc::rest`): 0 V for Audio, CV, V/OCT, HZ/V LIN and Gate/Clk inputs, +5 V (released) for the S-trig inputs EG 1 `Trig` and EG 2 `Trig`. 0 V on a trigger means "shorted," and a missing cable must not hold the envelope forever. Cables then add on top of the rest.
 *   An input sums every cable that lands on it. A second `connect` appends another cable and publishes. Stack order, cable color, and cable shape do not change that sum. See Input summing.
 *   An output may feed several inputs (S-27). That fan-out is a software convenience so EG 1 can reach both the VCA and the filter before the multiples module exists.
 *   Cable creation and deletion happen on the message thread. The audio thread reads a published snapshot.
 *   Snapshot storage is two preallocated graphs plus an atomic index. Swapping snapshots does not allocate. `processBlock` does not allocate, lock, take a mutex, or log.
 *   Audio thread order is a topological order computed when the snapshot is published.
-*   Until step 19, a cable that would close a cycle is rejected. From step 19, a cycle is accepted: the newest cable in the cycle is the back-edge (S-24) and carries a one-sample delay. Every other cable in that snapshot is zero-delay.
+*   A cycle is accepted. Every cable that closes a feedback loop carries exactly one sample of delay, and no module runs twice in one sample (JCS R9, RONIN_Redesign N12). The old second "again" pass, which ran a loop's modules twice and doubled a self-patched VCO's pitch, is removed. Every other cable in the snapshot is zero-delay.
 *   Port types: `Audio`, `CV`, `Gate`.
 *   Allowed: Audio to Audio, Audio to CV, CV to CV, CV to Audio, Gate to Gate, Gate to CV, Gate to Audio.
 *   Rejected: Audio or CV into a Gate-only input. A cable from a port to itself with no module in between.
-*   A logic Gate into a CV or Audio input uses S-15: a level at or above 0.5 writes 0 V, and a level below 0.5 writes +5 V. Gate-to-gate stays the raw level. Logical "held" inside an EG still means the trigger volts are below 1.5.
+*   Polarity conversion (JCS R3s) happens only on a cable that lands on an S-trig input (EG 1 / EG 2 `Trig`): a logic Gate source writes 0 V while high (level at or above 0.5) and +5 V while low. An S-trig source (EXT IN `Gate`) passes as written. Every other input receives the raw volts, so a Gate into a VCA or CV input is 0 / 5 V, not inverted. A cable migrated from a format-1 state that ran a Gate into a non-S-trig input carries `legacyInvert` and keeps the old S-15 inversion (JCS M3, RONIN M-R3); new cables never get it. The PATCH tab shows the flag and can convert the cable.
 *   EG `Trig` jacks are type CV, not Gate-only, because the hardware detector accepts a voltage. Ext In `Gate` is type Gate and already writes S-trig volts: 0 V while held, +5 V while released. Those volts are added to `Trig` as written. EG 2 `DelayTrig` is a logic Gate and still promotes. MG pulse is type CV (0 V to +5 V) and may be patched into `Trig` directly. Divider outputs are type CV.
 *   Gate-only inputs in phase 1: none on the modules. Ext In `Gate` and EG 2 `DelayTrig` are the Gate outputs. Output has no gate jack.
 *   Sample rate lives on the graph. `prepare(sampleRate)` runs on the message thread before audio starts, and again if the host changes rate. It may allocate. `processSample` may not.
@@ -76,7 +76,7 @@ Phase 2 columns are drawn on the panel and have no ports in the graph. The divid
 
 An input starts at 0 V on each sample. Every cable into that input adds the source port. A second connect appends a cable and publishes the snapshot. Fan-out from one output remains allowed.
 
-Stack order, cable color, and cable shape do not change the sum. Reordering the plugs drawn on a jack does not publish. `Cable` stores four integers: source module, source port, destination module, destination port.
+Stack order, cable color, and cable shape do not change the sum. Reordering the plugs drawn on a jack does not publish. `Cable` stores four integers (source module, source port, destination module, destination port), the `legacyInvert` migration flag, and a colour override (0 = colour by role, JCS R14). The colour never changes the sum.
 
 A jack on the 1978 hardware took one plug. This plugin stacks.
 
@@ -118,6 +118,8 @@ Exponential time or frequency knob:
 ```text
 value = min * pow(max / min, knob01)
 ```
+
+Knob smoothing (RONIN_Redesign N8, `Source/Modular/Smoothing.h`): gain knobs (VCA 1 Initial and intensity, Mixer levels, Output mix and level) ramp per sample over 10 ms on a double state that lands exactly on the target; the VCF cutoff knob ramps over 5 ms in the log (octave) domain. The first target after `prepare` snaps. VCA 2 keeps its own 20 ms opto lag (S-12) as its smoothing.
 
 One-pole smoother, used by VCA 2 and by the Ext In envelope:
 
@@ -171,7 +173,7 @@ Jacks:
 | Mono | out | Audio | (L + R) / 2 |
 | Gate | out | Gate | 0 V while the button is down or the follower is above threshold. +5 V while released |
 
-Signal flow: host float to volts, mono sum, absolute value into a one-pole follower (attack 5 ms stand-in, release from the knob), compare to threshold.
+Signal flow: host float to volts, mono sum, absolute value into a one-pole follower (attack 5 ms stand-in, release from the knob), compare to threshold with hysteresis (RONIN_Redesign N15): the gate opens when the follower rises above the threshold and closes only when it falls below 0.7 x threshold. A rippling 40 Hz bass now opens the gate once instead of 79 times (`testExtInGateHysteresis`).
 
 Failure modes: full-scale stereo summing to more than ±5 V. Do not clip the mono sum in Ext In. Let the filter see it. DC from the host passes. That is acceptable.
 
@@ -245,7 +247,9 @@ hz = hzFromLinear * fine * octExpo
 
 When `Hz/V` is unpatched it reads 0 V, and the clamp makes the linear term `footage * 0.05`, which is too low to be the unpatched panel pitch. Correction, still a stand-in: if the Hz/V jack has no cable, the linear term is `footage` (the reference pitch). If a cable is connected, S-03 applies, including the 0.05 V floor. The graph must tell the module whether the jack is patched. Add `bool inputConnected[8]` set by the graph each sample. No allocation.
 
-Anti-alias: PolyBLEP saw, triangle from the integrated saw, pulse by comparing the saw phase to the duty. This anti-alias method is part of S-02, not a confirmed circuit.
+Anti-alias: PolyBLEP saw, pulse by comparing the saw phase to the duty (KEPT). The triangle has two shapes, chosen on the VOICE tab (TRI SHAPE, host parameter `vcoTriShape`): TRIANGLE (default for new patches, INIT and a fresh instance) is a true triangle with PolyBLAMP corners, odd harmonics only, ±4.94 V, alias -52.8 dB at A7 / 48 kHz; PARABOLA (legacy) is the old integrated saw, kept unchanged and loaded for user-saved format-1 states (RONIN_Redesign N5, M-R2). A RANGE (footage) change takes effect at the next saw wrap. This anti-alias method is part of S-02, not a confirmed circuit.
+
+HQ 2x (VOICE tab, host parameter `hqMode`, JCS R11) is OFF by default. When on, the graph runs at twice the host rate behind the shared jidai-common 93-tap halfband (`jidai::dsp::Downsampler2x`; input zero-order hold, output decimation, the earlier 2fs sub-sample first) and the plugin reports 23 samples of latency; off reports 0. The spec asks for VCO + VCF; this build oversamples the whole graph (see the PR notes).
 
 Duty:
 
@@ -292,7 +296,8 @@ Step 20 additions, still not a WDF and not a claim of measured CA3019 parameters
 *   Compute a control current from cutoff and CV using the paper's shape `Ib = Is * (exp(vBias / (n*VT)) - 1)` with S-10's Is and n. Map `Ib` to the two resistances of the linearized bridge the way the paper reduces the bridge to two resistors, using a precomputed function of bias, not a runtime matrix allocate.
 *   Run the 2-pole with those resistances.
 *   Apply `tanh` in the feedback path as the stand-in for D5 to D12.
-*   A larger `|SigIn|` may reduce the effective bias slightly so cutoff and resonance fall. The coefficient of that pull is S-10 and starts small enough that a -12 dBFS saw does not mute the filter. Do not encode 250 Hz or 200 Hz.
+*   A larger `|SigIn|` reduces the effective bias slightly so cutoff and resonance fall. The pull coefficient is `Vcf::kInputPull = 0.004` (was 0.012; RONIN_Redesign N13, user decision): a 1 kHz knob with a 2.5 V mean input runs at 801.8 Hz (was 515.4 Hz). User-saved format-1 patches whose VCF SigIn is fed directly by VCO SAW or PULSE get their cutoff knob compensated on load (M-R5, reference 2.5 V for the saw, 5 V for the pulse); other sources are left as saved and listed in the load report. Do not encode 250 Hz or 200 Hz.
+*   Coefficients are cached: the envelope and highpass coefficients are computed in `prepare`, the biquad only when the effective cutoff or Q moves (N14). `Vcf::effectiveHz()` publishes the running cutoff for the VOICE tab.
 
 Failure modes: Q above 8 in step 8. Hard-coded self-oscillation frequency. Using a different filter topology or an OTA formula. A highpass mode (that is the AM8319, not this sheet).
 
@@ -379,6 +384,8 @@ sym = clamp(pwKnob + pwmVolts / 5, 0, 1)
 
 `sym` 0: falling saw on the triangle output's shape, pulse duty 0.05. `sym` 0.5: triangle, duty 0.5. `sym` 1: rising saw, duty 0.95. The dedicated saw jacks always output the two slopes at ±2.5 V, so a patch can pick a saw without turning PW. Pulse is 0 V to +5 V, never negative. Triangle and saws are ±2.5 V. Those levels are CONFIRMED.
 
+Anti-alias (RONIN_Redesign N7): the saw jacks and the pulse use 2-sample polyBLEP at each wrap and edge. The 200 Hz pulse alias at 48 kHz falls from -25.8 dB to -45.9 dB (`testMgPolyBlep`).
+
 Failure modes: a bipolar pulse. A frequency knob that stops at 20 Hz. Separate knobs for symmetry and width.
 
 Test: `testMgPulseIsUnipolar`. `testMgTriangleIsBipolar2V5`. `testMgFreqEndpoints`. `testMgPwAffectsPulseAndTriangle`. `testMgSawJacksOpposite`.
@@ -391,7 +398,7 @@ Knobs: Attack, Decay, Sustain, Release. Times S-13, 1 ms to 10 s exponential. Su
 
 Jacks: `Trig` CV in, `OutA` CV out, `OutB` CV out, `OutC` CV out.
 
-Trigger: held while `Trig volts < 1.5` (S-15). Unpatched, the graph writes +5 V and the envelope stays idle. Ext In Gate writes 0 V while held, which is below 1.5 V, so the envelope opens, and writes +5 V while released. A logic Gate such as EG 2 DelayTrig still promotes: held writes 0 V and released writes +5 V. Rising edge (released to held) restarts attack. While held after decay, output sits at sustain. Release starts when the input goes above 1.5 V. Retrigger from a new edge during release restarts attack from the current level (no forced drop to 0). That edge rule is part of S-15.
+Trigger (JCS R3s, RONIN_Redesign N4): becomes held when `Trig` falls below 1.0 V and released when it rises above 1.5 V; between the two it keeps its state. Unpatched, the graph writes +5 V and the envelope stays idle. Ext In Gate writes 0 V while held, which is below 1.0 V, so the envelope opens, and writes +5 V while released. A logic Gate such as EG 2 DelayTrig is converted on the cable (JCS R3s): high writes 0 V and low writes +5 V. Rising edge (released to held) restarts attack. While held after decay, output sits at sustain. Release starts when the input goes above 1.5 V. Retrigger from a new edge during release restarts attack from the current level (no forced drop to 0).
 
 Shapes, exponential segments toward the target (RC stand-in, S-13):
 
@@ -415,7 +422,7 @@ Purpose: hold, delay, attack, release. No decay knob. No sustain knob. No sustai
 
 Knobs: Hold, Delay, Attack, Release. All S-13, 1 ms to 10 s. Defaults: hold 1 ms, delay 1 ms, attack 0.02 s, release 0.20 s.
 
-Jacks: `Trig` CV in (same 1.5 V rule, S-15), `OutPos` CV out, `OutNeg` CV out, `DelayTrig` Gate out.
+Jacks: `Trig` S-trig in (same 1.0 / 1.5 V hysteresis as EG 1), `OutPos` CV out, `OutNeg` CV out, `DelayTrig` Gate out (0 / 5 V, JCS R2).
 
 S-26 timeline, which is the implementable spec:
 
@@ -427,7 +434,7 @@ S-26 timeline, which is the implementable spec:
 6. `OutNeg = -OutPos`.
 7. A new edge during the cycle restarts at step 1.
 
-`DelayTrig` is a Gate: high for that single sample, low otherwise. It can be patched into EG 1 `Trig` via Gate-to-CV promotion (writes 0 V for that sample, which is "held" under S-15). One sample may be too short for a detector that looks at edges if the edge requires two samples. Implementation rule: hold `DelayTrig` high for `max(1, round(0.001 * sampleRate))` samples (1 ms). That width is part of S-26.
+`DelayTrig` is a Gate: high at +5 V (`jcs::kGateHigh`, RONIN_Redesign N11), low at 0 V. Patched into EG 1 `Trig` it is converted on the cable (writes 0 V while high, which is "held"). One sample may be too short for a detector that looks at edges if the edge requires two samples. Implementation rule: hold `DelayTrig` high for `max(1, round(0.001 * sampleRate))` samples (1 ms). That width is part of S-26.
 
 Failure modes: adding Decay or Sustain knobs. Copying EG 1. A plateau at +5 V while the gate is held.
 
@@ -459,9 +466,9 @@ Knobs: none.
 
 Jacks: `In` CV in (Audio may be patched in), `Div2` CV out, `Div4` CV out.
 
-Schmitt (S-18): go high when input crosses +0.5 V upward, go low when it crosses +0.3 V downward. On each rising output of the Schmitt, toggle div2. On each rising edge of div2, toggle div4. High level +5 V, low level 0 V.
+Schmitt (JCS R3, RONIN_Redesign N10; replaces the S-18 0.5 / 0.3 V window): go high when the input rises above +1.0 V, go low when it falls below +0.5 V. On each rising output of the Schmitt, toggle div2. On each rising edge of div2, toggle div4. High level +5 V, low level 0 V.
 
-An input that never crosses the window produces constant lows. A bipolar triangle of ±2.5 V at audio rate does cross it. A tiny CV around 0.1 V does not. That matches the research note that a small CV will not clock the comparator.
+An input that never crosses the window produces constant lows. A bipolar triangle of ±2.5 V at audio rate does cross it. A tiny CV around 0.1 V does not, and neither does a 0.5 V CV. That matches the research note that a small CV will not clock the comparator.
 
 Failure modes: a ÷8 output. Sine sub-oscillators. A frequency knob.
 
@@ -498,8 +505,9 @@ Knobs:
 Jacks: `In` CV in, `Out` CV out.
 
 ```text
-coeff = 1 - exp(-1 / (tau * sampleRate))
-state += (In - state) * coeff
+coeff = 1 - exp(-1 / (tau * sampleRate))   # cached: recomputed only when Time or the rate changes
+state += (In - state) * coeff              # double state
+if |state| < 1e-15: state = 0              # flush, also without FTZ (web port)
 Out = state
 ```
 
@@ -537,7 +545,7 @@ CONFIRMED: four-quadrant IC, two inputs, one output, no panel knob, DC path. STA
 The adding amplifier and sample and hold are graph modules. The meter is a display on the panel. ESP, TRIG SW, the volt source, the headphone amp, and multiples remain notes in this section.
 
 *   Adding amp: `Mixer`. Jacks In 1, In 2, In 3, Out. Knobs Level 1, Level 2, Level 3, each defaulting to 0.8. `Out = -(In1*level1 + In2*level2 + In3*level3)`. DC passes. No offset jack.
-*   Sample and hold: its own module. Jacks In, Out, Ext Clock, Clock Out, and a Rate knob. The panel hole labelled CLOCK is Ext Clock. Clock Out has no panel hole. The internal clock runs while Ext Clock is unpatched. A rising edge at 1 V holds In onto Out. Clock Out follows the clock that won, high at +5 V. Rate stand-in: 0.1 Hz at knob 0 through 100 Hz at knob 1, exponential.
+*   Sample and hold: its own module. Jacks In, Out, Ext Clock, Clock Out, and a Rate knob. The panel hole labelled CLOCK is Ext Clock. Clock Out has no panel hole. The internal clock runs while Ext Clock is unpatched. Ext Clock goes through the same Schmitt as the Divider (high above 1.0 V, low below 0.5 V, JCS R3); each rising edge holds In onto Out. A noisy ramp now clocks twice instead of 176 times. Clock Out follows the clock that won, high at +5 V. Rate stand-in: 0.1 Hz at knob 0 through 100 Hz at knob 1, exponential.
 *   Meter: a display. A click on a mapped jack selects that jack. The needle is about ±5 V full scale. With no selection it reads Output Wet. `process()` does not read it.
 *   ESP: preamp, follower, trigger. The Ext In gate (S-22) remains the gate until ESP is built.
 *   TRIG SW: active-low button module. Replaces the Ext In manual button's role as the obvious trigger.
@@ -546,7 +554,9 @@ The adding amplifier and sample and hold are graph modules. The meter is a displ
 
 ## State
 
-Step 18 stores: format version, sample-rate-independent knob values (0 to 1 or the scale index), and the cable list as module-id plus port-index pairs. It does not store cable color, stack order, or module state (EG phase, filter memory, noise seed). Loading a preset calls `prepare` memory clear. Unknown version: reject the load, keep the current patch, report an error on the message thread.
+Format 2 (JCS R7, RONIN_Redesign §6) is XML: `<RONIN format="2" unit="RONIN" ...knobs by parameter id...>` with `<CABLES><CABLE from="VCO:SAW" to="VCF:IN" [legacyInvert="1"] [colour="AARRGGBB"]/></CABLES>`. Jack ids are `SECTION:LABEL` as printed on the panel; `RONIN/` and `RONIN#n/` prefixes are accepted on load. The SETUP settings ride along as `uiCableColour`, `uiEgTime` and `uiScale`. It does not store stack order or module state (EG phase, filter memory, noise seed). A newer format loads best-effort.
+
+Format 1 (the old `RNIN` blob) still loads and is migrated: EG knobs through M-R1, TRI SHAPE = PARABOLA (M-R2), Gate cables into non-S-trig inputs flagged `legacyInvert` (M-R3), and the direct-VCO cutoff compensation (M-R5). Every step is written to the load report shown on the SETUP tab. A state that does not parse is rejected and the current patch is kept.
 
 ## What the audio thread is forbidden to do
 
@@ -556,6 +566,10 @@ Allocate, lock, read the message-thread cable vector, call into JUCE, resize a b
 
 The editor is the landscape panel: knobs above, jacks in columns, cables hanging over the face. The tile rack was the development UI through step 7.
 
-Cable color is chosen on the panel and is not stored on `Cable`. A frame does not write color into the graph. The two default dry cables use different colors. Red, white, yellow, and green are the four choices. Color does not change the sound.
+Cable colour (JCS R14): by default (SETUP: BY ROLE) a cable takes the role colour of its source port: S-TRIG #b129b1, AUDIO #e53b2f, V/OCT #6590f3, GATE/CLK #2ec554, HZ/V LIN #5cd5ed, CV #f7e77d. A per-cable override set on the PATCH tab is stored on `Cable` and wins. SETUP: MANUAL restores the four palette swatches (red, white, yellow, green) chosen on the panel. Colour does not change the sound.
+
+Tabs (RONIN_Redesign §4.0): the panel art is unchanged and is the MAIN tab. A 36-design-px strip above it holds MAIN · VOICE · ENV · PATCH · SETUP; a non-MAIN tab replaces the face at the same size. The editor is 1280 x 480 by default (art 1280 x 451 + 29 px strip), aspect 1600:600, 960 to 2560 wide, SETUP scale 75 / 100 / 125 / 150 / 200 %. MAIN adds only transient overlays: knob read-outs in real units on hover and drag, right-click on a knob to type a value, jack hover with role, live volts and far end, a role-coloured hover ring, and the MIX inverting-sum note.
+
+Over-range (JCS R15): the graph flags a port once |V| > 5.5 V has lasted more than 10 ms (`PatchGraph::portOverRange`, held 100 ms for the UI). The front panel gets no LED; the flag shows as OVER in the jack hover text and as the red lamp in the PATCH jack monitor.
 
 Column knobs turn. A turn does not drive a module that is not in the graph. The top MIX control is Output mix. Output level stays 1. EXT IN is the column immediately left of OUTPUT.

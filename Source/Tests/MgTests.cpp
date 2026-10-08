@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
+#include "Modular/FloatCompare.h"
+#include "Tests/TestSuite.h"
 #include "Modular/Mg.h"
 #include "UI/FaceKnobs.h"
 #include "UI/PatchBayLogic.h"
@@ -45,14 +47,18 @@ float measureHz (MgModule& mg, float fm, int samples)
     int wraps = 0;
     double rise = 0.0;
     int riseCount = 0;
+    bool inWrap = false;
     for (int i = 1; i < samples; ++i)
     {
         step (mg, fm, 0.0f);
         const float saw = mg.portValue[MgModule::kSawUp];
         const float delta = saw - previous;
-        if (delta < -1.0f)
+        // The polyBLEP spreads one wrap over two samples (RONIN_Redesign §3.3): count it once.
+        const bool wrapping = delta < -1.0f;
+        if (wrapping && ! inWrap)
             ++wraps;
-        else
+        inWrap = wrapping;
+        if (! wrapping)
         {
             rise += static_cast<double> (delta);
             ++riseCount;
@@ -86,9 +92,9 @@ int testMgPulseIsUnipolar()
             low = pulse;
         if (pulse > high)
             high = pulse;
-        if (pulse == 0.0f)
+        if (ronin::exactlyEqual (pulse, 0.0f))
             hitLow = true;
-        if (pulse == 5.0f)
+        if (ronin::exactlyEqual (pulse, 5.0f))
             hitHigh = true;
     }
     check (low >= 0.0f, "pulse never goes negative");
@@ -256,9 +262,9 @@ int testMgPanelJacks()
     const FaceKnobBinding rate = faceKnobBinding ("MG", "RATE");
     const FaceKnobBinding width = faceKnobBinding ("MG", "PW");
     check (rate.knob == FaceKnob::MgRate && std::strcmp (rate.parameterName, "MG Rate") == 0, "rate name");
-    check (rate.minimum == 0.0f && rate.maximum == 1.0f && rate.fallback == 0.50f, "rate range");
+    check (ronin::exactlyEqual (rate.minimum, 0.0f) && ronin::exactlyEqual (rate.maximum, 1.0f) && ronin::exactlyEqual (rate.fallback, 0.50f), "rate range");
     check (width.knob == FaceKnob::MgPw && std::strcmp (width.parameterName, "MG PW") == 0, "pw name");
-    check (width.fallback == 0.50f, "pw faceplate default");
+    check (ronin::exactlyEqual (width.fallback, 0.50f), "pw faceplate default");
     check (faceKnobBinding ("VCO", "RANGE").knob == FaceKnob::VcoRange, "vco range is a parameter");
     return finish ("testMgPanelJacks");
 }

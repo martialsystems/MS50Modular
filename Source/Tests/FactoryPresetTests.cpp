@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
+#include "Modular/FloatCompare.h"
+#include "Tests/TestSuite.h"
 #include "Modular/DefaultPatch.h"
 #include "Modular/Divider.h"
 #include "Modular/Eg1.h"
@@ -21,9 +23,10 @@
 #include "UI/FaceKnobs.h"
 #include "UI/PatchBayLogic.h"
 
+#include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
-#include <algorithm>
 #include <cstring>
 #include <fstream>
 #include <iterator>
@@ -145,29 +148,10 @@ std::string functionBody (const std::string& text, const std::string& marker)
     return text.substr (start, end - start + 1);
 }
 
-double vcaOutRms (Rack& rack, int samples)
-{
-    double sum = 0.0;
-    const int skip = samples / 2;
-    int used = 0;
-    for (int i = 0; i < samples; ++i)
-    {
-        rack.graph.process();
-        if (i < skip)
-            continue;
-        const double y = static_cast<double> (rack.vca1.portValue[Vca1::kOut]);
-        sum += y * y;
-        ++used;
-    }
-    if (used <= 0)
-        return 0.0;
-    return std::sqrt (sum / static_cast<double> (used));
-}
-
 }
 
 
-std::string repoFile (const char* relative)
+static std::string repoFile (const char* relative)
 {
     std::string path = RONIN_PROCESSOR_SOURCE;
     const auto source = path.rfind ("/Source/");
@@ -177,17 +161,18 @@ std::string repoFile (const char* relative)
     return readFile (path.c_str());
 }
 
-// The factory bank is INIT only. INIT is the fresh-instance patch: the eight connectFactoryCables cables.
+// The factory bank opens on INIT, the fresh-instance patch: the eight connectFactoryCables cables.
 int testFactoryPresetCount()
 {
-    check (kFactoryPresetCount == 1, "one factory preset");
+    check (kFactoryPresetCount >= 16 && kFactoryPresetCount <= 24, "16 to 24 factory programs");
     check (kDefaultFactoryPreset == 0 && kInitPreset == 0, "default program is INIT at index 0");
     check (std::strcmp (factoryPresetName (0), "INIT") == 0, "the preset is named INIT");
     check (factoryPresetEffect (0), "INIT is effect on");
     check (kFactoryPresets[0].cableCount == 8, "INIT has eight cables");
-    check (std::strcmp (factoryPresetName (-1), "") == 0 && std::strcmp (factoryPresetName (1), "") == 0,
+    check (kFactoryPresets[0].knobCount == 0, "INIT sets no knob of its own: it is the default table");
+    check (std::strcmp (factoryPresetName (-1), "") == 0 && std::strcmp (factoryPresetName (kFactoryPresetCount), "") == 0,
            "no name outside the bank");
-    check (! factoryPresetEffect (1), "no effect flag outside the bank");
+    check (! factoryPresetEffect (kFactoryPresetCount), "no effect flag outside the bank");
 
     Rack fresh;
     fresh.addAll();
@@ -206,7 +191,7 @@ int testFactoryPresetCount()
     check (cablesMatch (loaded.graph, kPresetInit, 8), "INIT cables");
     check (loaded.graph.delayedCableCount() == 0, "INIT clears the delayed cable");
     check (std::fabs (loaded.vca1.initial()) < 1.0e-6f, "INIT clears VCA 1 Initial");
-    check (factoryVca1Initial (kDefaultFactoryPreset) == 0.0f, "INIT does not set VCA 1 Initial");
+    check (ronin::exactlyEqual (factoryVca1Initial (kDefaultFactoryPreset), 0.0f), "INIT does not set VCA 1 Initial");
 
     check (! loadFactoryPreset (loaded.graph, -1), "index -1 does not load");
     check (! loadFactoryPreset (loaded.graph, kFactoryPresetCount), "an index past the bank does not load");
@@ -224,7 +209,8 @@ int testFactoryPresetCount()
     check (ctor.find ("connectFactoryCables") == std::string::npos, "construction does not patch its own cable list");
     check (choose.find ("loadFactoryPreset") != std::string::npos, "choosing a program loads that preset");
     check (processor.find ("vca1Initial") != std::string::npos, "session state keeps VCA 1 Initial");
-    const std::string restore = functionBody (processor, "void RoninAudioProcessor::setStateInformation");
+    // Format-1 sessions are restored (and migrated) in loadFormat1 (state format 2, JCS R7).
+    const std::string restore = functionBody (processor, "void RoninAudioProcessor::loadFormat1");
     check (restore.find ("vca1Initial") != std::string::npos, "session restore reads VCA 1 Initial");
     check (restore.find ("kKnobInitial, 0.0f") != std::string::npos, "an old session leaves VCA 1 Initial at 0");
 
@@ -242,6 +228,118 @@ int testFactoryPresetCount()
     check (text.find ("INIT") != std::string::npos, "presets.md names INIT");
     check (text.find ("Ext In L to Output L") != std::string::npos, "INIT cables are written down");
     return finish ("testFactoryPresetCount");
+}
+
+// Brand, gear, model and artist terms no program name or description may use (descriptive names only).
+static constexpr const char* kBannedPresetTerms[] = {
+    "KORG", "ROLAND", "MOOG", "ARP", "OBERHEIM", "SEQUENTIAL", "PROPHET", "YAMAHA", "BEHRINGER", "NOVATION",
+    "ELEKTRON", "ARTURIA", "BUCHLA", "SERGE", "DOEPFER", "EURORACK", "ABLETON", "NATIVE INSTRUMENTS", "SERUM",
+    "MASSIVE", "SH-101", "SH101", "TB-303", "TB303", "303", "808", "909", "606", "MS-20", "MS20", "MS-50", "SQ-10",
+    "JUNO", "JUPITER", "MINIMOOG", "DX7", "MONOPOLY", "POLYSIX", "HOOVER", "REESE", "PHUTURE", "HARDFLOOR",
+    "KRAFTWERK", "DAFT", "MOROG", "SYNTHI", "VCS3", "ODYSSEY", "OB-X", "CS-80",
+};
+
+static std::string upper (const char* text)
+{
+    std::string out (text != nullptr ? text : "");
+    for (char& c : out)
+        c = static_cast<char> (std::toupper (static_cast<unsigned char> (c)));
+    return out;
+}
+
+// Each program: a descriptive name that fits the PRESET menu, a description that says what EXT IN wants, the
+// effect on, knobs by host parameter id in 0..1, every jack id resolving on the processor rack, every cable legal,
+// and the true TRIANGLE after a load. The processor-level checks (round trip, render) are in ProcessorTests.
+int testFactoryBankData()
+{
+    const char* const processorOnlyKnobs[] = { "outputMix", "outputLevel", "dividerRatio" };
+    for (int index = 0; index < kFactoryPresetCount; ++index)
+    {
+        const FactoryPreset& preset = kFactoryPresets[index];
+        const std::string name = preset.name != nullptr ? preset.name : "";
+        auto fail = [&] (bool ok, const char* what)
+        {
+            if (! ok)
+                std::printf ("  [%02d %s] %s\n", index + 1, name.c_str(), what);
+            check (ok, what);
+        };
+
+        fail (! name.empty() && name.size() <= 12, "name is 1 to 12 characters (PRESET menu: >NN NAME on 16 cells)");
+        bool glyphs = true;
+        for (char c : name)
+            glyphs = glyphs && ((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || std::strchr (" &+-./", c) != nullptr);
+        fail (glyphs, "name uses only the LCD glyphs (A-Z, 0-9, space & + - . /)");
+        for (int other = 0; other < index; ++other)
+            fail (name != kFactoryPresets[other].name, "names are unique");
+
+        const std::string description = upper (preset.description);
+        fail (description.size() > 20, "the program has a description");
+        fail (description.find ("INPUT") != std::string::npos, "the description says what input it expects");
+        for (const char* term : kBannedPresetTerms)
+        {
+            fail (upper (preset.name).find (term) == std::string::npos, "no brand, gear, model or artist term in the name");
+            fail (description.find (term) == std::string::npos, "no brand, gear, model or artist term in the description");
+        }
+        fail (preset.effectOn, "every program is effect on (the patch is the wet signal)");
+
+        for (int k = 0; k < preset.knobCount; ++k)
+        {
+            const FactoryKnob& knob = preset.knobs[k];
+            bool known = false;
+            for (const auto& target : kFactoryKnobTargets)
+                known = known || std::strcmp (target.id, knob.id) == 0;
+            for (const char* id : processorOnlyKnobs)
+                known = known || std::strcmp (id, knob.id) == 0;
+            fail (known, "knob id is a host parameter id");
+            fail (knob.value >= 0.0f && knob.value <= 1.0f, "knob travel is 0..1");
+            for (int j = 0; j < k; ++j)
+                fail (std::strcmp (preset.knobs[j].id, knob.id) != 0, "each knob id appears once");
+            fail (std::strcmp (knob.id, "vcoTriShape") != 0, "no program sets TRI SHAPE (every program is TRIANGLE)");
+        }
+
+        Cable cables[PatchGraph::kMaxCables] {};
+        int count = 0;
+        fail (factoryPresetCables (index, cables, PatchGraph::kMaxCables, count), "every jack id resolves");
+        fail (count == preset.cableCount && count <= PatchGraph::kMaxCables, "every cable resolves");
+        for (int c = 0; c < count; ++c)
+            for (int d = 0; d < c; ++d)
+                fail (! sameCable (cables[c], cables[d].sourceModule, cables[d].sourcePort, cables[d].destModule,
+                                   cables[d].destPort), "no duplicate cable");
+
+        Rack rack;
+        rack.addAll();
+        rack.vco.setTriShape (Vco::TriShape::Parabola);
+        for (int c = 0; c < count; ++c)
+            fail (rack.graph.cableIsLegal (cables[c]), "every cable is legal (direction and type)");
+        fail (loadFactoryPreset (rack.graph, index), "the program loads");
+        fail (rack.graph.cableCount() == preset.cableCount, "the loaded graph has the program's cables");
+        fail (rack.vco.triShape() == Vco::TriShape::Triangle, "the program is on the true TRIANGLE");
+        fail (std::fabs (rack.vca1.initial() - factoryVca1Initial (index)) < 1.0e-6f, "VCA 1 Initial is the program value");
+        for (int k = 0; k < preset.knobCount; ++k)
+            for (const auto& target : kFactoryKnobTargets)
+                if (std::strcmp (target.id, preset.knobs[k].id) == 0)
+                    if (! (target.module == FactoryModule::Vca1 && target.knob == Vca1::kKnobInitial))   // checked above
+                        fail (std::fabs (rack.graph.moduleAt (target.module)->presetKnob (target.knob) - preset.knobs[k].value) < 1.0e-6f,
+                              "the loader writes the program's module knobs");
+
+        // INIT, written by jack id, is exactly the eight index cables connectFactoryCables makes.
+        if (index == kInitPreset)
+        {
+            fail (count == 8, "INIT is eight cables");
+            for (int c = 0; c < count && c < 8; ++c)
+                fail (sameCable (cables[c], kPresetInit[c].sourceModule, kPresetInit[c].sourcePort,
+                                 kPresetInit[c].destModule, kPresetInit[c].destPort), "INIT jack ids are the factory cables");
+        }
+    }
+    check (std::strcmp (factoryPresetName (kInitPreset), "INIT") == 0, "01 is INIT");
+
+    const std::string doc = repoFile ("/docs/presets.md");
+    const std::string readme = repoFile ("/README.md");
+    for (int index = 0; index < kFactoryPresetCount; ++index)
+        check (doc.find (kFactoryPresets[index].name) != std::string::npos, "presets.md lists every program");
+    check (readme.find ("only INIT") == std::string::npos && readme.find ("for now") == std::string::npos,
+           "README no longer says the bank is INIT only");
+    return finish ("testFactoryBankData");
 }
 
 int testInitPresetRoundTrip()
@@ -323,12 +421,6 @@ double takeRms (Rack& rack, int samples, bool host)
     return std::sqrt (sum / static_cast<double> (samples));
 }
 
-void skipSamples (Rack& rack, int samples)
-{
-    for (int i = 0; i < samples; ++i)
-        rack.graph.process();
-}
-
 // INIT is an effect: the host input runs through the VCF and VCA 1, and EG 1 opens them on the Ext In gate.
 int testInitPlaysTheInput()
 {
@@ -377,7 +469,7 @@ int testInitPlaysTheInput()
     return finish ("testInitPlaysTheInput");
 }
 
-void checkNear (float value, float want, const char* message)
+static void checkNear (float value, float want, const char* message)
 {
     if (std::fabs (value - want) > 1.0e-6f)
     {
@@ -402,7 +494,7 @@ int testOneDefaultTable()
             ++gChecks;
             continue;
         }
-        if (binding.fallback != knob.valueDefault)
+        if (! ronin::exactlyEqual (binding.fallback, knob.valueDefault))
         {
             std::printf ("  FAIL %s %s: FaceKnobs %.4f, layout %.4f\n", knob.section, knob.label,
                          static_cast<double> (binding.fallback), static_cast<double> (knob.valueDefault));
@@ -419,31 +511,32 @@ int testOneDefaultTable()
     auto fallback = [] (const char* section, const char* label) { return faceKnobBinding (section, label).fallback; };
     const int init = kDefaultFactoryPreset;
     const FactoryProgramKnobs row = factoryProgramKnobs (init);
-    check (row.vcfCutoff == fallback ("VCF", "CUTOFF") && row.vcfPeak == fallback ("VCF", "PEAK"), "INIT filter is the table");
-    check (row.eg1Attack == fallback ("EG 1", "ATTACK") && row.eg1Decay == fallback ("EG 1", "DECAY")
-               && row.eg1Sustain == fallback ("EG 1", "SUSTAIN") && row.eg1Release == fallback ("EG 1", "RELEASE"),
+    check (ronin::exactlyEqual (row.vcfCutoff, fallback ("VCF", "CUTOFF")) && ronin::exactlyEqual (row.vcfPeak, fallback ("VCF", "PEAK")), "INIT filter is the table");
+    check (ronin::exactlyEqual (row.eg1Attack, fallback ("EG 1", "ATTACK")) && ronin::exactlyEqual (row.eg1Decay, fallback ("EG 1", "DECAY"))
+               && ronin::exactlyEqual (row.eg1Sustain, fallback ("EG 1", "SUSTAIN")) && ronin::exactlyEqual (row.eg1Release, fallback ("EG 1", "RELEASE")),
            "INIT envelope is the table");
-    check (row.vcoRange == fallback ("VCO", "RANGE"), "INIT range is the table");
-    check (factoryMgRate (init) == fallback ("MG", "RATE"), "INIT MG rate is the table");
-    check (factorySampleHoldRate (init) == fallback ("S&H", "RATE"), "INIT S&H rate is the table");
-    check (factoryIntegratorTime (init) == fallback ("INT", "TIME"), "INIT integrator time is the table");
-    check (factoryVca1Initial (init) == fallback ("VCA 1", "INITIAL"), "INIT VCA 1 Initial is the table");
+    check (ronin::exactlyEqual (row.vcoRange, fallback ("VCO", "RANGE")), "INIT range is the table");
+    check (ronin::exactlyEqual (factoryMgRate (init), fallback ("MG", "RATE")), "INIT MG rate is the table");
+    check (ronin::exactlyEqual (factorySampleHoldRate (init), fallback ("S&H", "RATE")), "INIT S&H rate is the table");
+    check (ronin::exactlyEqual (factoryIntegratorTime (init), fallback ("INT", "TIME")), "INIT integrator time is the table");
+    check (ronin::exactlyEqual (factoryVca1Initial (init), fallback ("VCA 1", "INITIAL")), "INIT VCA 1 Initial is the table");
     check (factoryPresetEffect (init), "INIT is effect on");
 
-    check (fallback ("EG 1", "ATTACK") == 0.05f && fallback ("EG 1", "DECAY") == 0.30f
-               && fallback ("EG 1", "SUSTAIN") == 0.60f && fallback ("EG 1", "RELEASE") == 0.30f,
-           "fresh EG 1 is 0.05 / 0.3 / 0.6 / 0.3");
-    check (fallback ("VCF", "CUTOFF") == 0.45f && fallback ("VCF", "PEAK") == 0.20f && fallback ("VCF", "MOD") == 0.40f,
+    // The old 0.05 / 0.3 / 0.6 / 0.3 defaults through M-R1 (real-time law, RONIN_Redesign §6).
+    check (ronin::exactlyEqual (fallback ("EG 1", "ATTACK"), 0.2079f) && ronin::exactlyEqual (fallback ("EG 1", "DECAY"), 0.39f)
+               && ronin::exactlyEqual (fallback ("EG 1", "SUSTAIN"), 0.60f) && ronin::exactlyEqual (fallback ("EG 1", "RELEASE"), 0.39f),
+           "fresh EG 1 is 0.2079 / 0.39 / 0.6 / 0.39");
+    check (ronin::exactlyEqual (fallback ("VCF", "CUTOFF"), 0.45f) && ronin::exactlyEqual (fallback ("VCF", "PEAK"), 0.20f) && ronin::exactlyEqual (fallback ("VCF", "MOD"), 0.40f),
            "fresh VCF is 0.45 / 0.2 / 0.4");
-    check (fallback ("MIX", "LEVEL 1") == 0.80f && fallback ("MIX", "LEVEL 2") == 0.80f && fallback ("MIX", "LEVEL 3") == 0.80f,
+    check (ronin::exactlyEqual (fallback ("MIX", "LEVEL 1"), 0.80f) && ronin::exactlyEqual (fallback ("MIX", "LEVEL 2"), 0.80f) && ronin::exactlyEqual (fallback ("MIX", "LEVEL 3"), 0.80f),
            "mixer levels are 0.8");
 
     // The old placeholder cycle repeated 0.50, 0.30, 0.68, 0.42, 0.78 down every column.
     int cycle = 0;
     for (int i = 0; i + 3 < kPanelKnobCount; ++i)
     {
-        if (kPanelKnobs[i].valueDefault == 0.50f && kPanelKnobs[i + 1].valueDefault == 0.30f
-            && kPanelKnobs[i + 2].valueDefault == 0.68f && kPanelKnobs[i + 3].valueDefault == 0.42f)
+        if (ronin::exactlyEqual (kPanelKnobs[i].valueDefault, 0.50f) && ronin::exactlyEqual (kPanelKnobs[i + 1].valueDefault, 0.30f)
+            && ronin::exactlyEqual (kPanelKnobs[i + 2].valueDefault, 0.68f) && ronin::exactlyEqual (kPanelKnobs[i + 3].valueDefault, 0.42f))
             ++cycle;
     }
     check (cycle == 0, "no 0.50 / 0.30 / 0.68 / 0.42 cycle");
@@ -466,7 +559,7 @@ int testOneDefaultTable()
     return finish ("testOneDefaultTable");
 }
 
-int onlyDelayedIndex (const PatchGraph& graph)
+static int onlyDelayedIndex (const PatchGraph& graph)
 {
     const int count = graph.cableCount();
     int found = -1;

@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
+#include "Modular/FloatCompare.h"
+#include "Tests/TestSuite.h"
 #include "Modular/DefaultPatch.h"
 #include "Modular/Eg1.h"
 #include "Modular/ExtIn.h"
@@ -63,16 +65,16 @@ int testExtInGateFiresAboveThreshold()
     check (extIndex == 0, "ext in is in the graph");
 
     run (graph, ext, 0.01f, 0.01f, static_cast<int> (0.1 * kRate));
-    check (ext.portValue[3] == 5.0f, "a quiet tone leaves the gate at +5 V");
+    check (ronin::exactlyEqual (ext.portValue[3], 5.0f), "a quiet tone leaves the gate at +5 V");
 
     run (graph, ext, 0.2f, 0.2f, static_cast<int> (0.03 * kRate));
-    check (ext.portValue[3] == 0.0f, "1 V mono drives the gate to 0 V");
+    check (ronin::exactlyEqual (ext.portValue[3], 0.0f), "1 V mono drives the gate to 0 V");
 
     ext.setHostSample (0.0f, 0.0f);
     graph.process();
-    check (ext.portValue[3] == 0.0f, "release holds 0 V just after the tone stops");
+    check (ronin::exactlyEqual (ext.portValue[3], 0.0f), "release holds 0 V just after the tone stops");
     run (graph, ext, 0.0f, 0.0f, static_cast<int> (0.25 * kRate));
-    check (ext.portValue[3] == 5.0f, "release returns the gate to +5 V");
+    check (ronin::exactlyEqual (ext.portValue[3], 5.0f), "release returns the gate to +5 V");
     check (std::fabs (ext.portValue[2]) < 1.0e-6f, "silence stays on the mono jack");
     return finish ("testExtInGateFiresAboveThreshold");
 }
@@ -87,12 +89,12 @@ int testExtInButtonForcesGate()
     ext.setButtonHeld (true);
     run (graph, ext, 0.0f, 0.0f, 1);
     check (ext.buttonHeld(), "button stays held");
-    check (ext.portValue[3] == 0.0f, "a held button drives the gate to 0 V");
+    check (ronin::exactlyEqual (ext.portValue[3], 0.0f), "a held button drives the gate to 0 V");
 
     ext.setButtonHeld (false);
     run (graph, ext, 0.0f, 0.0f, 4);
     check (! ext.buttonHeld(), "button is up");
-    check (ext.portValue[3] == 5.0f, "button up drives the gate to +5 V");
+    check (ronin::exactlyEqual (ext.portValue[3], 5.0f), "button up drives the gate to +5 V");
     return finish ("testExtInButtonForcesGate");
 }
 
@@ -186,7 +188,7 @@ int testExtInFollowerOpensEgWithoutButton()
 
     run (graph, ext, 0.4f, 0.4f, static_cast<int> (0.05 * kRate));
     check (! ext.buttonHeld(), "the button is up");
-    check (ext.portValue[3] == 0.0f, "the follower drives the gate to 0 V");
+    check (ronin::exactlyEqual (ext.portValue[3], 0.0f), "the follower drives the gate to 0 V");
     check (std::fabs (eg.portValue[Eg1::kTrig]) < 1.0e-3f, "a followed gate reaches EG 1 at 0 V");
     check (eg.portValue[Eg1::kOutA] > 1.0f, "the follower opens eg 1");
 

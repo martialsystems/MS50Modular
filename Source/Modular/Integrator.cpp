@@ -3,6 +3,7 @@
 #include "Integrator.h"
 
 #include <cmath>
+#include <functional>
 
 namespace {
 
@@ -25,6 +26,14 @@ float knobForTau (float seconds)
 Integrator::Integrator()
     : time01_ (knobForTau (0.050f))
 {
+    updateCoefficient();
+}
+
+void Integrator::updateCoefficient()
+{
+    const double rate = sampleRate > 1.0 ? sampleRate : 48000.0;
+    const double tau = 0.001 * std::pow (2000.0, static_cast<double> (time01_));
+    coeff_ = -std::expm1 (-1.0 / (tau * rate));
 }
 
 int Integrator::numPorts() const
@@ -47,7 +56,14 @@ int Integrator::numKnobs() const
 void Integrator::setKnob (int knob, float zeroToOne)
 {
     if (knob == kKnobTime)
-        time01_ = clamp01 (zeroToOne);
+    {
+        const float value = clamp01 (zeroToOne);
+        if (! std::equal_to<float>{} (value, time01_))   // exact: change detection only
+        {
+            time01_ = value;
+            updateCoefficient();
+        }
+    }
 }
 
 int Integrator::presetKnobCount() const
@@ -65,16 +81,14 @@ float Integrator::presetKnob (int knob) const
 void Integrator::prepare (double rate)
 {
     sampleRate = rate;
-    state_ = 0.0f;
+    state_ = 0.0;
+    updateCoefficient();
 }
 
 void Integrator::processSample()
 {
-    const double rate = sampleRate > 1.0 ? sampleRate : 48000.0;
-    const double tau = 0.001 * std::pow (2000.0, static_cast<double> (time01_));
-    const float coeff = static_cast<float> (1.0 - std::exp (-1.0 / (tau * rate)));
-    state_ += (portValue[kIn] - state_) * coeff;
-    if (! std::isfinite (state_))
-        state_ = 0.0f;
-    portValue[kOut] = state_;
+    state_ += (static_cast<double> (portValue[kIn]) - state_) * coeff_;
+    if (! std::isfinite (state_) || std::fabs (state_) < 1.0e-15)
+        state_ = 0.0;
+    portValue[kOut] = static_cast<float> (state_);
 }

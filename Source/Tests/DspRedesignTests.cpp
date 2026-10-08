@@ -1,0 +1,570 @@
+// Copyright (c) 2026 Martial Systems LLC. All rights reserved.
+// RONIN_Redesign §5 items 6-10, 13-14: HQ decimator, MG polyBLEP, smoothing, integrator, Schmitt inputs,
+// VCF caching and drive pull, EXT IN gate hysteresis.
+
+#include "Modular/FloatCompare.h"
+#include "Tests/TestSuite.h"
+#include <jidai/dsp/Halfband.h>
+
+#include <cmath>
+#include <cstdio>
+#include <functional>
+
+namespace {
+
+int gChecks = 0;
+
+void check (bool ok, const char* message)
+{
+    if (! ok)
+    {
+        std::printf ("  FAIL %s\n", message);
+        ++gChecks;
+    }
+}
+
+int finish (const char* name)
+{
+    const int failed = gChecks;
+    gChecks = 0;
+    std::printf ("%s %s\n", name, failed == 0 ? "PASS" : "FAIL");
+    return failed == 0 ? 0 : 1;
+}
+
+// Tap k of the shared 93-tap halfband: h[46] = 0.5, h[46 +- (2j+1)] = odd()[j], every other tap 0.
+constexpr int kHbTaps = jidai::dsp::Halfband93::kTaps;
+constexpr int kHbCentre = (kHbTaps - 1) / 2;
+double hbTap (int k)
+{
+    if (k == kHbCentre)
+        return 0.5;
+    const int d = k < kHbCentre ? kHbCentre - k : k - kHbCentre;
+    if (k < 0 || k >= kHbTaps || (d % 2) == 0)
+        return 0.0;
+    const int j = (d - 1) / 2;
+    return j < jidai::dsp::Halfband93::kSide ? jidai::dsp::Halfband93::odd()[j] : 0.0;
+}
+
+double halfbandMagnitude (double f)   // f in cycles per 2fs sample
+{
+    double re = 0.0;
+    double im = 0.0;
+    for (int k = 0; k < kHbTaps; ++k)
+    {
+        const double h = hbTap (k);
+        re += h * std::cos (2.0 * 3.14159265358979323846 * f * k);
+        im -= h * std::sin (2.0 * 3.14159265358979323846 * f * k);
+    }
+    return std::sqrt (re * re + im * im);
+}
+
+}
+
+int testHalfbandSpec()
+{
+    // SHOGUN v2.2 §3.4 stage 1: pass <= 0.2125, stop >= 0.2875 of 2fs, >= 111.5 dB, ripple <= 1e-4 dB.
+    double stopMax = 0.0;
+    for (int i = 0; i <= 4000; ++i)
+    {
+        const double f = 0.2875 + (0.5 - 0.2875) * i / 4000.0;
+        const double m = halfbandMagnitude (f);
+        stopMax = m > stopMax ? m : stopMax;
+    }
+    double passMin = 10.0;
+    double passMax = 0.0;
+    for (int i = 0; i <= 4000; ++i)
+    {
+        const double m = halfbandMagnitude (0.2125 * i / 4000.0);
+        passMin = m < passMin ? m : passMin;
+        passMax = m > passMax ? m : passMax;
+    }
+    check (20.0 * std::log10 (stopMax) <= -111.5, "stopband >= 111.5 dB");
+    check (20.0 * std::log10 (passMax / passMin) <= 1.0e-4, "passband ripple <= 1e-4 dB");
+    // Exact half-band: every even tap except the centre is zero; symmetric (linear phase).
+    bool exact = true;
+    for (int k = 0; k < kHbTaps; ++k)
+    {
+        if (k != kHbCentre && (k % 2) == 0 && ! ronin::exactlyEqual (hbTap (k), 0.0))
+            exact = false;
+        if (std::not_equal_to<double>() (hbTap (k), hbTap (kHbTaps - 1 - k)))
+            exact = false;
+    }
+    check (kHbTaps == 93 && kHbCentre == 46, "93 taps, centre 46");
+    check (exact, "exact half-band, linear phase");
+
+    // Latency: a sample generated in the 2fs domain (even phase, u0) comes out 23 base samples later.
+    jidai::dsp::Downsampler2x dec;
+    dec.reset();
+    int peak = -1;
+    float best = 0.0f;
+    for (int n = 0; n < 64; ++n)
+    {
+        const float y = static_cast<float> (dec.process (n == 0 ? 1.0 : 0.0, 0.0));
+        if (std::fabs (y) > best)
+        {
+            best = std::fabs (y);
+            peak = n;
+        }
+    }
+    check (peak == jidai::dsp::Halfband93::kLatencyPerDirection && jidai::dsp::Halfband93::kLatencyPerDirection == 23,
+           "latency is 23 base samples");
+    // DC passes at unity.
+    jidai::dsp::Downsampler2x dc;
+    dc.reset();
+    float y = 0.0f;
+    for (int n = 0; n < 100; ++n)
+        y = static_cast<float> (dc.process (1.0, 1.0));
+    check (std::fabs (y - 1.0f) < 1.0e-5f, "DC gain 1");
+    return finish ("testHalfbandSpec");
+}
+
+#include "Modular/Mg.h"
+#include "Spectrum.h"
+
+#include <vector>
+
+int testMgPolyBlep()
+{
+    // verify_ronin.py mg_pulse_alias_dB_200Hz: naive -25.8 dB, polyBLEP -45.9 dB at 199.7 Hz, 48 kHz.
+    MgModule mg;
+    mg.prepare (48000.0);
+    const float knob = static_cast<float> (std::log (199.7 / 0.01) / std::log (20000.0));
+    mg.setKnob (MgModule::kKnobFrequency, knob);
+    mg.setKnob (MgModule::kKnobPw, 0.5f);
+    std::vector<double> pulse (65536);
+    std::vector<double> saw (65536);
+    float lo = 10.0f;
+    float hi = -10.0f;
+    for (size_t i = 0; i < pulse.size(); ++i)
+    {
+        mg.portValue[MgModule::kFreqMod] = 0.0f;
+        mg.portValue[MgModule::kPwm] = 0.0f;
+        mg.processSample();
+        pulse[i] = static_cast<double> (mg.portValue[MgModule::kPulse]) - 2.5;
+        saw[i] = static_cast<double> (mg.portValue[MgModule::kSawUp]);
+        lo = std::fmin (lo, mg.portValue[MgModule::kPulse]);
+        hi = std::fmax (hi, mg.portValue[MgModule::kPulse]);
+    }
+    const double alias = spectrum::aliasDb (pulse, 199.7, 48000.0);
+    std::printf ("  MG pulse alias %.2f dB, saw %.2f dB\n", alias, spectrum::aliasDb (saw, 199.7, 48000.0));
+    check (std::fabs (alias + 45.9) < 1.0, "MG pulse alias at 200 Hz is about -45.9 dB");
+    check (spectrum::aliasDb (saw, 199.7, 48000.0) < -40.0, "MG saw wrap is band-limited");
+    check (lo >= -0.01f && hi <= 5.01f, "pulse stays 0/5 V");
+
+    // At LFO rates the shapes are unchanged: exact 0/5 V pulse and ±2.5 V saw.
+    MgModule slow;
+    slow.prepare (48000.0);
+    slow.setKnob (MgModule::kKnobFrequency, 0.3f);
+    bool exact = true;
+    for (int i = 0; i < 48000; ++i)
+    {
+        slow.processSample();
+        const float p = slow.portValue[MgModule::kPulse];
+        if (! (std::fabs (p) < 1.0e-3f || std::fabs (p - 5.0f) < 1.0e-3f))
+            exact = false;
+    }
+    check (exact, "LFO-rate pulse is 0/5 V");
+    return finish ("testMgPolyBlep");
+}
+
+// ---- §5.8 smoothing (N8) ----------------------------------------------------------------------
+
+#include "Modular/Mixer.h"
+#include "Modular/OutputModule.h"
+#include "Modular/Vca1.h"
+#include "Modular/Vcf.h"
+
+int testKnobSmoothing()
+{
+    constexpr double rate = 48000.0;
+    const int tau = static_cast<int> (0.010 * rate);   // 480 samples
+
+    // VCA 1 intensity 0 -> 1 with a steady +1 V input and the gate fully open: a 10 ms one-pole, no step.
+    // The 10 Hz low cut also moves, so compare against a twin that sat at intensity 1 all along.
+    Vca1 vca;
+    Vca1 twin;
+    for (Vca1* v : { &vca, &twin })
+    {
+        v->setKnob (Vca1::kKnobLowCut, 0.0f);
+        v->setKnob (Vca1::kKnobIntensity, v == &twin ? 1.0f : 0.0f);
+        v->setKnob (Vca1::kKnobInitial, 1.0f);
+        v->prepare (rate);
+        v->portValue[Vca1::kSigIn] = 0.0f;
+        for (int i = 0; i < 4800; ++i)
+            v->processSample();
+        v->portValue[Vca1::kSigIn] = 1.0f;
+    }
+    check (std::fabs (vca.portValue[Vca1::kOut]) < 1.0e-6f, "intensity 0 is silent");
+    vca.setKnob (Vca1::kKnobIntensity, 1.0f);
+    vca.processSample();
+    twin.processSample();
+    const float first = vca.portValue[Vca1::kOut] / twin.portValue[Vca1::kOut];
+    for (int i = 1; i < tau; ++i)
+    {
+        vca.processSample();
+        twin.processSample();
+    }
+    const float atTau = vca.portValue[Vca1::kOut] / twin.portValue[Vca1::kOut];
+    check (first > 0.0f && first < 0.01f, "VCA 1 intensity does not step");
+    check (std::fabs (atTau - (1.0f - std::exp (-1.0f))) < 0.003f, "VCA 1 intensity is a 10 ms one-pole");
+
+    // Mixer level: 0.8 -> 0 reaches 1/e of the way after 10 ms and is exactly 0 after 200 ms.
+    Mixer mixer;
+    mixer.prepare (rate);
+    mixer.portValue[Mixer::kIn1] = 1.0f;
+    mixer.portValue[Mixer::kIn2] = 0.0f;
+    mixer.portValue[Mixer::kIn3] = 0.0f;
+    mixer.processSample();
+    check (std::fabs (mixer.portValue[Mixer::kOut] + 0.8f) < 1.0e-6f, "mixer starts on its knob, no ramp from 0");
+    mixer.setKnob (Mixer::kKnobLevel1, 0.0f);
+    for (int i = 0; i < tau; ++i)
+        mixer.processSample();
+    const float mixAtTau = -mixer.portValue[Mixer::kOut];
+    check (std::fabs (mixAtTau - 0.8f * std::exp (-1.0f)) < 0.002f, "mixer level is a 10 ms one-pole");
+    for (int i = 0; i < 9600; ++i)
+        mixer.processSample();
+    check (ronin::exactlyEqual (mixer.portValue[Mixer::kOut], 0.0f), "mixer level lands exactly on 0");
+    check (ronin::exactlyEqual (mixer.presetKnob (Mixer::kKnobLevel1), 0.0f), "the stored knob is the target");
+
+    // Output level: a level jump does not step the host output.
+    OutputModule out;
+    out.setMix (0.0f);
+    out.setLevel (1.0f);
+    out.setOutputLevel (0.7f);
+    out.prepare (rate);
+    out.portValue[0] = 1.0f;
+    out.portValue[1] = 1.0f;
+    out.processSample();
+    const float before = out.hostLeft();
+    out.setOutputLevel (1.0f);
+    out.processSample();
+    const float after = out.hostLeft();
+    check (std::fabs (before - 0.2f) < 1.0e-6f, "output starts on its level");
+    check (after - before < 0.01f && after > before, "output level ramps, no step");
+
+    // VCF cutoff knob 0 -> 1 ramps in the log domain over 5 ms: after one tau the knob is at 1 - 1/e.
+    Vcf vcf;
+    vcf.setKnob (Vcf::kKnobCutoff, 0.0f);
+    vcf.setKnob (Vcf::kKnobAmount, 0.0f);
+    vcf.prepare (rate);
+    vcf.portValue[Vcf::kSigIn] = 0.0f;
+    vcf.processSample();
+    check (std::fabs (vcf.effectiveHz() - 20.0f) < 0.5f, "cutoff starts on the knob (20 Hz)");
+    vcf.setKnob (Vcf::kKnobCutoff, 1.0f);
+    for (int i = 0; i < static_cast<int> (0.005 * rate); ++i)
+        vcf.processSample();
+    const double expected = 20.0 * std::pow (900.0, 1.0 - std::exp (-1.0));
+    std::printf ("  vcf at tau %.1f Hz (log-domain expects %.1f)\n", static_cast<double> (vcf.effectiveHz()), expected);
+    check (std::fabs (std::log2 (static_cast<double> (vcf.effectiveHz()) / expected)) < 0.02, "cutoff ramp is log-domain, 5 ms");
+    for (int i = 0; i < 9600; ++i)
+        vcf.processSample();
+    check (std::fabs (vcf.effectiveHz() - 18000.0f) < 1.0f, "cutoff lands on 18 kHz");
+    return finish ("testKnobSmoothing");
+}
+
+// ---- §5.9 integrator (N9) ---------------------------------------------------------------------
+
+#include "Modular/Integrator.h"
+
+int testIntegratorDoubleFlushCached()
+{
+    Integrator in;
+    in.setKnob (Integrator::kKnobTime, 1.0f);   // tau = 2 s, the slowest
+    in.prepare (48000.0);
+    const double expected = -std::expm1 (-1.0 / (2.0 * 48000.0));
+    check (std::fabs (in.coefficient() - expected) < 1.0e-15, "a = -expm1(-1/(tau sr)), cached");
+    in.prepare (96000.0);
+    check (std::fabs (in.coefficient() + std::expm1 (-1.0 / (2.0 * 96000.0))) < 1.0e-15, "re-cached on a rate change");
+    in.prepare (48000.0);
+
+    // A slow integrator tracks a tiny step (a float state with a ~1e-5 coefficient would stall short of it).
+    in.portValue[Integrator::kIn] = 1.0f;
+    for (int i = 0; i < 48000 * 30; ++i)
+        in.processSample();
+    check (std::fabs (in.state() - 1.0) < 1.0e-6, "the slowest setting settles on its input");
+
+    // Decay to 0 never sits subnormal: it is flushed below 1e-15 V and lands exactly on 0.
+    in.setKnob (Integrator::kKnobTime, 0.0f);   // tau = 1 ms
+    in.portValue[Integrator::kIn] = 0.0f;
+    bool subnormal = false;
+    for (int i = 0; i < 48000; ++i)
+    {
+        in.processSample();
+        const double s = in.state();
+        if (! ronin::exactlyEqual (s, 0.0) && std::fabs (s) < 1.0e-15)
+            subnormal = true;
+    }
+    check (! subnormal, "no state below 1e-15 V");
+    check (ronin::exactlyEqual (in.state(), 0.0) && ronin::exactlyEqual (in.portValue[Integrator::kOut], 0.0f), "decay lands exactly on 0");
+    return finish ("testIntegratorDoubleFlushCached");
+}
+
+// ---- §5.10 S&H ext clock and Divider In Schmitt (N10) -----------------------------------------
+
+#include "Modular/Divider.h"
+#include "Modular/SampleHold.h"
+
+#include <random>
+#include <vector>
+
+namespace {
+
+// verify_crossunit.py §5: a 2 Hz sine, 2.5 V + 0.8 V offset, plus 50 mV gaussian noise, 1 s at 48 kHz.
+std::vector<float> noisyRamp()
+{
+    std::mt19937 rng (1);
+    std::normal_distribution<double> noise (0.0, 0.05);
+    std::vector<float> sig (48000);
+    for (size_t i = 0; i < sig.size(); ++i)
+    {
+        double v = std::sin (2.0 * 3.14159265358979323846 * 2.0 * static_cast<double> (i) / 48000.0) * 2.5 + 0.8;
+        v = std::fmax (-5.0, std::fmin (5.0, v));
+        sig[i] = static_cast<float> (v + noise (rng));
+    }
+    return sig;
+}
+
+}
+
+int testSchmittInputs()
+{
+    const auto sig = noisyRamp();
+
+    // S&H: count samples taken (held value changes) on the ext clock.
+    SampleHold sh;
+    sh.prepare (48000.0);
+    sh.inputConnected[SampleHold::kExtClock] = true;
+    int takes = 0;
+    int clockEdges = 0;
+    bool lastClock = false;
+    for (size_t i = 0; i < sig.size(); ++i)
+    {
+        sh.portValue[SampleHold::kIn] = static_cast<float> (i);   // a new value every sample
+        sh.portValue[SampleHold::kExtClock] = sig[i];
+        const float before = sh.portValue[SampleHold::kOut];
+        sh.processSample();
+        if (! ronin::exactlyEqual (sh.portValue[SampleHold::kOut], before))
+            ++takes;
+        const bool clock = sh.portValue[SampleHold::kClockOut] > 2.5f;
+        if (clock && ! lastClock)
+            ++clockEdges;
+        lastClock = clock;
+    }
+    std::printf ("  S&H takes on the noisy ramp: %d (was 176)\n", takes);
+    check (takes == 2, "S&H ext clock: 2 edges on the noisy ramp");
+    check (clockEdges == 2, "S&H clock out follows the Schmitt");
+
+    // Divider: 2 input edges -> Div2 toggles twice.
+    Divider div;
+    div.prepare (48000.0);
+    int toggles = 0;
+    float last = 0.0f;
+    for (float v : sig)
+    {
+        div.portValue[Divider::kIn] = v;
+        div.processSample();
+        if (! ronin::exactlyEqual (div.portValue[Divider::kDiv2], last))
+            ++toggles;
+        last = div.portValue[Divider::kDiv2];
+    }
+    check (toggles == 2, "Divider: 2 edges on the noisy ramp");
+
+    // Thresholds: 1.0 V is not enough, just above is; release below 0.5 V.
+    Divider d;
+    d.prepare (48000.0);
+    auto feed = [&d] (float v) { d.portValue[Divider::kIn] = v; d.processSample(); return d.portValue[Divider::kDiv2]; };
+    check (ronin::exactlyEqual (feed (1.0f), 0.0f), "1.0 V does not trigger");
+    check (ronin::exactlyEqual (feed (1.01f), 5.0f), "> 1.0 V triggers, Div2 goes to 5 V");
+    check (ronin::exactlyEqual (feed (0.6f), 5.0f) && ronin::exactlyEqual (feed (1.5f), 5.0f), "no retrigger above 0.5 V");
+    check (ronin::exactlyEqual (feed (0.49f), 5.0f) && ronin::exactlyEqual (feed (1.5f), 0.0f), "below 0.5 V re-arms");
+    return finish ("testSchmittInputs");
+}
+
+// ---- §5.13 / 13b VCF caching and drive pull (N13, N14) ----------------------------------------
+
+int testDrivePull()
+{
+    check (ronin::exactlyEqual (Vcf::kInputPull, 0.004), "kInputPull == 0.004");
+    const double hz = Vcf::effectiveHzFor (1000.0, 2.5, Vcf::kInputPull);
+    std::printf ("  1 kHz knob, 2.5 V mean: %.2f Hz (legacy %.2f Hz)\n", hz,
+                 Vcf::effectiveHzFor (1000.0, 2.5, Vcf::kLegacyInputPull));
+    check (std::fabs (hz - 801.8) < 0.5, "a 1 kHz knob with a 2.5 V mean gives 801.8 Hz +-0.5");
+    check (std::fabs (Vcf::effectiveHzFor (1000.0, 2.5, Vcf::kLegacyInputPull) - 515.4) < 0.5, "legacy 0.012 gave 515.4 Hz");
+
+    // The running filter: a +-2.5 V square (mean |x| = 2.5 V) settles to the law.
+    Vcf vcf;
+    vcf.setKnob (Vcf::kKnobCutoff, static_cast<float> (std::log (1000.0 / 20.0) / std::log (900.0)));
+    vcf.setKnob (Vcf::kKnobAmount, 0.0f);
+    vcf.prepare (48000.0);
+    for (int i = 0; i < 48000; ++i)
+    {
+        vcf.portValue[Vcf::kSigIn] = (i / 24) % 2 == 0 ? 2.5f : -2.5f;   // 1 kHz square, mean |x| = 2.5 V
+        vcf.processSample();
+    }
+    std::printf ("  running VCF effective cutoff %.2f Hz\n", static_cast<double> (vcf.effectiveHz()));
+    check (std::fabs (vcf.effectiveHz() - 801.8f) < 1.0f, "the running VCF droops to 801.8 Hz");
+
+    // Rate-independent law (coefficients cached in prepare): same effective cutoff at 96 kHz.
+    Vcf fast;
+    fast.setKnob (Vcf::kKnobCutoff, static_cast<float> (std::log (1000.0 / 20.0) / std::log (900.0)));
+    fast.setKnob (Vcf::kKnobAmount, 0.0f);
+    fast.prepare (96000.0);
+    for (int i = 0; i < 96000; ++i)
+    {
+        fast.portValue[Vcf::kSigIn] = (i / 48) % 2 == 0 ? 2.5f : -2.5f;
+        fast.processSample();
+    }
+    check (std::fabs (fast.effectiveHz() - vcf.effectiveHz()) < 1.0f, "the follower and law are rate-independent");
+    return finish ("testDrivePull");
+}
+
+// ---- §5.14 EXT IN gate hysteresis (N15) -------------------------------------------------------
+
+#include "Modular/ExtIn.h"
+
+int testExtInGateHysteresis()
+{
+    // A 40 Hz bass whose follower ripples 0.24 .. 0.33 V across a 0.316 V threshold (knob 0.5, release 10 ms).
+    ExtIn ext;
+    ext.setKnob (ExtIn::kKnobThreshold, 0.5f);
+    ext.setKnob (ExtIn::kKnobRelease, 0.0f);
+    ext.prepare (48000.0);
+    int opens = 0;
+    bool open = false;
+    for (int i = 0; i < 48000; ++i)
+    {
+        const float volts = static_cast<float> (0.4 * std::sin (2.0 * 3.14159265358979323846 * 40.0 * i / 48000.0));
+        ext.setHostSample (volts / ExtIn::kHostToVolts, volts / ExtIn::kHostToVolts);
+        ext.processSample();
+        const bool nowOpen = ext.portValue[3] < 1.0f;
+        if (nowOpen && ! open)
+            ++opens;
+        open = nowOpen;
+    }
+    std::printf ("  EXT IN gate opens on a rippling 40 Hz bass: %d (was 79)\n", opens);
+    check (opens == 1, "the gate opens once and stays open (no chatter)");
+
+    // It closes below 0.7 x threshold, not at the threshold.
+    ExtIn quiet;
+    quiet.setKnob (ExtIn::kKnobThreshold, 0.5f);
+    quiet.setKnob (ExtIn::kKnobRelease, 0.0f);
+    quiet.prepare (48000.0);
+    const float th = 0.05f * std::pow (40.0f, 0.5f);
+    auto run = [&quiet] (float volts, int samples) {
+        for (int i = 0; i < samples; ++i)
+        {
+            quiet.setHostSample (volts / ExtIn::kHostToVolts, volts / ExtIn::kHostToVolts);
+            quiet.processSample();
+        }
+        return quiet.portValue[3];
+    };
+    check (ronin::exactlyEqual (run (1.1f * th, 4800), 0.0f), "opens above the threshold (0 V held)");
+    check (ronin::exactlyEqual (run (0.8f * th, 4800), 0.0f), "stays open at 0.8 x threshold");
+    check (ronin::exactlyEqual (run (0.6f * th, 4800), 5.0f), "closes below 0.7 x threshold (+5 V released)");
+    check (ronin::exactlyEqual (run (0.9f * th, 4800), 5.0f), "does not reopen below the threshold");
+    return finish ("testExtInGateHysteresis");
+}
+
+// ---- HQ 2x sub-sample order (argument evaluation order audit) ------------------------------------------------
+#include "Modular/HqPair.h"
+#include "Modular/OutputModule.h"
+#include "Modular/PatchGraph.h"
+
+namespace {
+
+// A stateful 2fs source: a 7 kHz sine whose phase advances once per process() call.
+class SineSource : public Module {
+public:
+    int numPorts() const override { return 1; }
+    PortDesc port (int) const override { return { "Out", PortType::Audio, PortDir::Out }; }
+    void setKnob (int, float) override {}
+    void prepare (double rate) override { sampleRate = rate; phase_ = 0.0; }
+    void processSample() override
+    {
+        portValue[0] = static_cast<float> (5.0 * std::sin (phase_));
+        phase_ += 2.0 * 3.14159265358979323846 * 7000.0 / sampleRate;
+    }
+
+private:
+    double phase_ = 0.0;
+};
+
+struct OrderRack {
+    PatchGraph graph;
+    SineSource sine;
+    OutputModule output;
+
+    OrderRack()
+    {
+        const int outIndex = graph.addModule (output);
+        const int sineIndex = graph.addModule (sine);
+        check (graph.connect (sineIndex, 0, outIndex, 0), "sine -> output L");
+        check (graph.connect (sineIndex, 0, outIndex, 1), "sine -> output R");
+        output.setLevel (1.0f);
+        output.setOutputLevel (0.7f);
+        output.setMix (0.0f);
+        graph.prepare (96000.0);
+    }
+};
+
+struct CountingEngine {
+    int count = 0;
+    void process() noexcept { ++count; }
+    float hostLeft() const noexcept { return static_cast<float> (count); }
+    float hostRight() const noexcept { return static_cast<float> (-count); }
+};
+
+struct RecordingDecimator {
+    double first = 0.0;
+    double second = 0.0;
+    double process (double u0, double u1) noexcept { first = u0; second = u1; return u0; }
+};
+
+}
+
+int testHqSubSampleOrder()
+{
+    // 1. The helper renders the earlier sub-sample first and passes it as u0, whatever the compiler's argument order.
+    CountingEngine engine;
+    const hq::StereoPair pair = hq::renderPair (engine, engine);
+    check (engine.count == 2, "two 2fs steps per base sample");
+    check (std::equal_to<float>() (pair.earlierLeft, 1.0f) && std::equal_to<float>() (pair.laterLeft, 2.0f),
+           "earlier sub-sample is the first step (left)");
+    check (std::equal_to<float>() (pair.earlierRight, -1.0f) && std::equal_to<float>() (pair.laterRight, -2.0f),
+           "earlier sub-sample is the first step (right)");
+    RecordingDecimator rec;
+    hq::decimate (rec, pair.earlierLeft, pair.laterLeft);
+    check (std::equal_to<double>() (rec.first, 1.0) && std::equal_to<double>() (rec.second, 2.0),
+           "decimator gets u0 = earlier, u1 = later");
+
+    // 2. A real graph through the shared halfband: the helper path matches an explicitly sequenced reference
+    //    bit for bit, and the reversed order is measurably different (so this test would catch a swap).
+    OrderRack a;
+    OrderRack b;
+    jidai::dsp::Downsampler2x decA;
+    jidai::dsp::Downsampler2x decRef;
+    jidai::dsp::Downsampler2x decSwap;
+    double worstRef = 0.0;
+    double worstSwap = 0.0;
+    for (int n = 0; n < 4096; ++n)
+    {
+        const hq::StereoPair p = hq::renderPair (a.graph, a.output);
+        const float y = hq::decimate (decA, p.earlierLeft, p.laterLeft);
+
+        b.graph.process();
+        const double e = static_cast<double> (b.output.hostLeft());
+        b.graph.process();
+        const double l = static_cast<double> (b.output.hostLeft());
+        const double ref = decRef.process (e, l);
+        const double swapped = decSwap.process (l, e);
+        if (n >= 256)
+        {
+            worstRef = std::fmax (worstRef, std::fabs (static_cast<double> (y) - static_cast<double> (static_cast<float> (ref))));
+            worstSwap = std::fmax (worstSwap, std::fabs (ref - swapped));
+        }
+    }
+    std::printf ("  HQ order: helper vs sequenced %.3g, swapped vs sequenced %.3g\n", worstRef, worstSwap);
+    check (std::equal_to<double>() (worstRef, 0.0), "HQ helper equals the explicitly sequenced reference");
+    check (worstSwap > 1.0e-3, "a swapped sub-sample order is detected");
+    return finish ("testHqSubSampleOrder");
+}

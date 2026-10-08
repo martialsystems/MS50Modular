@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
+#include "Tests/TestSuite.h"
 #include "Modular/ExtIn.h"
 #include "Modular/OutputModule.h"
 #include "Modular/PatchGraph.h"
@@ -50,12 +51,12 @@ struct SineRack {
 
 float leftSample (int n)
 {
-    return static_cast<float> (kAmplitude * std::sin (2.0 * kPi * kHz * static_cast<double> (n) / kSampleRate));
+    return static_cast<float> (static_cast<double> (kAmplitude) * std::sin (2.0 * kPi * kHz * static_cast<double> (n) / kSampleRate));
 }
 
 float rightSample (int n)
 {
-    return static_cast<float> (kAmplitude * std::sin (2.0 * kPi * kHz * static_cast<double> (n) / kSampleRate + kPi / 2.0));
+    return static_cast<float> (static_cast<double> (kAmplitude) * std::sin (2.0 * kPi * kHz * static_cast<double> (n) / kSampleRate + kPi / 2.0));
 }
 
 void fillStereo (float* left, float* right)

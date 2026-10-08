@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
+#include "Modular/FloatCompare.h"
+#include "Tests/TestSuite.h"
 #include "Modular/Inverter.h"
 #include "UI/FaceKnobs.h"
 #include "UI/PatchBayLogic.h"
@@ -51,7 +53,7 @@ int testInverterNegatesDc()
     drive (inverter, -2.5f);
     check (std::fabs (inverter.portValue[Inverter::kOut] - 2.5f) < 1.0e-5f, "-2.5 V becomes +2.5 V");
     drive (inverter, 0.0f);
-    check (inverter.portValue[Inverter::kOut] == 0.0f, "0 V stays 0 V");
+    check (ronin::exactlyEqual (inverter.portValue[Inverter::kOut], 0.0f), "0 V stays 0 V");
     return finish ("testInverterNegatesDc");
 }
 
@@ -62,7 +64,7 @@ int testInverterNegatesAudio()
     bool negated = true;
     for (int i = 0; i < 32; ++i)
     {
-        const float input = std::sin (0.2 * static_cast<double> (i)) * 3.0f + 1.0f;
+        const float input = static_cast<float> (std::sin (0.2 * static_cast<double> (i)) * 3.0 + 1.0);
         drive (inverter, input);
         if (std::fabs (inverter.portValue[Inverter::kOut] + input) > 1.0e-4f)
             negated = false;

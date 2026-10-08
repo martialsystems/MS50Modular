@@ -79,7 +79,7 @@ Rules:
 | ID | Quantity | Value used in the plugin | Replace when |
 |---|---|---|---|
 | S-01 | DAC scale | 5 V graph = 1.0 output unit at level 1 | A confirmed jack voltage disagrees with the cartoons |
-| S-02 | VCO wave peaks | Saw, triangle, and pulse are bipolar ±5 V | A scope shot of the three VCO jacks |
+| S-02 | VCO wave peaks | Saw and pulse are bipolar ±5 V. TRIANGLE (default) is a PolyBLAMP triangle, ±4.94 V; PARABOLA (legacy, user format-1 patches) is the old integrated saw, about -3.9 / +6.5 V (RONIN_Redesign N5, M-R2) | A scope shot of the three VCO jacks |
 | S-03 | Hz/V law | `f = footageHz * max(volts, 0.05) / 1.0` | Measured Hz versus DC on `CV IN Hz/V` at each scale |
 | S-04 | OCT/V law and fine tune | 0 V = footage Hz. +1 V = +1 octave. Fine tune ±2 semitones | Measured OCT/V slope and fine-tune span |
 | S-05 | VCO FREQ A/B depth | Full attenuator, ±5 V in, adds ±5 octaves through the expo summer | Measured FM depth |
@@ -87,33 +87,33 @@ Rules:
 | S-07 | VCF cutoff knob | Exponential 20 Hz to 18 kHz at 0 V CV, small input | Measured cutoff versus knob at low peak |
 | S-08 | VCF cutoff CV | Attenuator 0 to 1 scales a ±5 V jack. Positive volts raise cutoff. Not V/octave and not Hz/V | Measured cutoff versus DC |
 | S-09 | VCF peak, step 8 | Resonant 2-pole, Q from 0.5 to 8, stable at full peak | Step 20 replaces this row's Q law |
-| S-10 | Diode bridge, step 20 | `rd = n*VT/Ib` with paper 1N4148 `Is = 2.52e-9`, `n = 1.752`. Feedback clip is `tanh`. Input level may pull cutoff down. Do not hard-code 250 Hz | A measured CA3019 fit, or a decision to drop the paper's Is and n |
+| S-10 | Diode bridge, step 20 | `rd = n*VT/Ib` with paper 1N4148 `Is = 2.52e-9`, `n = 1.752`. Feedback clip is `tanh`. Input level pulls cutoff down with `kInputPull = 0.004` (was 0.012; RONIN_Redesign N13, user decision; M-R5 compensates user format-1 patches fed directly by the VCO). Do not hard-code 250 Hz | A measured CA3019 fit, or a decision to drop the paper's Is and n |
 | S-11 | VCA 1 gain | `gain = clamp(envVolts/5, 0, 1) * intensity`. Low-cut is a one-pole highpass, 10 Hz to 2 kHz | A diode-bridge gain law measured or derived from KOD-A40045 without new guesses |
 | S-12 | VCA 2 / MVCA | `gain = clamp(cvVolts/5, 0, 1)` then a one-pole smoother, 20 ms | Measured optocoupler step response |
-| S-13 | EG time knobs | Exponential 1 ms to 10 s | A scope shot or a manual sentence |
+| S-13 | EG time knobs | EG 1 A/D/R and EG 2 Attack/Release: the label is the real segment time, exponential 1 ms to 60 s (RONIN_Redesign N2, `EgLaw.h`; old patches migrate through M-R1). EG 2 Hold/Delay keep 1 ms to 10 s | A scope shot or a manual sentence |
 | S-14 | EG1 levels | OutA 0 to +5 V. OutB 0 to -5 V. OutC bipolar: peak +5 V, sustain 0.5 maps to 0 V | OutC is the weak one: the EG1 sheet did not print volts. OutA/OutB volts are also unprinted and follow EG2's 5 V cartoons only as a stand-in |
-| S-15 | Trigger threshold | A CV/audio trig jack is "held" when volts < 1.5. Unpatched Trig rests at +5 V (released). A Gate held promotes to 0 V. A Gate released promotes to +5 V | Measured EG trig threshold |
+| S-15 | Trigger threshold | Superseded by JCS R3s (RONIN_Redesign N4): an S-trig input becomes held below 1.0 V and released above 1.5 V. Unpatched Trig rests at +5 V (released, R10). A logic Gate cable into an S-trig input converts (high -> 0 V, low -> +5 V); into any other input it passes raw unless the cable carries the format-1 `legacyInvert` flag | Measured EG trig threshold |
 | S-16 | MG pot curves | Frequency knob exponential from 0.01 Hz to 200 Hz. One PW knob sets triangle symmetry and pulse width together | The endpoints are confirmed. The curve and the symmetry map are not |
 | S-17 | Noise level | White and pink bipolar, peak about ±2.5 V, fixed internal trim | Measured jack level and spectrum |
-| S-18 | Divider thresholds | Schmitt: high at +0.5 V, low at +0.3 V. Outputs are 0 V or +5 V, square | Measured comparator threshold and pulse height |
+| S-18 | Divider thresholds | Superseded by JCS R3 (RONIN_Redesign N10): Schmitt high above +1.0 V, low below +0.5 V, shared with the S&H Ext Clock. Outputs are 0 V or +5 V, square | Measured comparator threshold and pulse height |
 | S-19 | Inverter offset | Offset forced to 0. The sheet's trim exists and is not a panel control | A unit with a large residual offset |
 | S-20 | Integrator time | One-pole lag, tau 1 ms to 2 s, same sign as the input. A held input settles at that voltage | Measured glide time, and a check that a held DC input does not ramp away |
 | S-21 | Ring scale | `outVolts = (aVolts * bVolts) / 5`. Bleed constant 0 | Measured full-scale product and residual feedthrough |
-| S-22 | Ext In gate | Envelope of `abs(mono)` with an attack/release follower. The jack writes 0 V while the button is down or the follower is above threshold, and +5 V while released | Phase 2 ESP trigger and TRIG SW replace this. The button is not a separate module |
+| S-22 | Ext In gate | Envelope of `abs(mono)` with an attack/release follower. The jack writes 0 V while the button is down or the follower is above threshold, and +5 V while released. Hysteresis: opens above the threshold, closes below 0.7 x threshold (RONIN_Redesign N15) | Phase 2 ESP trigger and TRIG SW replace this. The button is not a separate module |
 | S-23 | Output mix law | `y = dry * (1 - mix) + wet * mix`, wet mono copied to L and R, then `* level * 0.2` | Only if the headphone amp is ever modeled, which is phase 2 |
-| S-24 | Feedback edge | In a cycle, the newest cable is the back-edge and delays one sample | A different deterministic rule, if documented in the same change as the tests |
-| S-25 | Control rate | Knobs and CV are read every audio sample. There is no slower CV block | A profiled need for a coarser rate. Do not add one for style |
+| S-24 | Feedback edge | JCS R9: every cable that closes a cycle delays one sample and no module runs twice per sample (the old double-run pass is removed) | A different deterministic rule, if documented in the same change as the tests |
+| S-25 | Control rate | Knobs and CV are read every audio sample. There is no slower CV block. Gain knobs ramp over 10 ms and the cutoff knob over 5 ms (log domain) so a jump does not click (RONIN_Redesign N8) | A profiled need for a coarser rate. Do not add one for style |
 | S-26 | EG2 timeline | See SCHEMATICS, EG2. No sustain plateau | An owner's sentence or a scope shot of hold versus delay |
 | S-27 | Output fan-out | One output may feed many inputs. An input sums every cable that lands on it. Stack order, cable color, and cable shape do not change that sum. A jack on the 1978 hardware took one plug. This plugin stacks | If a later pass removes fan-out, the multiples module (phase 2) becomes required first |
 
-Footage frequencies used with S-03 and S-04, equal-tempered C, A440. These pitches are a stand-in for what "32'" meant at the jack with no cable inserted. The switch positions 32', 16', 8', 4' are confirmed. The hertz numbers are not.
+Footage frequencies used with S-03 and S-04, equal-tempered C, A440: 8' is the shared exact C3 (`jcs::pitch::kC3Hz` = 440·2^(−21/12) Hz, jidai-common 1.1.1) and the others are whole octaves of it. These pitches are a stand-in for what "32'" meant at the jack with no cable inserted. The switch positions 32', 16', 8', 4' are confirmed. The hertz numbers are not.
 
 | SCALE | Stand-in Hz at the reference |
 |---|---|
-| 32' | 32.703 |
-| 16' | 65.406 |
-| 8' | 130.813 |
-| 4' | 261.626 |
+| 32' | 32.70319566 |
+| 16' | 65.40639133 |
+| 8' | 130.81278265 |
+| 4' | 261.62556530 |
 
 ## Cable rule (2026-10-05)
 
@@ -161,7 +161,7 @@ Procedure:
 4. Record the plugin dry from the host, no extra plug-ins. Store that recording outside the repo.
 5. Write three lines: what matched, what did not, which stand-in id would have to move. Do not retune S-numbers in the same session as the listening. A second change, with the id edited and the test note linked, is the retune.
 
-Files that are not dry enough for timbre: Dr. Kunz (Small Stone, SDD-3000, dbx) and the Perfect Circuit jam (another synth in the same mix). They are patch ideas only.
+Files that are not dry enough for timbre: Dr. Kunz (outboard effects in the chain) and the Perfect Circuit jam (another synth in the same mix). They are patch ideas only.
 
 ## Definition of done for a module
 

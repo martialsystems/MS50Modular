@@ -2,13 +2,23 @@
 
 #include "Vco.h"
 
+#include "Jcs.h"
+
 #include <cmath>
 
 namespace {
 
-// S-03 footage. 8' is the unpatched panel pitch.
-constexpr float kFootage[4] = { 32.703f, 65.406f, 130.813f, 261.626f };
+// S-03 footage, equal-tempered C at A4 = 440 (JCS R4). 8' is the unpatched panel pitch: C3 = the shared exact
+// jcs::pitch::kC3Hz (130.8127826502993 Hz); 32', 16' and 4' are whole octaves of it.
+constexpr double kC3 = jcs::pitch::kC3Hz;
+constexpr float kFootage[4] = { static_cast<float> (kC3 / 4.0), static_cast<float> (kC3 / 2.0), static_cast<float> (kC3),
+                                static_cast<float> (kC3 * 2.0) };
 
+}
+
+float Vco::footageHzFor (int scaleIndex) noexcept
+{
+    return kFootage[scaleIndex < 0 ? 0 : (scaleIndex > 3 ? 3 : scaleIndex)];
 }
 
 float Vco::clamp01 (float value)
@@ -42,6 +52,25 @@ float Vco::polyBlep (float t, float dt)
     return 0.0f;
 }
 
+// Two-sample polyBLAMP residual (integrated polyBLEP), unit slope change. RONIN_Redesign §3.2,
+// the same form as jidai-audit/verify/verify_ronin.py tri_blamp.
+float Vco::polyBlamp (float t, float dt)
+{
+    if (dt <= 1.0e-8f)
+        return 0.0f;
+    if (t < dt)
+    {
+        const float x = t / dt - 1.0f;
+        return -(1.0f / 3.0f) * x * x * x;
+    }
+    if (t > 1.0f - dt)
+    {
+        const float x = (t - 1.0f) / dt + 1.0f;
+        return (1.0f / 3.0f) * x * x * x;
+    }
+    return 0.0f;
+}
+
 int Vco::scaleIndex() const
 {
     int index = static_cast<int> (std::round (static_cast<double> (clamp01 (scale01_) * 3.0f)));
@@ -54,14 +83,14 @@ int Vco::scaleIndex() const
 
 float Vco::footageHz() const
 {
-    return kFootage[scaleIndex()];
+    return kFootage[activeScale_];
 }
 
 float Vco::fineRatio() const
 {
     // The stored knob is 0..1. Zero cents is the center, not the raw 0..1 value.
     const float signedKnob = clamp01 (fine01_) * 2.0f - 1.0f;
-    return std::pow (2.0f, (signedKnob * 2.0f) / 12.0f);
+    return std::exp2 ((signedKnob * 2.0f) / 12.0f);
 }
 
 int Vco::numPorts() const
@@ -71,10 +100,12 @@ int Vco::numPorts() const
 
 PortDesc Vco::port (int index) const
 {
+    // JCS R4: VCO:HZ/V is the linear HZ/V LIN role (f = footage * max(V, 0.05)), never the rack pitch standard.
+    // VCO:V/OCT is the rack standard, relative: f = footage * 2^V, so 8' at 0 V = C3 = jcs::pitch::kC3Hz.
     if (index == kHzPerVolt)
-        return { "Hz/V", PortType::CV, PortDir::In };
+        return { "Hz/V", PortType::CV, PortDir::In, 0.0f, false, false, PortRole::HzvLin };
     if (index == kOct)
-        return { "Oct/V", PortType::CV, PortDir::In };
+        return { "Oct/V", PortType::CV, PortDir::In, 0.0f, false, false, PortRole::VOct };
     if (index == kFreqA)
         return { "FreqA", PortType::CV, PortDir::In };
     if (index == kFreqB)
@@ -128,6 +159,11 @@ float Vco::presetKnob (int knob) const
     return 0.0f;
 }
 
+void Vco::applyFactoryPreset (int)
+{
+    triShape_ = TriShape::Triangle;
+}
+
 int Vco::presetScaleIndex() const
 {
     return scaleIndex();
@@ -138,19 +174,26 @@ void Vco::prepare (double rate)
     sampleRate = rate;
     phase_ = 0.0;
     triState_ = 0.0;
+    activeScale_ = scaleIndex();
+    started_ = false;
 }
 
 void Vco::processSample()
 {
+    // §3.5: a RANGE change lands at the next saw wrap (immediately before the first sample after prepare).
+    if (! started_)
+        activeScale_ = scaleIndex();
+    started_ = true;
     const float footage = footageHz();
     const float oct = portValue[kOct] + portValue[kFreqA] * amountA01_ + portValue[kFreqB] * amountB01_;
-    const float octExpo = std::pow (2.0f, oct);
+    const float octExpo = std::exp2 (oct);
     float linear = footage;
     if (inputConnected[kHzPerVolt])
     {
         float volts = portValue[kHzPerVolt];
-        if (volts < 0.05f)
-            volts = 0.05f;
+        constexpr float floorVolts = static_cast<float> (jcs::pitch::kRoninLinFloor);   // JCS R4.2 / S-03: 0.05 V
+        if (volts < floorVolts)
+            volts = floorVolts;
         linear = footage * volts;
     }
 
@@ -166,9 +209,14 @@ void Vco::processSample()
     if (dt < 0.0f)
         dt = 0.0f;
 
+    lastHz_.store (hz, std::memory_order_relaxed);
+
     phase_ += static_cast<double> (dt);
     if (phase_ >= 1.0)
+    {
         phase_ -= std::floor (phase_);
+        activeScale_ = scaleIndex();
+    }
     const float phase = static_cast<float> (phase_);
 
     float sawUnit = 2.0f * phase - 1.0f;
@@ -183,15 +231,30 @@ void Vco::processSample()
         fall += 1.0f;
     pulseUnit -= polyBlep (fall, dt);
 
-    // TODO(init-triangle): this Tri output is the parabola below. A true triangle (and a shape setting that
-    // new patches set to triangle while older patches keep the parabola) is not implemented yet.
-    // Integral of the polyblep saw. The naive integral is a parabola of height 0.25,
-    // so 40 brings that shape to ±5 V. The slow servo only removes residual DC.
+    // PARABOLA (legacy): the integral of the polyBLEP saw. The naive integral is a parabola of height 0.25, so 40
+    // brings it to about ±5 V; the slow servo removes residual DC. Kept bit-for-bit for user v1 patches (M-R2).
     triState_ += static_cast<double> (sawUnit) * static_cast<double> (dt);
     triState_ -= triState_ * 1.0e-4;
     if (! std::isfinite (triState_))
         triState_ = 0.0;
-    float tri = static_cast<float> (triState_ * 40.0);
+
+    float tri = 0.0f;
+    if (triShape_ == TriShape::Parabola)
+    {
+        tri = static_cast<float> (triState_ * 40.0);
+    }
+    else
+    {
+        // TRIANGLE: naive triangle with PolyBLAMP at both corners (phase 0 and 1/2), ±5 V.
+        // Odd harmonics only, no DC servo, no start transient (RONIN_Redesign §3.2).
+        float t = phase < 0.5f ? 4.0f * phase - 1.0f : 3.0f - 4.0f * phase;
+        t += 4.0f * dt * polyBlamp (phase, dt);
+        float half = phase + 0.5f;
+        if (half >= 1.0f)
+            half -= 1.0f;
+        t -= 4.0f * dt * polyBlamp (half, dt);
+        tri = t * 5.0f;
+    }
     if (! std::isfinite (tri))
         tri = 0.0f;
 

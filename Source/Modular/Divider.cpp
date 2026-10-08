@@ -6,10 +6,9 @@
 
 namespace {
 
-// S-18. High at +0.5 V, low at +0.3 V. A ±5 V pulse crosses this window.
-constexpr float kSchmittHigh = 0.5f;
-constexpr float kSchmittLow = 0.3f;
-constexpr float kHighVolts = 5.0f;
+// RONIN_Redesign §3.7 / JCS R3: high > 1.0 V, low < 0.5 V (was S-18 0.5/0.3 V). A ±5 V pulse still
+// crosses it; a 0/5 V gate now has a 0.5 V dead band against noise.
+constexpr float kHighVolts = jcs::kGateHigh;
 
 }
 
@@ -21,10 +20,10 @@ int Divider::numPorts() const
 PortDesc Divider::port (int index) const
 {
     if (index == kIn)
-        return { "In", PortType::CV, PortDir::In };
+        return { "In", PortType::CV, PortDir::In, 0.0f, false, false, PortRole::GateClk };
     if (index == kDiv2)
-        return { "Div2", PortType::CV, PortDir::Out };
-    return { "Div4", PortType::CV, PortDir::Out };
+        return { "Div2", PortType::CV, PortDir::Out, 0.0f, false, false, PortRole::GateClk };
+    return { "Div4", PortType::CV, PortDir::Out, 0.0f, false, false, PortRole::GateClk };
 }
 
 int Divider::numKnobs() const
@@ -40,6 +39,7 @@ void Divider::prepare (double rate)
 {
     sampleRate = rate;
     schmittHigh_ = false;
+    schmitt_.reset();
     div2High_ = false;
     div4High_ = false;
 }
@@ -47,16 +47,10 @@ void Divider::prepare (double rate)
 void Divider::processSample()
 {
     const float input = portValue[kIn];
-    const bool wasHigh = schmittHigh_;
-    if (std::isfinite (input))
-    {
-        if (! schmittHigh_ && input >= kSchmittHigh)
-            schmittHigh_ = true;
-        else if (schmittHigh_ && input <= kSchmittLow)
-            schmittHigh_ = false;
-    }
+    const bool rising = std::isfinite (input) && schmitt_.rising (input);
+    schmittHigh_ = schmitt_.high;
 
-    if (schmittHigh_ && ! wasHigh)
+    if (rising)
     {
         const bool wasDiv2 = div2High_;
         div2High_ = ! div2High_;

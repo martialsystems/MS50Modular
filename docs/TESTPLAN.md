@@ -163,3 +163,47 @@ Do not commit the videos or the bounces.
 | Never as a timbre reference | Dr. Kunz `_iJJYsWUYd0`, Perfect Circuit `UXW39LO-bxY` | Effects or a second synth are in the file |
 
 Write mismatches into `docs/listening/step-20.md`. Change a stand-in only in a follow-up commit that names the id.
+
+## Redesign (2026-10: RONIN_Redesign and JCS v1.1)
+
+Three automated targets, all must pass:
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --target RoninTests RoninProcessorTests RoninPanelProbe Ronin_VST3
+./build/RoninTests                                                              # every line PASS
+xvfb-run -a ./build/RoninProcessorTests_artefacts/Release/RoninProcessorTests   # "11 passed, 0 failed"
+xvfb-run -a build/RoninPanelProbe_artefacts/Release/RoninPanelProbe             # "tabs: clicked through", PROBE PASS
+```
+
+New tests in `RoninTests` (the numbers come from `jidai-audit/verify/verify_ronin*.py` and `verify_crossunit.py`):
+
+| Change (§5 / §6) | Tests |
+|---|---|
+| 1-3 EG | `testEgNoStallInFloat`, `testEgLabelsAreRealTime`, `testEgKnobLawAndMigration`, `testEgSnapAndSustainSlew`, `testEgTrigHysteresis` |
+| 4-5 VCO | `testTriDefaultIsTriangle` (H3 -19.1, H5 -28.0, H7 -33.9 dB, ±4.94 V, A7 alias -52.8 dB), `testParabolaSelectableModule`, `testSawPulsePolyBlepKept` (-36 / -29 dB), `testFootageSwitchesAtWrap` |
+| 6 HQ | `testHalfbandSpec` (shared 93-tap halfband, 23 samples), `testHqSubSampleOrder` (earlier sub-sample first; helper equals a sequenced reference, a swap is detected), `testHqLatencyIsTwentyThree` (getLatencySamples 23) |
+| 7 MG | `testMgPolyBlep` (200 Hz pulse alias -45.9 dB, was -25.8) |
+| 8 smoothing | `testKnobSmoothing` |
+| 9 integrator | `testIntegratorDoubleFlushCached` |
+| 10 Schmitt | `testSchmittInputs` (noisy ramp: 2 edges, was 176) |
+| 11 DelayTrig | `testEg2LabelsAndDelayTrig` (5 V) |
+| 12 graph | `testGraphFeedbackOneSampleNoDoubleRun`, `testGraphStrigScopeAndLegacyInvert`, `testGraphTypedRestNoLatch`, `testGraphOverRangeR15` (JCS R15) |
+| 13 / 13b VCF | `testDrivePull` (801.8 Hz at a 2.5 V mean, legacy 515.4 Hz) |
+| 13c roles | `testHzvJackRoleLin` |
+| 14 EXT IN | `testExtInGateHysteresis` (1 open, was 79) |
+| 16 UI read-outs | `testKnobUnits`, `testKnobTypeValue` |
+
+`RoninProcessorTests` (needs JUCE): `testHqDefaultOff`, `testHqLatencyIsTwentyThree`, `testTriDefaultFreshAndInit`, `testTriDefaultByOrigin`, `testParabolaSelectable`, `testUserPatchCutoffCompensation` (0.45 -> 0.385 for a saw, pulse about -0.130, others reported), `testFormat1MigrationEgAndLegacyInvert`, `testFormat2Xml`, `testSlashJackIdsStateRoundTrip`, `testFactoryBankStateRoundTrip`, `testFactoryBankRenders`.
+
+Factory bank (`docs/presets.md`, 22 programs):
+
+*   `testFactoryPresetCount` (RoninTests): 16 to 24 programs, INIT first with no knob overrides, the INIT path unchanged.
+*   `testFactoryBankData` (RoninTests): names fit the PRESET menu (12 characters, LCD glyphs) and are unique; no brand, gear, model or artist term in a name or description; every description says what EXT IN expects; knob ids are host parameter ids with values 0 to 1; jack ids resolve and every cable is legal; each program loads on the JUCE-free rack with the TRIANGLE; presets.md lists every program and the README does not call the bank INIT only.
+*   `testFactoryBankStateRoundTrip` (RoninProcessorTests): each program loads from a PARABOLA instance onto TRIANGLE with Effect on, saves format 2 with its own knobs (1e-6) and the table elsewhere, its cables in order, and save, load into a fresh instance, save again gives identical bytes.
+*   RoninPanelProbe: every program's row in the PRESET list is on screen (a bank over 18 rows splits into balanced columns) and a click on it loads that program; `RONIN_PROBE_PAGES=<dir>` also saves `PRESET_LIST.png`.
+*   `testFactoryBankRenders` (RoninProcessorTests): 4 s at 48 kHz (and 2 s with HQ) per program, effect programs fed a 125 BPM chord, kick and tick test input. Every sample finite, peak above -60 dBFS, peak at most 1.0. The checks are thresholds, not exact samples, so they hold under any floating-point contraction (checked with clang `-ffp-contract=off` and `-ffp-contract=fast`). `RONIN_PRESET_WAV_DIR=<dir>` writes each render as a WAV for listening.
+
+Strict warnings (the JIDAI rack's flag set): `cmake -S . -B build-strict -DRONIN_STRICT_WARNINGS=ON` then build `Ronin_VST3 RoninTests RoninProcessorTests RoninPanelProbe` with g++ and with clang. RONIN sources compile with JUCE's recommended warnings plus `-Wfloat-equal -Wimplicit-int-float-conversion` (clang) `-Wshadow -Wconversion -Wdouble-promotion -Werror`; JUCE and jidai-common are SYSTEM includes. The build must finish with zero warnings, and every test above must still pass unchanged.
+
+Panel pixel check (§5 item 16): `RONIN_PROBE_DUMP=/tmp/new.png RoninPanelProbe` writes the MAIN bay (no cables, every knob at 0.5, 1280 x 451). The same block built on origin/main writes the reference; the two PNGs must be identical (0 of 577 280 pixels differ on the redesign branch). `RONIN_PROBE_MANUAL=1` uses the MANUAL palette, and `RONIN_PROBE_PAGES=<dir>` saves VOICE / ENV / PATCH / SETUP screenshots. `panel/assets/panel.svg` must stay byte-identical.

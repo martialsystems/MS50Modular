@@ -1,11 +1,14 @@
 // Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
+#include "Modular/FloatCompare.h"
 #include "PluginEditor.h"
 #include "PluginProcessor.h"
 #include "UI/PatchBayLogic.h"
 #include "UI/PatchBayView.h"
+#include "UI/TabPages.h"
 
 #include <cmath>
+#include <cstdlib>
 #include <cstdio>
 #include <cstring>
 
@@ -223,9 +226,49 @@ public:
                                                           juce::DocumentWindow::allButtons);
         window->setUsingNativeTitleBar (true);
         window->setContentOwned (created, true);
-        window->centreWithSize (1280, 451);
+        window->centreWithSize (1280, 480);
         window->setVisible (true);
         window->toFront (true);
+        if (std::getenv ("RONIN_PROBE_MANUAL") != nullptr)
+            processor->setCableColourByRole (false);   // pixel check: the pre-redesign palette
+        if (const char* dumpPath = std::getenv ("RONIN_PROBE_DUMP"))
+        {
+            // Panel pixel check (RONIN_Redesign §4.0): MAIN face with no cables and every knob at 0.5, bay at
+            // 1280 x 451. The same block runs against origin/main; the PNGs must match.
+            const juce::String path (dumpPath);
+            juce::Timer::callAfterDelay (150, [this]
+            {
+                Cable published[64] {};
+                const int n = processor->copyPublishedCables (published, 64);
+                for (int i = 0; i < n; ++i)
+                    processor->disconnectJacks (published[i].sourceModule, published[i].sourcePort,
+                                                published[i].destModule, published[i].destPort);
+                for (int i = 0; i < kPanelKnobCount; ++i)
+                    if (auto* p = processor->parameterForPanelKnob (kPanelKnobs[i].section, kPanelKnobs[i].label))
+                        p->setValueNotifyingHost (0.5f);
+                window->setContentOwned (processor->createEditor(), true);   // fresh bay: no cables loaded
+            });
+            juce::Timer::callAfterDelay (900, [this, path]
+            {
+                auto* editor = dynamic_cast<juce::Component*> (window->getContentComponent());
+                auto* bay = editor->getChildComponent (0);
+                const int extra = editor->getHeight() - bay->getHeight();
+                editor->setSize (1280, 451 + extra);
+                juce::Timer::callAfterDelay (300, [this, path]
+                {
+                    auto* bayNow = window->getContentComponent()->getChildComponent (0);
+                    const auto shot = bayNow->createComponentSnapshot (bayNow->getLocalBounds(), true, 1.0f);
+                    juce::File file (path);
+                    file.deleteFile();
+                    juce::FileOutputStream out (file);
+                    juce::PNGImageFormat().writeImageToStream (shot, out);
+                    out.flush();
+                    std::printf ("DUMP %dx%d %s\n", shot.getWidth(), shot.getHeight(), path.toRawUTF8());
+                    quit();
+                });
+            });
+            return;
+        }
         juce::Timer::callAfterDelay (150, [this] { run(); });
     }
 
@@ -340,7 +383,7 @@ private:
                             continue;
                         for (int i = 0; i < 128; ++i)
                         {
-                            const double x = buffer.getSample (0, i);
+                            const double x = static_cast<double> (buffer.getSample (0, i));
                             energy += x * x;
                         }
                         count += 128;
@@ -451,7 +494,7 @@ private:
         wheelOnKnob (*bay, kPanelKnobs[cutoff].cx, kPanelKnobs[cutoff].cy, 1.0f);
         expect (near (bay->knobValue (cutoff), cutoffDefault + 0.5f), "wheel up turns cutoff");
         dragKnobLocal (*bay, kPanelKnobs[cutoff].cx, kPanelKnobs[cutoff].cy, -5000.0f, false);
-        expect (bay->knobValue (cutoff) == 1.0f, "cutoff clamps at 1");
+        expect (ronin::exactlyEqual (bay->knobValue (cutoff), 1.0f), "cutoff clamps at 1");
         const auto turnedPaint = paintBay (*bay);
         const auto capCentre = bay->designToLocal (kPanelKnobs[cutoff].cx, kPanelKnobs[cutoff].cy);
         const auto capEdge = bay->designToLocal (kPanelKnobs[cutoff].cx + kPanelKnobs[cutoff].radius + 8.0f,
@@ -509,14 +552,14 @@ private:
             writeCrop (paintBay (*bay), "/tmp/ronin_knob_mid.png");
         }
         clickAt (*bay, kPanelKnobs[ratio].cx, kPanelKnobs[ratio].cy);
-        expect (bay->knobValue (ratio) == 1.0f, "divider click steps from /2 to /4");
+        expect (ronin::exactlyEqual (bay->knobValue (ratio), 1.0f), "divider click steps from /2 to /4");
         expect (bay->knobReadout().contains ("4") && ! bay->knobReadout().contains ("16"), "switch readout shows 4");
         if (auto* ratioParam = processor->parameterForPanelKnob ("DIV", "RATIO SWITCH"))
             expect (near (ratioParam->getValue(), 1.0f), "the switch is saved as a host setting");
         else
             expect (false, "the switch is saved as a host setting");
         dragKnobLocal (*bay, kPanelKnobs[ratio].cx, kPanelKnobs[ratio].cy, 120.0f, false);
-        expect (bay->knobValue (ratio) == 0.0f, "divider drag snaps back to /2");
+        expect (ronin::exactlyEqual (bay->knobValue (ratio), 0.0f), "divider drag snaps back to /2");
         expect (publishedCount (*processor) == cablesBefore, "turning knobs does not publish");
         expect (std::fabs (bay->outputMix() - mixBefore) < 1.0e-6f, "column knobs leave Output mix alone");
         expect (! bay->menuOpen(), "turning knobs does not open the chooser");
@@ -575,30 +618,30 @@ private:
         }
         expect (same, "reordering the stack does not change the graph");
 
-        editor->setSize (1600, 564);
+        editor->setSize (1600, 600);   // art 1600 x 564 + 36 px tab strip
         const auto wide = bay->designToLocal (kPanelJacks[outL].x, kPanelJacks[outL].y);
         const auto wideBack = bay->localToDesign (wide);
         expect (std::fabs (wideBack.x - kPanelJacks[outL].x) < 0.6f, "mapping at 1600 wide");
-        editor->setSize (1100, 388);
+        editor->setSize (1100, 413);
         const auto narrow = bay->designToLocal (kPanelJacks[white].x, kPanelJacks[white].y);
         const auto narrowBack = bay->localToDesign (narrow);
         expect (std::fabs (narrowBack.x - kPanelJacks[white].x) < 0.6f
                 && std::fabs (narrowBack.y - kPanelJacks[white].y) < 0.6f,
                 "mapping at 1100 wide");
 
-        editor->setSize (1280, 451);
+        editor->setSize (1280, 480);
         const float powerY = kPowerY + kPowerH * 0.5f;
         const float onX = kPowerX + kPowerW * 0.75f;
         const float offX = kPowerX + kPowerW * 0.25f;
         clickAt (*bay, onX, powerY);
-        expect (bay->outputMix() == 1.0f, "power rocker turns on");
+        expect (ronin::exactlyEqual (bay->outputMix(), 1.0f), "power rocker turns on");
         expect (processor->effectIsOn(), "right half is wet");
         expect (rockerBrightness (*bay, onX, powerY) > rockerBrightness (*bay, offX, powerY) + 20.0f,
                 "raised end points at ON");
         clickAt (*bay, onX, powerY);
-        expect (bay->outputMix() == 1.0f, "power rocker on stays on");
+        expect (ronin::exactlyEqual (bay->outputMix(), 1.0f), "power rocker on stays on");
         clickAt (*bay, offX, powerY);
-        expect (bay->outputMix() == 0.0f, "power rocker turns off");
+        expect (ronin::exactlyEqual (bay->outputMix(), 0.0f), "power rocker turns off");
         expect (! processor->effectIsOn(), "left half is dry");
         expect (rockerBrightness (*bay, offX, powerY) > rockerBrightness (*bay, onX, powerY) + 20.0f,
                 "raised end points at OFF");
@@ -623,7 +666,7 @@ private:
         expect (bay->keyPressed (juce::KeyPress (juce::KeyPress::escapeKey)), "escape closes the preset list while power is off");
         expect (! bay->presetMenuOpen(), "preset list is closed while power is off");
         clickAt (*bay, onX, powerY);
-        expect (bay->outputMix() == 1.0f, "power rocker turns back on");
+        expect (ronin::exactlyEqual (bay->outputMix(), 1.0f), "power rocker turns back on");
 
         for (int i = 0; i < 20; ++i)
             bay->advanceCableFrame();
@@ -697,7 +740,7 @@ private:
             expect (! processor->extInButtonHeld(), "mouse up releases the hold");
 
             clickAt (*bay, offX, powerY);
-            expect (bay->outputMix() == 0.0f, "hold check turns the effect off");
+            expect (ronin::exactlyEqual (bay->outputMix(), 0.0f), "hold check turns the effect off");
             bay->mouseDown (down);
             juce::Image offHeld (juce::Image::ARGB, bay->getWidth(), bay->getHeight(), true);
             juce::Graphics offHeldGraphics (offHeld);
@@ -707,7 +750,7 @@ private:
             bay->mouseUp (up);
             expect (! processor->extInButtonHeld(), "mouse up releases the hold while the effect is off");
             clickAt (*bay, onX, powerY);
-            expect (bay->outputMix() == 1.0f, "hold check turns the effect back on");
+            expect (ronin::exactlyEqual (bay->outputMix(), 1.0f), "hold check turns the effect back on");
 
             const auto legend = bay->designToLocal (1325.6f + 10.0f, 287.4f + 4.0f);
             juce::MouseEvent legendDown (source, legend, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
@@ -763,8 +806,39 @@ private:
         expect (bay->presetMenuOpen(), "preset screen opens the list");
         expect (bay->keyPressed (juce::KeyPress (juce::KeyPress::escapeKey)), "escape closes the preset list");
         expect (! bay->presetMenuOpen(), "preset list is closed");
-        clickAt (*bay, kPresetBezelX + 12.0f, kPresetBezelY + kPresetBezelH * 0.5f);
         const float row0Y = kPresetBezelY + kPresetBezelH + 3.0f + 5.0f + 10.5f;
+        {
+            // Every factory program is on screen in the PRESET list and loads by a click on its row. A bank
+            // longer than 18 rows splits into balanced columns (PatchBayView presetMenuDesign).
+            const int programs = processor->getNumPrograms();
+            const int columns = programs > 18 ? (programs + 17) / 18 : 1;
+            const int rows = (programs + columns - 1) / columns;
+            const float columnW = (kPresetKeyX + kPresetKeyW) - kPresetBezelX;
+            bool allOnScreen = true;
+            bool allLoad = true;
+            for (int program = 0; program < programs; ++program)
+            {
+                const float x = kPresetBezelX + 20.0f + static_cast<float> (program / rows) * columnW;
+                const float y = row0Y + static_cast<float> (program % rows) * 21.0f;
+                allOnScreen = allOnScreen && x + 40.0f < 1280.0f && y + 10.0f < 451.0f;
+                clickAt (*bay, kPresetBezelX + 12.0f, kPresetBezelY + kPresetBezelH * 0.5f);
+                if (program == programs - 1)
+                    if (const char* dir = std::getenv ("RONIN_PROBE_PAGES"))
+                    {
+                        const auto shot = bay->createComponentSnapshot (bay->getLocalBounds(), true, 1.0f);
+                        juce::File file (juce::File (juce::String (dir)).getChildFile ("PRESET_LIST.png"));
+                        file.deleteFile();
+                        juce::FileOutputStream out (file);
+                        juce::PNGImageFormat().writeImageToStream (shot, out);
+                    }
+                clickAt (*bay, x, y);
+                allLoad = allLoad && ! bay->presetMenuOpen() && processor->getCurrentProgram() == program;
+            }
+            expect (programs >= 16 && programs <= 24, "the PRESET list holds the whole factory bank");
+            expect (allOnScreen, "every PRESET row is on screen");
+            expect (allLoad, "a click on each PRESET row loads that program");
+        }
+        clickAt (*bay, kPresetBezelX + 12.0f, kPresetBezelY + kPresetBezelH * 0.5f);
         clickAt (*bay, kPresetBezelX + 20.0f, row0Y);
         expect (! bay->presetMenuOpen(), "choosing a preset closes the list");
         expect (processor->getCurrentProgram() == kInitPreset, "the first preset is INIT");
@@ -772,13 +846,14 @@ private:
         clickAt (*bay, kPresetBezelX + 12.0f, kPresetBezelY + kPresetBezelH * 0.5f);
         clickAt (*bay, kPresetBezelX + 20.0f, row0Y);
         expect (processor->getCurrentProgram() == kInitPreset, "the first preset is INIT again");
-        expect (bay->outputMix() != 0.0f, "INIT leaves the effect on");
+        expect (! ronin::exactlyEqual (bay->outputMix(), 0.0f), "INIT leaves the effect on");
         expect (publishedCount (*processor) == 8, "INIT replaces the cables with its eight");
         if (auto* restoredLevel = processor->parameterForPanelKnob ("OUTPUT", "LEVEL"))
             expect (near (restoredLevel->getValue(), 0.7f), "preset restore puts output level back at 0.7");
         if (auto* restoredMix = processor->parameterForPanelKnob ("OUTPUT", "MIX"))
             expect (near (restoredMix->getValue(), 1.0f), "preset restore puts output mix back at 1");
 
+        checkTabs (*editor, *bay);
         finish();
     }
 
@@ -821,6 +896,144 @@ private:
             expect (near (initialParam->getValue(), 0.0f), "INIT puts the VCA 1 Initial parameter back at 0");
             expect (near (bay.knobValue (initial), 0.0f), "INIT shows 0 on the VCA 1 Initial knob");
         }
+    }
+
+    // RONIN_Redesign §4.0 / §5.16: tab strip above the unchanged art, VOICE / ENV / PATCH / SETUP click-through,
+    // MAIN overlays (hover read-outs, role colours).
+    void checkTabs (RoninAudioProcessorEditor& editor, PatchBayView& bay)
+    {
+        using ronin_ui::Tab;
+        editor.applyScale (100);
+        expect (editor.getWidth() == 1280 && editor.getHeight() == 480, "editor default 1280 x 480");
+        expect (bay.getWidth() == 1280 && bay.getHeight() == 451, "MAIN art keeps 1280 x 451 under the strip");
+        expect (bay.getY() == editor.tabStrip().getHeight() && editor.tabStrip().getY() == 0, "strip sits above the art");
+        expect (editor.getChildComponent (0) == &bay, "bay stays child 0");
+
+        auto clickStrip = [&editor] (Tab tab)
+        {
+            auto& strip = editor.tabStrip();
+            const auto at = strip.tabBounds (tab).getCentre();
+            auto source = juce::Desktop::getInstance().getMainMouseSource();
+            const juce::ModifierKeys mods (juce::ModifierKeys::leftButtonModifier);
+            const auto time = juce::Time::getCurrentTime();
+            juce::MouseEvent down (source, at, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, &strip, &strip, time, at, time, 1, false);
+            strip.mouseDown (down);
+        };
+        auto clickPage = [] (ronin_ui::Page& page, float x, float y)
+        {
+            // A real mouse event at the design point, so the page's local mapping is exercised too.
+            const auto at = page.origin() + juce::Point<float> (x, y) * page.scale();
+            auto source = juce::Desktop::getInstance().getMainMouseSource();
+            const juce::ModifierKeys mods (juce::ModifierKeys::leftButtonModifier);
+            const auto time = juce::Time::getCurrentTime();
+            juce::MouseEvent down (source, at, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, &page, &page, time, at, time, 1, false);
+            juce::Image scratch (juce::Image::ARGB, page.getWidth(), page.getHeight(), true);
+            juce::Graphics g (scratch);
+            page.paint (g);   // regions come from paint
+            page.mouseDown (down);
+        };
+
+        for (auto tab : { Tab::Voice, Tab::Env, Tab::Patch, Tab::Setup, Tab::Main })
+        {
+            clickStrip (tab);
+            expect (editor.currentTab() == tab, "tab click selects the tab");
+            expect (bay.isVisible() == (tab == Tab::Main), "MAIN art shows only on MAIN");
+            if (auto* page = editor.page (tab))
+            {
+                expect (page->isVisible() && page->getBounds() == bay.getBounds(), "page replaces the art at its size");
+                const auto shot = page->createComponentSnapshot (page->getLocalBounds(), true, 1.0f);
+                expect (shot.isValid(), "page paints");
+                if (const char* dir = std::getenv ("RONIN_PROBE_PAGES"))
+                {
+                    const auto whole = editor.createComponentSnapshot (editor.getLocalBounds(), true, 1.0f);
+                    juce::File file (juce::File (juce::String (dir)).getChildFile (juce::String (ronin_ui::tabName (tab)) + ".png"));
+                    file.deleteFile();
+                    juce::FileOutputStream out (file);
+                    juce::PNGImageFormat().writeImageToStream (whole, out);
+                }
+            }
+        }
+
+        // VOICE: TRI SHAPE (M-R2) and HQ 2x (default OFF, latency 0 / 23).
+        clickStrip (Tab::Voice);
+        auto& voice = *editor.page (Tab::Voice);
+        expect (processor->triShape() == Vco::TriShape::Triangle, "fresh instance is TRIANGLE");
+        clickPage (voice, 160.0f + 180.0f, 257.0f);
+        expect (processor->triShape() == Vco::TriShape::Parabola, "VOICE selects PARABOLA (legacy)");
+        clickPage (voice, 160.0f + 60.0f, 257.0f);
+        expect (processor->triShape() == Vco::TriShape::Triangle, "VOICE selects TRIANGLE");
+        expect (! processor->hqParameter()->get(), "HQ defaults OFF");
+        clickPage (voice, 720.0f + 120.0f, 127.0f);
+        expect (processor->hqParameter()->get(), "VOICE turns HQ on");
+        clickPage (voice, 720.0f + 40.0f, 127.0f);
+        expect (! processor->hqParameter()->get(), "VOICE turns HQ off");
+
+        // SETUP: cable colour mode, EG time display, UI scale.
+        clickStrip (Tab::Setup);
+        auto& setup = *editor.page (Tab::Setup);
+        expect (processor->cableColourByRole(), "cable colour defaults BY ROLE");
+        clickPage (setup, 420.0f + 195.0f, 223.0f);
+        expect (! processor->cableColourByRole(), "SETUP selects MANUAL colours");
+        clickPage (setup, 420.0f + 65.0f, 223.0f);
+        expect (processor->cableColourByRole(), "SETUP selects BY ROLE colours");
+        clickPage (setup, 420.0f + 195.0f, 303.0f);
+        expect (processor->egTimeInMs(), "SETUP selects ms EG display");
+        clickPage (setup, 420.0f + 65.0f, 303.0f);
+        expect (! processor->egTimeInMs(), "SETUP selects s EG display");
+        clickPage (setup, 110.0f + 120.0f * 2.0f + 60.0f, 118.0f);   // 125 %
+        expect (editor.getWidth() == 1600 && editor.getHeight() == 600, "125 % scale is 1600 x 600");
+        expect (processor->uiScalePercent() == 125, "scale is saved with the patch");
+        clickPage (*editor.page (Tab::Setup), 110.0f + 120.0f + 60.0f, 118.0f);      // 100 %
+        expect (editor.getWidth() == 1280 && editor.getHeight() == 480, "100 % scale is back to 1280 x 480");
+
+        // PATCH: one row per published cable; Del unplugs and the MAIN bay follows.
+        clickStrip (Tab::Patch);
+        auto* patch = dynamic_cast<ronin_ui::PatchPage*> (editor.page (Tab::Patch));
+        const int cablesBefore = publishedCount (*processor);
+        expect (patch != nullptr && patch->rowCount() == cablesBefore, "PATCH lists every cable");
+        if (patch != nullptr && cablesBefore > 0)
+        {
+            expect (patch->rowText (0).contains (":"), "PATCH rows name jacks SECTION:LABEL");
+            clickPage (*patch, 300.0f, 76.0f + 15.0f);
+            expect (patch->selectedCable() == 0, "clicking a row selects it");
+            const int visualBefore = bay.visualCount();
+            patch->keyPressed (juce::KeyPress (juce::KeyPress::deleteKey));
+            expect (publishedCount (*processor) == cablesBefore - 1, "Del unplugs the selected cable");
+            expect (bay.visualCount() == visualBefore - 1, "MAIN bay drops the unplugged cable");
+        }
+
+        clickStrip (Tab::Main);
+        // MAIN overlays: transient hover text with role, volts and far end; MIX is the inverting mixer.
+        const int saw = panelJackIndex ("VCO", "SAW");
+        const auto sawText = bay.hoverTextForJack (saw);
+        expect (sawText.startsWith ("VCO:SAW") && sawText.contains ("AUDIO") && sawText.contains (" V"),
+                "jack hover shows id, role and volts");
+        const auto mixText = bay.hoverTextForJack (panelJackIndex ("MIX", "OUT"));
+        expect (mixText.contains ("inverting mixer"), "MIX hover explains the inverting sum");
+        const auto trigText = bay.hoverTextForJack (panelJackIndex ("EG 1", "TRIG"));
+        expect (trigText.contains ("S-TRIG"), "EG 1 TRIG reads as an S-trig input");
+
+        // Right-click a knob -> type a value in real units.
+        const int cutoff = panelKnobIndex ("VCF", "CUTOFF");
+        auto* cutoffParam = processor->parameterForPanelKnob ("VCF", "CUTOFF");
+        if (cutoff >= 0 && cutoffParam != nullptr)
+        {
+            gesture (bay, kPanelKnobs[cutoff].cx, kPanelKnobs[cutoff].cy, kPanelKnobs[cutoff].cx, kPanelKnobs[cutoff].cy,
+                     false, true);
+            expect (bay.valueEditorOpen(), "right-click on a knob opens the value box");
+            expect (bay.valueEditorText().endsWith ("Hz"), "the value box shows real units");
+            expect (bay.typeKnobValue (cutoff, "1 kHz"), "typing 1 kHz is accepted");
+            expect (std::fabs (Vcf::knobHzFor (static_cast<double> (cutoffParam->getValue())) - 1000.0) < 1.0, "1 kHz lands on the knob law");
+            expect (bay.knobReadout().contains ("1.00 kHz"), "the read-out follows the typed value");
+            expect (! bay.typeKnobValue (cutoff, "fast"), "nonsense is refused");
+        }
+        const auto egKnob = panelKnobIndex ("EG 1", "ATTACK");
+        if (egKnob >= 0 && processor->parameterForPanelKnob ("EG 1", "ATTACK") != nullptr)
+        {
+            expect (bay.typeKnobValue (egKnob, "621.5 ms"), "typing an EG time is accepted");
+            expect (bay.knobReadout().contains ("621 ms") || bay.knobReadout().contains ("622 ms"), "EG reads real time");
+        }
+        std::printf ("tabs: %s\n", gFails == 0 ? "clicked through" : "failures above");
     }
 
     void finish()

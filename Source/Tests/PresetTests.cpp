@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
+#include "Tests/TestSuite.h"
 #include "Modular/DefaultPatch.h"
 #include "Modular/Divider.h"
 #include "Modular/Eg1.h"

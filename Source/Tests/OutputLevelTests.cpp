@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
+#include "Modular/FloatCompare.h"
+#include "Tests/TestSuite.h"
 #include "Modular/DefaultPatch.h"
 #include "Modular/EffectSwitch.h"
 #include "Modular/Eg1.h"
@@ -76,6 +78,12 @@ struct DryRack {
     {
         ext.setHostSample (left, right);
         graph.process();
+    }
+
+    void settle (float left, float right)
+    {
+        for (int i = 0; i < 9600; ++i)   // §3.5: let the 10 ms knob ramp settle
+            drive (left, right);
     }
 };
 
@@ -193,7 +201,7 @@ int testOutputLevelScalesDry()
     check (level.knob == FaceKnob::OutputLevel, "output level is a host knob");
     check (std::strcmp (level.parameterId, "outputLevel") == 0, "parameter id");
     check (std::strcmp (level.parameterName, "Output Level") == 0, "parameter name");
-    check (level.minimum == 0.0f && level.maximum == 1.0f, "travel stays 0 to 1");
+    check (ronin::exactlyEqual (level.minimum, 0.0f) && ronin::exactlyEqual (level.maximum, 1.0f), "travel stays 0 to 1");
     check (std::fabs (level.fallback - 0.7f) < 1.0e-6f, "default is 0.7");
     check (near (outputLevelGain (level.fallback), 1.0f), "default level is unity gain");
     check (near (outputLevelGain (1.0f), 2.0f), "full level is twice as loud");
@@ -234,19 +242,19 @@ int testOutputLevelScalesDry()
     }
 
     dry.output.setOutputLevel (1.0f);
-    dry.drive (0.25f, -0.4f);
+    dry.settle (0.25f, -0.4f);
     check (near (dry.output.hostLeft(), 0.5f), "full level doubles the dry left");
     check (near (dry.output.hostRight(), -0.8f), "full level doubles the dry right");
     check (std::fabs (dry.output.hostLeft()) > 0.25f, "effect off, raising level makes the track louder");
 
     dry.output.setOutputLevel (0.0f);
-    dry.drive (0.25f, -0.4f);
+    dry.settle (0.25f, -0.4f);
     check (near (dry.output.hostLeft(), 0.0f), "level 0 mutes the dry left");
     check (near (dry.output.hostRight(), 0.0f), "level 0 mutes the dry right");
 
     dry.output.setLevel (0.0f);
     dry.output.setOutputLevel (1.0f);
-    dry.drive (0.25f, -0.4f);
+    dry.settle (0.25f, -0.4f);
     check (near (dry.output.hostLeft(), 0.0f), "schematic trim 0 stays silent at full level");
     check (near (dry.output.hostRight(), 0.0f), "schematic trim 0 stays silent on the right");
 

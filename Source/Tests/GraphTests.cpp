@@ -1,7 +1,9 @@
 // Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
+#include "Modular/FloatCompare.h"
 #include "Modular/OutputModule.h"
 #include "Modular/PatchGraph.h"
+#include "Tests/TestSuite.h"
 
 #include <atomic>
 #include <cstdio>
@@ -151,7 +153,7 @@ int testInputSumsTwoCables()
     check (graph.attemptConnect (ib, 1, id, 0) == PatchGraph::ConnectResult::Ok, "second into dest");
     graph.prepare (48000.0);
     graph.process();
-    check (dest.portValue[0] == 1.5f, "dest input is 1.5");
+    check (ronin::exactlyEqual (dest.portValue[0], 1.5f), "dest input is 1.5");
     return finish ("testInputSumsTwoCables");
 }
 
@@ -204,8 +206,8 @@ int testFanOutAllowed()
 
     graph.prepare (48000.0);
     graph.process();
-    check (b.portValue[1] == 0.25f, "B received fan-out");
-    check (c.portValue[1] == 0.25f, "C received fan-out");
+    check (ronin::exactlyEqual (b.portValue[1], 0.25f), "B received fan-out");
+    check (ronin::exactlyEqual (c.portValue[1], 0.25f), "C received fan-out");
     return finish ("testFanOutAllowed");
 }
 
@@ -387,7 +389,7 @@ int testSnapshotSwapDoesNotAllocate()
     for (int sample = 0; sample < 1000; ++sample)
         graph.process();
     check (gAllocations.load (std::memory_order_relaxed) == 0, "allocation counter stayed 0");
-    check (b.portValue[1] == 0.5f, "GainModule copied the value");
+    check (ronin::exactlyEqual (b.portValue[1], 0.5f), "GainModule copied the value");
     return finish ("testSnapshotSwapDoesNotAllocate");
 }
 
@@ -411,8 +413,8 @@ int testNoAllocInProcess()
     return finish ("testNoAllocInProcess");
 }
 
-// Two loops through B. Each closing cable is the newest when it lands, so the graph delays
-// only the newest (D Out to B In). The older loop keeps its zero-delay timing. Processing allocates nothing.
+// Two loops through B. JCS R9: every cable that closes a loop when it lands (B Out to A In, D Out to B In)
+// is delayed one sample, and no module runs twice. Processing allocates nothing.
 int testTwoLoopsDoNotAllocate()
 {
     PatchGraph graph;
@@ -430,8 +432,9 @@ int testTwoLoopsDoNotAllocate()
     check (graph.connect (ib, 1, id, 0), "B into D");
     check (graph.connect (id, 1, ib, 0), "D back into B closes the second loop");
     check (graph.cableCount() == 5, "five cables");
-    check (graph.delayedCableCount() == 1, "one delayed cable");
-    check (graph.cableIsDelayed (4), "the newest loop cable is the delayed one");
+    check (graph.delayedCableCount() == 2, "two delayed cables, one per loop");
+    check (graph.cableIsDelayed (2) && graph.cableIsDelayed (4), "both loop-closing cables are delayed");
+    check (! graph.cableIsDelayed (0) && ! graph.cableIsDelayed (1) && ! graph.cableIsDelayed (3), "the rest are zero-delay");
     graph.prepare (48000.0);
 
     gAllocations.store (0, std::memory_order_relaxed);
@@ -484,103 +487,6 @@ int testPublishedSnapshotCopy()
 }
 
 }
-
-int testDryMixPassesStereo();
-int testExtInMonoAveragesStereo();
-int testWetMixIgnoresDry();
-int testLevelZeroIsSilence();
-int testLeftOnlyStaysLeft();
-int testSineDryStereoPasses();
-int testOutputLevelScalesDry();
-int testOutputMixBlendsWet();
-int testEffectOnIsWet();
-int testSineLeftOnlyStaysLeft();
-int testSineWetUnpatchedIsSilence();
-int testSineRmsInRange();
-int testNoiseBothJacksMove();
-int testNoiseSeedRepeats();
-int testNoisePinkIsDarkerThanWhite();
-int testNoiseHasNoKnobs();
-int testPanelStackRule();
-int testPanelKnobs();
-int testVcfPassesDcOrLow();
-int testVcfPeakIncreasesResonance();
-int testVcfPositiveCvRaisesCutoff();
-int testVcfWetPathQuieterAtLowCutoff();
-int testVcfPanelJacks();
-int testVcfHasNoHighpassSwitch();
-int testVcfStaysFiniteWhenDrivenHard();
-int testVcfHotInputMovesSpectrum();
-int testVca1SilentWithoutEnv();
-int testVca1IntensityScalesOutput();
-int testVca1LowCutDarkens();
-int testVca1NegativeEnvIsClosed();
-int testVca2PassesDc();
-int testVca2ControlDoesNotClick();
-int testVca2NoKnobs();
-int testVcaPanelJacks();
-int testVcaFactoryWetIsSilent();
-int testEg1SustainLevel();
-int testEg1OutBIsNegation();
-int testEg1ReleasesWhenTriggerLifts();
-int testEg1HasDecay();
-int testEg1ThreeJacks();
-int testEg1UnpatchedTrigIsIdle();
-int testEg1PromotedGate();
-int testEg1FactoryPatch();
-int testExtInGateFiresAboveThreshold();
-int testExtInButtonForcesGate();
-int testExtInButtonOpensVoice();
-int testExtInFollowerOpensEgWithoutButton();
-int testMgPulseIsUnipolar();
-int testMgTriangleIsBipolar2V5();
-int testMgFreqEndpoints();
-int testMgPwAffectsPulseAndTriangle();
-int testMgSawJacksOpposite();
-int testMgPanelJacks();
-int testScaleDoesNotChangeOctJack();
-int testOctIsOneVoltPerOctave();
-int testHzPerVoltIsLinear();
-int testThreeOutputsAlwaysRun();
-int testPwmMovesDutyNotPitch();
-int testVcoPanelJacks();
-int testEg2HasNoSustainKnob();
-int testEg2ReturnsToZeroWithoutAPlateau();
-int testEg2DelayTrigAfterHold();
-int testEg2NegIsNegation();
-int testEg2Restart();
-int testEg2PanelJacks();
-int testRingFourQuadrant();
-int testRingZeroKills();
-int testRingPassesDcProduct();
-int testRingHasNoKnobs();
-int testRingPanelJacks();
-int testDividerOnlyTwoAndFour();
-int testDividerSquareCounts();
-int testDividerIgnoresTinySignal();
-int testInverterNegatesDc();
-int testInverterNegatesAudio();
-int testInverterHasNoKnobs();
-int testIntegratorSettlesToInput();
-int testIntegratorSameSign();
-int testIntegratorSlowIsSlower();
-int testIntegratorIsItsOwnModule();
-int testMixerSumsThree();
-int testMixerIsInverted();
-int testMixerLevelZeroMutesThatInput();
-int testSampleHoldHoldsBetweenClocks();
-int testSampleHoldExtClockWins();
-int testSampleHoldRateChangesInternalClock();
-int testMeterFollowsSelectedJack();
-int testFactoryPresetCount();
-int testInitPresetRoundTrip();
-int testPresetBadVersionStillRejected();
-int testInitPlaysTheInput();
-int testSelfPatchFeedbackRules();
-int testOneDefaultTable();
-int testPresetRoundTrip();
-int testPresetRejectsBadVersion();
-int testFeedbackIsOneSample();
 
 int main()
 {
@@ -684,6 +590,7 @@ int main()
     failed += testSampleHoldRateChangesInternalClock();
     failed += testMeterFollowsSelectedJack();
     failed += testFactoryPresetCount();
+    failed += testFactoryBankData();
     failed += testInitPresetRoundTrip();
     failed += testPresetBadVersionStillRejected();
     failed += testInitPlaysTheInput();
@@ -692,5 +599,32 @@ int main()
     failed += testPresetRoundTrip();
     failed += testPresetRejectsBadVersion();
     failed += testFeedbackIsOneSample();
+    failed += testEgNoStallInFloat();
+    failed += testEgLabelsAreRealTime();
+    failed += testEgKnobLawAndMigration();
+    failed += testEgSnapAndSustainSlew();
+    failed += testEgTrigHysteresis();
+    failed += testEg2LabelsAndDelayTrig();
+    failed += testTriDefaultIsTriangle();
+    failed += testParabolaSelectableModule();
+    failed += testSawPulsePolyBlepKept();
+    failed += testFootageSwitchesAtWrap();
+    failed += testHalfbandSpec();
+    failed += testHqSubSampleOrder();
+    failed += testJackIdSlashRoundTrip();
+    failed += testMgPolyBlep();
+    failed += testKnobSmoothing();
+    failed += testIntegratorDoubleFlushCached();
+    failed += testSchmittInputs();
+    failed += testGraphFeedbackOneSampleNoDoubleRun();
+    failed += testGraphStrigScopeAndLegacyInvert();
+    failed += testGraphTypedRestNoLatch();
+    failed += testDrivePull();
+    failed += testHzvJackRoleLin();
+    failed += testExtInGateHysteresis();
+    failed += testKnobUnits();
+    failed += testKnobTypeValue();
+    failed += testGraphOverRangeR15();
+    failed += testBadgeMatchesGraphConversion();
     return failed == 0 ? 0 : 1;
 }

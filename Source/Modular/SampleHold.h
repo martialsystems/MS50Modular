@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "Jcs.h"
 #include "Module.h"
 
 // Sample and hold. Ext Clock wins when it is patched. Otherwise the rate knob
@@ -28,6 +29,7 @@ private:
     float rate01_;
     float held_ = 0.0f;
     float lastExt_ = 0.0f;
+    jcs::Schmitt extClock_;   // §3.7: JCS R3 Schmitt, high > 1.0 V, low < 0.5 V
     double phase_ = 0.5;
     bool clockHigh_ = false;
 };

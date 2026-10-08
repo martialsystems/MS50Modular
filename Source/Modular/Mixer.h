@@ -3,6 +3,7 @@
 #pragma once
 
 #include "Module.h"
+#include "Smoothing.h"
 
 // Adding amplifier. Three attenuators, inverting sum, DC path. No offset jack.
 class Mixer : public Module {
@@ -27,4 +28,5 @@ public:
 
 private:
     float level_[3];
+    KnobSmoother levelSmooth_[3] { KnobSmoother { 0.8f }, KnobSmoother { 0.8f }, KnobSmoother { 0.8f } };   // §3.5
 };
