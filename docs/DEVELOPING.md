@@ -23,7 +23,7 @@ Source/
 third_party/jidai-common/ vendored shared JCS + DSP headers (commit in VENDOR.md; no local edits)
 panel/                    layout, SVG, geometry emitter
 tools/PanelProbe.cpp      standalone window check
-tools/vst3_load_check.cpp loads a built bundle and processes a dry block
+tools/vst3_load_check.cpp loads a built bundle as a host: vendor, Fx class, INIT wet first block, dry after Effect off
 scripts/install_fl_plugin.sh   macOS: build the universal Release VST3 and point FL Studio at it
 scripts/sine_through_fx.py     plays a sine through a built bundle at mix 0
 docs/                     the developer documents above
