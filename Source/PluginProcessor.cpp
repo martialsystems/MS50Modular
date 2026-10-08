@@ -553,16 +553,17 @@ int RoninAudioProcessor::getCurrentProgram()
 
 void RoninAudioProcessor::applyProgramParameters (int index)
 {
-    auto restore = [] (juce::AudioParameterFloat* parameter, float fallback)
+    // Every host knob goes back to the one default table, then takes the program's own value if it has one
+    // (FactoryPresets.h, knobs by host parameter id). INIT has none, so it is the table as is.
+    auto restore = [index] (juce::AudioParameterFloat* parameter, float fallback)
     {
         if (parameter != nullptr)
-            parameter->setValueNotifyingHost (fallback);
+            parameter->setValueNotifyingHost (factoryKnob (index, parameter->getParameterID().toRawUTF8(), fallback));
     };
 
     if (effectOn_ != nullptr)
         effectOn_->setValueNotifyingHost (factoryPresetEffect (index) ? 1.0f : 0.0f);
 
-    // One default table. A factory program may override its knobs and VCA 1 Initial; INIT uses the table as is.
     const FactoryProgramKnobs knobs = factoryProgramKnobs (index);
     restore (vcfCutoff_, knobs.vcfCutoff);
     restore (vcfPeak_, knobs.vcfPeak);
