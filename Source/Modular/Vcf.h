@@ -3,6 +3,9 @@
 #pragma once
 
 #include "Module.h"
+#include "Smoothing.h"
+
+#include <atomic>
 
 // Step 20 diode-bridge stand-in. Knob ids stay on Cutoff, Peak, and Amount.
 class Vcf : public Module {
@@ -24,6 +27,9 @@ public:
     void prepare (double sampleRate) override;
     void processSample() override;
 
+    // Effective cutoff of the last sample (after CV, smoothing and drive pull). Read by the UI and tests.
+    float effectiveHz() const noexcept { return effectiveHz_.load (std::memory_order_relaxed); }
+
 private:
     static float clamp01 (float value);
     float knobHz() const;
@@ -32,6 +38,8 @@ private:
 
     // Schematic defaults (S-07, S-09, S-08). The processor then pushes the faceplate.
     float cutoff01_ = 0.55f;
+    // §3.5: knobHz = 20*900^k is exponential in k, so a linear ramp of k is a log-domain ramp of Hz.
+    KnobSmoother cutoffSmooth_ { 0.55f, KnobSmoother::kCutoffSeconds };
     float peak01_ = 0.15f;
     float amount01_ = 0.4f;
     double z1_ = 0.0;
@@ -39,4 +47,5 @@ private:
     double env_ = 0.0;
     double hpX_ = 0.0;
     double hpY_ = 0.0;
+    std::atomic<float> effectiveHz_ { 0.0f };
 };

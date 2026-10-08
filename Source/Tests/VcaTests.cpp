@@ -315,7 +315,8 @@ int testVcaFactoryWetIsSilent()
 
     output.setMix (outputMixForEffect (false));
     ext.setHostSample (0.25f, -0.5f);
-    graph.process();
+    for (int settle = 0; settle < 9600; ++settle)   // §3.5: let the 10 ms knob ramp settle
+        graph.process();
     check (std::fabs (output.hostLeft() - 0.25f) < 1.0e-5f, "effect off keeps dry left");
     check (std::fabs (output.hostRight() + 0.5f) < 1.0e-5f, "effect off keeps dry right");
     return finish ("testVcaFactoryWetIsSilent");

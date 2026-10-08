@@ -82,7 +82,10 @@ void Vcf::setKnob (int knob, float zeroToOne)
 {
     const float value = clamp01 (zeroToOne);
     if (knob == kKnobCutoff)
+    {
         cutoff01_ = value;
+        cutoffSmooth_.setTarget (value);
+    }
     else if (knob == kKnobPeak)
         peak01_ = value;
     else if (knob == kKnobAmount)
@@ -113,6 +116,7 @@ void Vcf::prepare (double rate)
     env_ = 0.0;
     hpX_ = 0.0;
     hpY_ = 0.0;
+    cutoffSmooth_.prepare (rate);
 }
 
 float Vcf::knobHz() const
@@ -125,7 +129,8 @@ float Vcf::cutoffHz() const
 {
     // S-08: cv = jack volts * amount. ±5 V maps to ±4 octaves around the knob.
     const float cv = portValue[kCutoff] * amount01_;
-    float hz = knobHz() * std::pow (2.0f, (cv / 5.0f) * 4.0f);
+    // The DSP follows the smoothed knob (§3.5); knobHz() is the knob's own readout.
+    float hz = 20.0f * std::pow (900.0f, cutoffSmooth_.current()) * std::pow (2.0f, (cv / 5.0f) * 4.0f);
     if (! std::isfinite (hz))
         return 15.0f;
     if (hz < 15.0f)
@@ -152,6 +157,7 @@ void Vcf::processSample()
     if (! std::isfinite (input))
         input = 0.0f;
 
+    cutoffSmooth_.next();
     const float q = resonance();
     const double rate = sampleRate > 1.0 ? sampleRate : 48000.0;
     const double envA = 1.0 - std::exp (-1.0 / (0.03 * rate));
@@ -168,6 +174,7 @@ void Vcf::processSample()
         hz = 20000.0;
     if (hz > rate * 0.45)
         hz = rate * 0.45;
+    effectiveHz_.store (static_cast<float> (hz), std::memory_order_relaxed);
 
     const double g = std::tan (kPi * hz / rate);
     const double k = 1.0 / static_cast<double> (q);

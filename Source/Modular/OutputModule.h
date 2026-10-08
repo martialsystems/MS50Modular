@@ -3,6 +3,7 @@
 #pragma once
 
 #include "Module.h"
+#include "Smoothing.h"
 
 // Plugin boundary. Not the headphone amplifier.
 // Step 3 runs mix 0 and level 1 so a dry cable is a host-unit pass.
@@ -54,6 +55,8 @@ private:
     float level_ = 1.0f;
     float outputLevel_ = 0.7f;
     float ampGain_ = outputLevelGain (0.7f);
+    KnobSmoother mixSmooth_ { 0.0f };                                   // §3.5: 10 ms per-sample ramp
+    KnobSmoother gainSmooth_ { outputLevelGain (0.7f) * kVoltsToHost }; // level * amp gain * volts->host
     float hostLeft_ = 0.0f;
     float hostRight_ = 0.0f;
 };

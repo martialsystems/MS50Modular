@@ -58,7 +58,8 @@ int testMixerSumsThree()
     mixer.setKnob (Mixer::kKnobLevel1, 1.0f);
     mixer.setKnob (Mixer::kKnobLevel2, 0.5f);
     mixer.setKnob (Mixer::kKnobLevel3, 0.25f);
-    drive (mixer, 1.0f, 2.0f, 4.0f);
+    for (int settle = 0; settle < 9600; ++settle)   // §3.5: let the 10 ms knob ramp settle
+        drive (mixer, 1.0f, 2.0f, 4.0f);
     check (std::fabs (mixer.portValue[Mixer::kOut] - (-3.0f)) < 1.0e-5f, "1 + 1 + 1 inverted");
 
     const FaceKnobBinding level1 = faceKnobBinding ("MIX", "LEVEL 1");

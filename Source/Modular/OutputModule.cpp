@@ -50,29 +50,35 @@ float OutputModule::presetKnob (int knob) const
 void OutputModule::setMix (float zeroToOne)
 {
     mix_ = clamp01 (zeroToOne);
+    mixSmooth_.setTarget (mix_);
 }
 
 void OutputModule::setLevel (float zeroToOne)
 {
     level_ = clamp01 (zeroToOne);
+    gainSmooth_.setTarget (level_ * ampGain_ * kVoltsToHost);
 }
 
 void OutputModule::setOutputLevel (float zeroToOne)
 {
     outputLevel_ = clamp01 (zeroToOne);
     ampGain_ = outputLevelGain (outputLevel_);
+    gainSmooth_.setTarget (level_ * ampGain_ * kVoltsToHost);
 }
 
 void OutputModule::prepare (double rate)
 {
     sampleRate = rate;
+    mixSmooth_.prepare (rate);
+    gainSmooth_.prepare (rate);
 }
 
 void OutputModule::processSample()
 {
     const float wet = portValue[2];
-    const float dry = 1.0f - mix_;
-    const float gain = level_ * ampGain_ * kVoltsToHost;
-    hostLeft_ = (portValue[0] * dry + wet * mix_) * gain;
-    hostRight_ = (portValue[1] * dry + wet * mix_) * gain;
+    const float mix = mixSmooth_.next();
+    const float dry = 1.0f - mix;
+    const float gain = gainSmooth_.next();
+    hostLeft_ = (portValue[0] * dry + wet * mix) * gain;
+    hostRight_ = (portValue[1] * dry + wet * mix) * gain;
 }

@@ -154,7 +154,8 @@ int testNoiseBothJacksMove()
 
     output.setMix (0.0f);
     extIn.setHostSample (0.5f, -0.25f);
-    graph.process();
+    for (int settle = 0; settle < 9600; ++settle)   // §3.5: let the 10 ms knob ramp settle
+        graph.process();
     check (near (output.hostLeft(), 0.5f), "mix 0 restores dry left");
     check (near (output.hostRight(), -0.25f), "mix 0 restores dry right");
 

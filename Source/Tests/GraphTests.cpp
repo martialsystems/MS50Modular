@@ -593,6 +593,7 @@ int testSawPulsePolyBlepKept();
 int testFootageSwitchesAtWrap();
 int testHalfbandSpec();
 int testMgPolyBlep();
+int testKnobSmoothing();
 
 int main()
 {
@@ -716,5 +717,6 @@ int main()
     failed += testFootageSwitchesAtWrap();
     failed += testHalfbandSpec();
     failed += testMgPolyBlep();
+    failed += testKnobSmoothing();
     return failed == 0 ? 0 : 1;
 }

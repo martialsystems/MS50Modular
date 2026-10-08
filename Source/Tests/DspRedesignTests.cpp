@@ -147,3 +147,98 @@ int testMgPolyBlep()
     check (exact, "LFO-rate pulse is 0/5 V");
     return finish ("testMgPolyBlep");
 }
+
+// ---- §5.8 smoothing (N8) ----------------------------------------------------------------------
+
+#include "Modular/Mixer.h"
+#include "Modular/OutputModule.h"
+#include "Modular/Vca1.h"
+#include "Modular/Vcf.h"
+
+int testKnobSmoothing()
+{
+    constexpr double rate = 48000.0;
+    const int tau = static_cast<int> (0.010 * rate);   // 480 samples
+
+    // VCA 1 intensity 0 -> 1 with a steady +1 V input and the gate fully open: a 10 ms one-pole, no step.
+    // The 10 Hz low cut also moves, so compare against a twin that sat at intensity 1 all along.
+    Vca1 vca;
+    Vca1 twin;
+    for (Vca1* v : { &vca, &twin })
+    {
+        v->setKnob (Vca1::kKnobLowCut, 0.0f);
+        v->setKnob (Vca1::kKnobIntensity, v == &twin ? 1.0f : 0.0f);
+        v->setKnob (Vca1::kKnobInitial, 1.0f);
+        v->prepare (rate);
+        v->portValue[Vca1::kSigIn] = 0.0f;
+        for (int i = 0; i < 4800; ++i)
+            v->processSample();
+        v->portValue[Vca1::kSigIn] = 1.0f;
+    }
+    check (std::fabs (vca.portValue[Vca1::kOut]) < 1.0e-6f, "intensity 0 is silent");
+    vca.setKnob (Vca1::kKnobIntensity, 1.0f);
+    vca.processSample();
+    twin.processSample();
+    const float first = vca.portValue[Vca1::kOut] / twin.portValue[Vca1::kOut];
+    for (int i = 1; i < tau; ++i)
+    {
+        vca.processSample();
+        twin.processSample();
+    }
+    const float atTau = vca.portValue[Vca1::kOut] / twin.portValue[Vca1::kOut];
+    check (first > 0.0f && first < 0.01f, "VCA 1 intensity does not step");
+    check (std::fabs (atTau - (1.0f - std::exp (-1.0f))) < 0.003f, "VCA 1 intensity is a 10 ms one-pole");
+
+    // Mixer level: 0.8 -> 0 reaches 1/e of the way after 10 ms and is exactly 0 after 200 ms.
+    Mixer mixer;
+    mixer.prepare (rate);
+    mixer.portValue[Mixer::kIn1] = 1.0f;
+    mixer.portValue[Mixer::kIn2] = 0.0f;
+    mixer.portValue[Mixer::kIn3] = 0.0f;
+    mixer.processSample();
+    check (std::fabs (mixer.portValue[Mixer::kOut] + 0.8f) < 1.0e-6f, "mixer starts on its knob, no ramp from 0");
+    mixer.setKnob (Mixer::kKnobLevel1, 0.0f);
+    for (int i = 0; i < tau; ++i)
+        mixer.processSample();
+    const float mixAtTau = -mixer.portValue[Mixer::kOut];
+    check (std::fabs (mixAtTau - 0.8f * std::exp (-1.0f)) < 0.002f, "mixer level is a 10 ms one-pole");
+    for (int i = 0; i < 9600; ++i)
+        mixer.processSample();
+    check (mixer.portValue[Mixer::kOut] == 0.0f, "mixer level lands exactly on 0");
+    check (mixer.presetKnob (Mixer::kKnobLevel1) == 0.0f, "the stored knob is the target");
+
+    // Output level: a level jump does not step the host output.
+    OutputModule out;
+    out.setMix (0.0f);
+    out.setLevel (1.0f);
+    out.setOutputLevel (0.7f);
+    out.prepare (rate);
+    out.portValue[0] = 1.0f;
+    out.portValue[1] = 1.0f;
+    out.processSample();
+    const float before = out.hostLeft();
+    out.setOutputLevel (1.0f);
+    out.processSample();
+    const float after = out.hostLeft();
+    check (std::fabs (before - 0.2f) < 1.0e-6f, "output starts on its level");
+    check (after - before < 0.01f && after > before, "output level ramps, no step");
+
+    // VCF cutoff knob 0 -> 1 ramps in the log domain over 5 ms: after one tau the knob is at 1 - 1/e.
+    Vcf vcf;
+    vcf.setKnob (Vcf::kKnobCutoff, 0.0f);
+    vcf.setKnob (Vcf::kKnobAmount, 0.0f);
+    vcf.prepare (rate);
+    vcf.portValue[Vcf::kSigIn] = 0.0f;
+    vcf.processSample();
+    check (std::fabs (vcf.effectiveHz() - 20.0f) < 0.5f, "cutoff starts on the knob (20 Hz)");
+    vcf.setKnob (Vcf::kKnobCutoff, 1.0f);
+    for (int i = 0; i < static_cast<int> (0.005 * rate); ++i)
+        vcf.processSample();
+    const double expected = 20.0 * std::pow (900.0, 1.0 - std::exp (-1.0));
+    std::printf ("  vcf at tau %.1f Hz (log-domain expects %.1f)\n", vcf.effectiveHz(), expected);
+    check (std::fabs (std::log2 (vcf.effectiveHz() / expected)) < 0.02, "cutoff ramp is log-domain, 5 ms");
+    for (int i = 0; i < 9600; ++i)
+        vcf.processSample();
+    check (std::fabs (vcf.effectiveHz() - 18000.0f) < 1.0f, "cutoff lands on 18 kHz");
+    return finish ("testKnobSmoothing");
+}

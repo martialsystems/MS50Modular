@@ -3,6 +3,7 @@
 #pragma once
 
 #include "Module.h"
+#include "Smoothing.h"
 
 // S-11. Separate from VCA 2. No shared mode flag.
 class Vca1 : public Module {
@@ -36,5 +37,7 @@ private:
     float lowCut01_ = 0.0f;
     float intensity_ = 0.85f;
     float initial01_ = 0.0f;
+    KnobSmoother intensitySmooth_ { 0.85f };   // §3.5: 10 ms per-sample ramp
+    KnobSmoother initialSmooth_ { 0.0f };
     float low_ = 0.0f;
 };

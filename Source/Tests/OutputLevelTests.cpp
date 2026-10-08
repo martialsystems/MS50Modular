@@ -77,6 +77,12 @@ struct DryRack {
         ext.setHostSample (left, right);
         graph.process();
     }
+
+    void settle (float left, float right)
+    {
+        for (int i = 0; i < 9600; ++i)   // §3.5: let the 10 ms knob ramp settle
+            drive (left, right);
+    }
 };
 
 struct VoiceTail {
@@ -234,19 +240,19 @@ int testOutputLevelScalesDry()
     }
 
     dry.output.setOutputLevel (1.0f);
-    dry.drive (0.25f, -0.4f);
+    dry.settle (0.25f, -0.4f);
     check (near (dry.output.hostLeft(), 0.5f), "full level doubles the dry left");
     check (near (dry.output.hostRight(), -0.8f), "full level doubles the dry right");
     check (std::fabs (dry.output.hostLeft()) > 0.25f, "effect off, raising level makes the track louder");
 
     dry.output.setOutputLevel (0.0f);
-    dry.drive (0.25f, -0.4f);
+    dry.settle (0.25f, -0.4f);
     check (near (dry.output.hostLeft(), 0.0f), "level 0 mutes the dry left");
     check (near (dry.output.hostRight(), 0.0f), "level 0 mutes the dry right");
 
     dry.output.setLevel (0.0f);
     dry.output.setOutputLevel (1.0f);
-    dry.drive (0.25f, -0.4f);
+    dry.settle (0.25f, -0.4f);
     check (near (dry.output.hostLeft(), 0.0f), "schematic trim 0 stays silent at full level");
     check (near (dry.output.hostRight(), 0.0f), "schematic trim 0 stays silent on the right");
 

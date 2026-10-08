@@ -88,7 +88,8 @@ struct BlendRack {
     {
         output.setMix (outputMixAfterSwitch (effectOn, mixKnob));
         ext.setHostSample (left, right);
-        graph.process();
+        for (int settle = 0; settle < 9600; ++settle)   // §3.5: let the 10 ms knob ramp settle
+            graph.process();
     }
 };
 
