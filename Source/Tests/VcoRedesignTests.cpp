@@ -7,6 +7,7 @@
 
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <vector>
 
 namespace {
@@ -164,4 +165,40 @@ int testFootageSwitchesAtWrap()
     check (switched, "the new footage takes over at the wrap");
     check (std::fabs (Vco::footageHzFor (2) - 130.813f) < 1.0e-4f, "8' is C3 = 130.813 Hz (footage table KEPT)");
     return finish ("testFootageSwitchesAtWrap");
+}
+
+// §5.13c / §6: VCO:HZ/V is role HZ/V LIN (JCS R4, R14) and its law f = footage * max(V, 0.05) is unchanged.
+int testHzvJackRoleLin()
+{
+    Vco vco;
+    const PortDesc hzv = vco.port (Vco::kHzPerVolt);
+    const PortDesc oct = vco.port (Vco::kOct);
+    check (portRole (hzv) == jcs::Role::HzvLin, "VCO:HZ/V port role is HZ/V LIN");
+    check (std::strcmp (jcs::roleInfo (portRole (hzv)).name, "HZ/V LIN") == 0, "the role is named HZ/V LIN");
+    check (jcs::roleInfo (jcs::Role::HzvLin).rgb == 0x5cd5edu, "HZ/V LIN colour #5cd5ed");
+    check (portRole (oct) == jcs::Role::VOct, "VCO:V/OCT port role is V/OCT");
+    check (jcs::cableBadge (jcs::Role::VOct, portRole (hzv)) == jcs::Badge::PitchLaw, "V/OCT into HZ/V LIN warns (not refused)");
+
+    auto hzAt = [] (float volts) {
+        Vco v;
+        v.setKnob (Vco::kKnobFine, 0.5f);
+        v.prepare (48000.0);
+        v.inputConnected[Vco::kHzPerVolt] = true;
+        v.portValue[Vco::kHzPerVolt] = volts;
+        for (int i = 0; i < 64; ++i)
+            v.processSample();
+        return static_cast<double> (v.lastHz());
+    };
+    Vco ref;
+    ref.prepare (48000.0);
+    ref.processSample();
+    const double footage = Vco::footageHzFor (ref.activeScaleIndex());
+    const double one = hzAt (1.0f);
+    std::printf ("  footage %.4f Hz, 1 V -> %.4f Hz\n", footage, one);
+    check (std::fabs (one / footage - 1.0) < 1.0e-4, "1 V plays the footage reference (f = footage * V)");
+    check (std::fabs (hzAt (2.0f) / one - 2.0) < 1.0e-4, "2 V doubles it: linear, not 1 V/oct");
+    check (std::fabs (hzAt (0.5f) / one - 0.5) < 1.0e-4, "0.5 V halves it");
+    check (std::fabs (hzAt (0.0f) / one - 0.05) < 1.0e-4, "0 V floors at 0.05 V");
+    check (std::fabs (hzAt (-3.0f) / one - 0.05) < 1.0e-4, "negative volts floor at 0.05 V");
+    return finish ("testHzvJackRoleLin");
 }

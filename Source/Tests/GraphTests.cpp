@@ -601,6 +601,7 @@ int testGraphFeedbackOneSampleNoDoubleRun();
 int testGraphStrigScopeAndLegacyInvert();
 int testGraphTypedRestNoLatch();
 int testDrivePull();
+int testHzvJackRoleLin();
 
 int main()
 {
@@ -731,5 +732,6 @@ int main()
     failed += testGraphStrigScopeAndLegacyInvert();
     failed += testGraphTypedRestNoLatch();
     failed += testDrivePull();
+    failed += testHzvJackRoleLin();
     return failed == 0 ? 0 : 1;
 }
