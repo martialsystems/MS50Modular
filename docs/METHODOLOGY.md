@@ -161,7 +161,7 @@ Procedure:
 4. Record the plugin dry from the host, no extra plug-ins. Store that recording outside the repo.
 5. Write three lines: what matched, what did not, which stand-in id would have to move. Do not retune S-numbers in the same session as the listening. A second change, with the id edited and the test note linked, is the retune.
 
-Files that are not dry enough for timbre: Dr. Kunz (Small Stone, SDD-3000, dbx) and the Perfect Circuit jam (another synth in the same mix). They are patch ideas only.
+Files that are not dry enough for timbre: Dr. Kunz (outboard effects in the chain) and the Perfect Circuit jam (another synth in the same mix). They are patch ideas only.
 
 ## Definition of done for a module
 
