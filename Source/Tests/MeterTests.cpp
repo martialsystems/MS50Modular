@@ -120,12 +120,12 @@ int testMeterFollowsSelectedJack()
            "/16 is not a meter source");
     check (module == -1 && port == -1, "an unmapped click does not invent a port");
 
-    const std::string process = functionBody (readFile (MS50_PATCH_GRAPH_SOURCE), "void PatchGraph::process()");
+    const std::string process = functionBody (readFile (RONIN_PATCH_GRAPH_SOURCE), "void PatchGraph::process()");
     check (! process.empty(), "process() is readable");
     check (process.find ("Meter") == std::string::npos, "process() does not mention the meter");
     check (process.find ("portVolts") == std::string::npos, "process() does not read the meter");
 
-    const std::string view = readFile (MS50_PATCH_BAY_VIEW_SOURCE);
+    const std::string view = readFile (RONIN_PATCH_BAY_VIEW_SOURCE);
     const std::string paint = functionBody (view, "void PatchBayView::paint");
     const auto holdPaint = paint.find ("paintExtInHold");
     const auto cablePaint = paint.find ("for (int cable");

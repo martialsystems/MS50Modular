@@ -141,7 +141,7 @@ int testIntegratorIsItsOwnModule()
            "integrator out feeds output wet");
     check (linked.sourceModule == 13 && linked.sourcePort == Integrator::kOut, "integrator out is the source");
 
-    const char* path = MS50_PROCESSOR_SOURCE;
+    const char* path = RONIN_PROCESSOR_SOURCE;
     std::ifstream input (path);
     check (static_cast<bool> (input), "processor source is readable");
     const std::string text ((std::istreambuf_iterator<char> (input)), std::istreambuf_iterator<char>());

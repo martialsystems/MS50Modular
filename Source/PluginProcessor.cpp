@@ -21,7 +21,7 @@ float percentToValue (const juce::NormalisableRange<float>& range, const juce::S
 
 }
 
-MS50ModularAudioProcessor::MS50ModularAudioProcessor()
+RoninAudioProcessor::RoninAudioProcessor()
     : AudioProcessor (BusesProperties()
                           .withInput ("Input", juce::AudioChannelSet::stereo(), true)
                           .withOutput ("Output", juce::AudioChannelSet::stereo(), true))
@@ -80,11 +80,11 @@ MS50ModularAudioProcessor::MS50ModularAudioProcessor()
     integratorModuleIndex_ = graph.addModule (integrator);
     mixerModuleIndex_ = graph.addModule (mixer);
     sampleHoldModuleIndex_ = graph.addModule (sampleHold);
-    // A fresh instance is the Voice program: its cables, the default table, and Effect on.
+    // A fresh instance is the INIT program: its cables, the default table, and Effect on.
     setCurrentProgram (kDefaultFactoryPreset);
 }
 
-void MS50ModularAudioProcessor::addKnobParameter (const FaceKnobBinding& binding)
+void RoninAudioProcessor::addKnobParameter (const FaceKnobBinding& binding)
 {
     if (binding.knob == FaceKnob::None || binding.parameterId == nullptr || binding.parameterId[0] == '\0')
         return;
@@ -177,7 +177,7 @@ void MS50ModularAudioProcessor::addKnobParameter (const FaceKnobBinding& binding
         dividerRatio_ = parameter;
 }
 
-juce::AudioParameterFloat* MS50ModularAudioProcessor::floatParameter (FaceKnob knob) const noexcept
+juce::AudioParameterFloat* RoninAudioProcessor::floatParameter (FaceKnob knob) const noexcept
 {
     if (knob == FaceKnob::VcfCutoff)
         return vcfCutoff_;
@@ -248,17 +248,17 @@ juce::AudioParameterFloat* MS50ModularAudioProcessor::floatParameter (FaceKnob k
     return nullptr;
 }
 
-juce::AudioProcessorParameter* MS50ModularAudioProcessor::parameterForPanelKnob (const char* section, const char* label) const
+juce::AudioProcessorParameter* RoninAudioProcessor::parameterForPanelKnob (const char* section, const char* label) const
 {
     return floatParameter (faceKnobBinding (section, label).knob);
 }
 
-bool MS50ModularAudioProcessor::effectIsOn() const noexcept
+bool RoninAudioProcessor::effectIsOn() const noexcept
 {
     return effectOn_ != nullptr && effectOn_->get();
 }
 
-void MS50ModularAudioProcessor::applyHostControls()
+void RoninAudioProcessor::applyHostControls()
 {
     auto apply = [] (juce::AudioParameterFloat* parameter, Module& module, int knob)
     {
@@ -303,13 +303,13 @@ void MS50ModularAudioProcessor::applyHostControls()
         output.setOutputLevel (outputLevel_->convertTo0to1 (outputLevel_->get()));
 }
 
-float MS50ModularAudioProcessor::effectiveOutputMix() const noexcept
+float RoninAudioProcessor::effectiveOutputMix() const noexcept
 {
     const float mixKnob = outputMix_ != nullptr ? outputMix_->convertTo0to1 (outputMix_->get()) : 1.0f;
     return outputMixAfterSwitch (effectIsOn(), mixKnob);
 }
 
-int MS50ModularAudioProcessor::copyPublishedCables (Cable* dest, int capacity) const
+int RoninAudioProcessor::copyPublishedCables (Cable* dest, int capacity) const
 {
     return graph.copyPublishedCables (dest, capacity);
 }
@@ -324,7 +324,7 @@ bool onMessageThread()
 
 }
 
-PatchGraph::ConnectResult MS50ModularAudioProcessor::connectJacks (int sourceModule, int sourcePort,
+PatchGraph::ConnectResult RoninAudioProcessor::connectJacks (int sourceModule, int sourcePort,
                                                                   int destModule, int destPort)
 {
     jassert (onMessageThread());
@@ -333,7 +333,7 @@ PatchGraph::ConnectResult MS50ModularAudioProcessor::connectJacks (int sourceMod
     return graph.attemptConnect (sourceModule, sourcePort, destModule, destPort);
 }
 
-void MS50ModularAudioProcessor::disconnectJacks (int sourceModule, int sourcePort, int destModule, int destPort)
+void RoninAudioProcessor::disconnectJacks (int sourceModule, int sourcePort, int destModule, int destPort)
 {
     jassert (onMessageThread());
     if (! onMessageThread())
@@ -341,7 +341,7 @@ void MS50ModularAudioProcessor::disconnectJacks (int sourceModule, int sourcePor
     graph.disconnect (sourceModule, sourcePort, destModule, destPort);
 }
 
-void MS50ModularAudioProcessor::setOutputMix (float zeroToOne)
+void RoninAudioProcessor::setOutputMix (float zeroToOne)
 {
     jassert (onMessageThread());
     if (! onMessageThread())
@@ -352,26 +352,26 @@ void MS50ModularAudioProcessor::setOutputMix (float zeroToOne)
     applyHostControls();
 }
 
-void MS50ModularAudioProcessor::setExtInButtonHeld (bool held)
+void RoninAudioProcessor::setExtInButtonHeld (bool held)
 {
     extIn.setButtonHeld (held);
 }
 
-bool MS50ModularAudioProcessor::extInButtonHeld() const noexcept
+bool RoninAudioProcessor::extInButtonHeld() const noexcept
 {
     return extIn.buttonHeld();
 }
 
-float MS50ModularAudioProcessor::meterVolts() const noexcept
+float RoninAudioProcessor::meterVolts() const noexcept
 {
     const int module = meter_.readingModule (outputModuleIndex_);
     const int port = meter_.readingPort (2);
     return graph.portVolts (module, port);
 }
 
-MS50ModularAudioProcessor::~MS50ModularAudioProcessor() = default;
+RoninAudioProcessor::~RoninAudioProcessor() = default;
 
-void MS50ModularAudioProcessor::prepareToPlay (double sampleRate, int)
+void RoninAudioProcessor::prepareToPlay (double sampleRate, int)
 {
     graph.prepare (sampleRate);
     extIn.prepare (sampleRate);
@@ -394,11 +394,11 @@ void MS50ModularAudioProcessor::prepareToPlay (double sampleRate, int)
     setLatencySamples (0);
 }
 
-void MS50ModularAudioProcessor::releaseResources()
+void RoninAudioProcessor::releaseResources()
 {
 }
 
-bool MS50ModularAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
+bool RoninAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
     if (layouts.inputBuses.size() != 1 || layouts.outputBuses.size() != 1)
         return false;
@@ -407,7 +407,7 @@ bool MS50ModularAudioProcessor::isBusesLayoutSupported (const BusesLayout& layou
         && layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo();
 }
 
-void MS50ModularAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
+void RoninAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
     juce::ScopedNoDenormals noDenormals;
 
@@ -436,52 +436,52 @@ void MS50ModularAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, 
     }
 }
 
-juce::AudioProcessorEditor* MS50ModularAudioProcessor::createEditor()
+juce::AudioProcessorEditor* RoninAudioProcessor::createEditor()
 {
-    return new MS50ModularAudioProcessorEditor (*this);
+    return new RoninAudioProcessorEditor (*this);
 }
 
-bool MS50ModularAudioProcessor::hasEditor() const
+bool RoninAudioProcessor::hasEditor() const
 {
     return true;
 }
 
-const juce::String MS50ModularAudioProcessor::getName() const
+const juce::String RoninAudioProcessor::getName() const
 {
     return "RONIN";
 }
 
-bool MS50ModularAudioProcessor::acceptsMidi() const
+bool RoninAudioProcessor::acceptsMidi() const
 {
     return false;
 }
 
-bool MS50ModularAudioProcessor::producesMidi() const
+bool RoninAudioProcessor::producesMidi() const
 {
     return false;
 }
 
-bool MS50ModularAudioProcessor::isMidiEffect() const
+bool RoninAudioProcessor::isMidiEffect() const
 {
     return false;
 }
 
-double MS50ModularAudioProcessor::getTailLengthSeconds() const
+double RoninAudioProcessor::getTailLengthSeconds() const
 {
     return 0.0;
 }
 
-int MS50ModularAudioProcessor::getNumPrograms()
+int RoninAudioProcessor::getNumPrograms()
 {
     return kFactoryPresetCount;
 }
 
-int MS50ModularAudioProcessor::getCurrentProgram()
+int RoninAudioProcessor::getCurrentProgram()
 {
     return currentProgram_;
 }
 
-void MS50ModularAudioProcessor::applyProgramParameters (int index)
+void RoninAudioProcessor::applyProgramParameters (int index)
 {
     auto restore = [] (juce::AudioParameterFloat* parameter, float fallback)
     {
@@ -492,7 +492,7 @@ void MS50ModularAudioProcessor::applyProgramParameters (int index)
     if (effectOn_ != nullptr)
         effectOn_->setValueNotifyingHost (factoryPresetEffect (index) ? 1.0f : 0.0f);
 
-    // One default table. Hold and the self-mod presets override their knobs. Feedback and the self-mod presets set VCA 1 Initial.
+    // One default table. A factory program may override its knobs and VCA 1 Initial; INIT uses the table as is.
     const FactoryProgramKnobs knobs = factoryProgramKnobs (index);
     restore (vcfCutoff_, knobs.vcfCutoff);
     restore (vcfPeak_, knobs.vcfPeak);
@@ -529,7 +529,7 @@ void MS50ModularAudioProcessor::applyProgramParameters (int index)
     restore (dividerRatio_, PanelDefault::kDividerRatio);
 }
 
-void MS50ModularAudioProcessor::setCurrentProgram (int index)
+void RoninAudioProcessor::setCurrentProgram (int index)
 {
     if (! loadFactoryPreset (graph, index))
         return;
@@ -542,18 +542,18 @@ void MS50ModularAudioProcessor::setCurrentProgram (int index)
     graph.prepare (rate > 0.0 ? rate : 48000.0);
 }
 
-const juce::String MS50ModularAudioProcessor::getProgramName (int index)
+const juce::String RoninAudioProcessor::getProgramName (int index)
 {
     return factoryPresetName (index);
 }
 
-void MS50ModularAudioProcessor::changeProgramName (int, const juce::String&)
+void RoninAudioProcessor::changeProgramName (int, const juce::String&)
 {
 }
 
-void MS50ModularAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
+void RoninAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    juce::XmlElement xml ("MS50");
+    juce::XmlElement xml ("RONIN");
     for (auto* parameter : getParameters())
     {
         if (auto* ranged = dynamic_cast<juce::RangedAudioParameter*> (parameter))
@@ -567,10 +567,10 @@ void MS50ModularAudioProcessor::getStateInformation (juce::MemoryBlock& destData
     copyXmlToBinary (xml, destData);
 }
 
-void MS50ModularAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
+void RoninAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
     auto xml = getXmlFromBinary (data, sizeInBytes);
-    if (xml == nullptr || ! xml->hasTagName ("MS50"))
+    if (xml == nullptr || ! xml->hasTagName ("RONIN"))
         return;
 
     if (xml->hasAttribute ("graph"))
@@ -608,5 +608,5 @@ void MS50ModularAudioProcessor::setStateInformation (const void* data, int sizeI
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
-    return new MS50ModularAudioProcessor();
+    return new RoninAudioProcessor();
 }

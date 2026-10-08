@@ -183,6 +183,8 @@ void Vco::processSample()
         fall += 1.0f;
     pulseUnit -= polyBlep (fall, dt);
 
+    // TODO(init-triangle): this Tri output is the parabola below. A true triangle (and a shape setting that
+    // new patches set to triangle while older patches keep the parabola) is not implemented yet.
     // Integral of the polyblep saw. The naive integral is a parabola of height 0.25,
     // so 40 brings that shape to ±5 V. The slow servo only removes residual DC.
     triState_ += static_cast<double> (sawUnit) * static_cast<double> (dt);

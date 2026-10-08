@@ -35,7 +35,7 @@ struct SineRack {
         graph.prepare (kSampleRate);
     }
 
-    // Same sample loop as MS50ModularAudioProcessor::processBlock.
+    // Same sample loop as RoninAudioProcessor::processBlock.
     void render (const float* inLeft, const float* inRight, float* outLeft, float* outRight, int n)
     {
         for (int i = 0; i < n; ++i)

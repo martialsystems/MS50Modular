@@ -82,7 +82,7 @@ public:
 
     Steinberg::tresult PLUGIN_API getName(Steinberg::Vst::String128 name) override
     {
-        static constexpr char kName[] = "MS50Host";
+        static constexpr char kName[] = "RoninHost";
         for (std::size_t i = 0; i < sizeof(kName); ++i)
             name[i] = static_cast<Steinberg::char16>(kName[i]);
         return Steinberg::kResultOk;

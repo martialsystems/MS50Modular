@@ -36,7 +36,7 @@ Files to create:
 
 ```cmake
 cmake_minimum_required(VERSION 3.22)
-project(MS50Modular VERSION 0.1.0 LANGUAGES C CXX)
+project(Ronin VERSION 0.1.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -48,7 +48,7 @@ FetchContent_Declare(
   GIT_SHALLOW TRUE)
 FetchContent_MakeAvailable(JUCE)
 
-juce_add_plugin(MS50Modular
+juce_add_plugin(Ronin
   COMPANY_NAME "Personal"
   IS_SYNTH FALSE
   NEEDS_MIDI_INPUT FALSE
@@ -57,20 +57,20 @@ juce_add_plugin(MS50Modular
   EDITOR_WANTS_KEYBOARD_FOCUS FALSE
   COPY_PLUGIN_AFTER_BUILD FALSE
   PLUGIN_MANUFACTURER_CODE Psnl
-  PLUGIN_CODE Ms50
+  PLUGIN_CODE Rnin
   FORMATS VST3
   PRODUCT_NAME "RONIN")
 
-target_sources(MS50Modular PRIVATE
+target_sources(Ronin PRIVATE
   Source/PluginProcessor.cpp
   Source/PluginEditor.cpp)
 
-target_compile_definitions(MS50Modular PUBLIC
+target_compile_definitions(Ronin PUBLIC
   JUCE_WEB_BROWSER=0
   JUCE_USE_CURL=0
   JUCE_VST3_CAN_REPLACE_VST2=0)
 
-target_link_libraries(MS50Modular PRIVATE
+target_link_libraries(Ronin PRIVATE
   juce::juce_audio_utils
   juce::juce_recommended_config_flags
   juce::juce_recommended_warning_flags)
@@ -93,13 +93,13 @@ Rollback: remove `CMakeLists.txt` and `Source/` and the `build/` directory. `bui
 
 ## Step 2: Port, Cable, Module, PatchGraph
 
-Files: `Source/Modular/Port.h`, `Module.h`, `Module.cpp`, `Cable.h`, `PatchGraph.h`, `PatchGraph.cpp`, `Source/Tests/GraphTests.cpp`, and a CMake target `MS50ModularTests` that is a console app, not a plugin. It links the modular sources and does not link the plugin target.
+Files: `Source/Modular/Port.h`, `Module.h`, `Module.cpp`, `Cable.h`, `PatchGraph.h`, `PatchGraph.cpp`, `Source/Tests/GraphTests.cpp`, and a CMake target `RoninTests` that is a console app, not a plugin. It links the modular sources and does not link the plugin target.
 
 Implement the rules in `SCHEMATICS.md` up to, but not including, delayed feedback. A cycle is rejected. Inputs sum. Fan-out allowed. Type matrix enforced. Two snapshots, atomic index, no alloc in a method named `process`.
 
 `Module` is the base from the schematic sketch. No concrete synth modules yet. Tests use a `GainModule` in the test file only, gain fixed at 1, not on the rack.
 
-Acceptance: `MS50ModularTests` runs `testInputSumsTwoCables`, `testSecondCableDoesNotReplaceFirst`, `testFanOutAllowed`, `testRejectSignalIntoGate`, `testRejectCycle`, `testSnapshotSwapDoesNotAllocate` (the process function's source does not call `new` or `push_back`; a debug counter of allocations stays 0 across 1000 samples).
+Acceptance: `RoninTests` runs `testInputSumsTwoCables`, `testSecondCableDoesNotReplaceFirst`, `testFanOutAllowed`, `testRejectSignalIntoGate`, `testRejectCycle`, `testSnapshotSwapDoesNotAllocate` (the process function's source does not call `new` or `push_back`; a debug counter of allocations stays 0 across 1000 samples).
 
 Do not touch: `PluginProcessor` audio behavior, the editor layout.
 
@@ -122,7 +122,7 @@ Rollback: processor returns to the step 1 copy. Keep the graph types.
 Every DSP step reruns the sine harness:
 
 ```bash
-cmake --build build --config Debug --target MS50ModularTests && ./build/MS50ModularTests
+cmake --build build --config Debug --target RoninTests && ./build/RoninTests
 ```
 
 Dry mix 0 must still pass unless that step documents a default-mix change. `SINE_* FAIL` fails the step. Stacking cables does not change the default dry pair, so `SINE_DRY` still has to pass. `SINE_HOST SKIP` is allowed when pedalboard or the VST3 bundle is absent. The host command is `python3 scripts/sine_through_fx.py --vst3 <debug-vst3>`.
@@ -208,9 +208,9 @@ After a change that should be heard in FL Studio, quit FL Studio and Plugin Mana
 scripts/install_fl_plugin.sh
 ```
 
-The script builds target `MS50Modular_VST3` as a Release bundle for arm64 and x86_64 under `build/fl-release/`. It loads each slice, requires subcategory Fx, processes one dry stereo block, and runs `scripts/sine_through_fx.py` on that bundle. It then points `~/Library/Audio/Plug-Ins/VST3/RONIN.vst3` at that bundle and removes the old `MS-50 Modular.vst3` link and its scan records. A failed Effects record, or one older than the new binary, is deleted, including the New-folder copies. A record that already verified this same bundle is kept. Generator copies are removed. When the record was deleted, use Find plugins so FL Studio writes a new one.
+The script builds target `Ronin_VST3` as a Release bundle for arm64 and x86_64 under `build/fl-release/`. It loads each slice, requires subcategory Fx, processes one dry stereo block, and runs `scripts/sine_through_fx.py` on that bundle. It then points `~/Library/Audio/Plug-Ins/VST3/RONIN.vst3` at that bundle. A failed Effects record, or one older than the new binary, is deleted, including the New-folder copies. A record that already verified this same bundle is kept. Generator copies are removed. When the record was deleted, use Find plugins so FL Studio writes a new one.
 
-Keep one copy. A second bundle in `/Library/Audio/Plug-Ins/VST3` is a second row. Building the static library target `MS50Modular` does not refresh the VST3. The Debug tree stays arm64 for `MS50ModularTests` and `MS50PanelProbe`.
+Keep one copy. A second bundle in `/Library/Audio/Plug-Ins/VST3` is a second row. Building the static library target `Ronin` does not refresh the VST3. The Debug tree stays arm64 for `RoninTests` and `RoninPanelProbe`.
 
 ## Step 7: Noise
 

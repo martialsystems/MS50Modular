@@ -4,7 +4,7 @@
 
 // The one default table. FaceKnobs fallbacks, layout.json "default", PanelGeometry.inc,
 // double-click reset and factory program load all read these values.
-// A fresh instance is the Voice program with these knobs. Hold overrides some of them in FactoryPresets.h.
+// A fresh instance is the INIT program (FactoryPresets.h) with these knobs.
 namespace PanelDefault {
 
 inline constexpr float kVcoRange = 0.50f;

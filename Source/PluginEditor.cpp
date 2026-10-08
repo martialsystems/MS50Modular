@@ -2,7 +2,7 @@
 
 #include "PluginEditor.h"
 
-MS50ModularAudioProcessorEditor::MS50ModularAudioProcessorEditor (MS50ModularAudioProcessor& audioProcessor)
+RoninAudioProcessorEditor::RoninAudioProcessorEditor (RoninAudioProcessor& audioProcessor)
     : AudioProcessorEditor (audioProcessor),
       bay (audioProcessor)
 {
@@ -14,14 +14,14 @@ MS50ModularAudioProcessorEditor::MS50ModularAudioProcessorEditor (MS50ModularAud
     setSize (1280, 451);
 }
 
-MS50ModularAudioProcessorEditor::~MS50ModularAudioProcessorEditor() = default;
+RoninAudioProcessorEditor::~RoninAudioProcessorEditor() = default;
 
-void MS50ModularAudioProcessorEditor::paint (juce::Graphics& g)
+void RoninAudioProcessorEditor::paint (juce::Graphics& g)
 {
     g.fillAll (juce::Colour (0xff101012));
 }
 
-void MS50ModularAudioProcessorEditor::resized()
+void RoninAudioProcessorEditor::resized()
 {
     bay.setBounds (getLocalBounds());
 }

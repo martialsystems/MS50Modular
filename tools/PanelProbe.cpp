@@ -163,13 +163,13 @@ float rockerBrightness (PatchBayView& bay, float designX, float designY)
     return static_cast<float> (pixel.getRed() + pixel.getGreen() + pixel.getBlue());
 }
 
-int publishedCount (MS50ModularAudioProcessor& processor)
+int publishedCount (RoninAudioProcessor& processor)
 {
     Cable cables[kPatchBayMaxCables] {};
     return processor.copyPublishedCables (cables, kPatchBayMaxCables);
 }
 
-float hostLeftAfter (MS50ModularAudioProcessor& processor, float left, float right)
+float hostLeftAfter (RoninAudioProcessor& processor, float left, float right)
 {
     processor.prepareToPlay (48000.0, 64);
     juce::AudioBuffer<float> buffer (2, 64);
@@ -210,13 +210,13 @@ bool cablePixelBright (juce::Component& component, juce::Point<float> local)
 class ProbeApp : public juce::JUCEApplication
 {
 public:
-    const juce::String getApplicationName() override { return "MS50PanelProbe"; }
+    const juce::String getApplicationName() override { return "RoninPanelProbe"; }
     const juce::String getApplicationVersion() override { return "1"; }
     bool moreThanOneInstanceAllowed() override { return true; }
 
     void initialise (const juce::String&) override
     {
-        processor = std::make_unique<MS50ModularAudioProcessor>();
+        processor = std::make_unique<RoninAudioProcessor>();
         auto* created = processor->createEditor();
         window = std::make_unique<juce::DocumentWindow> ("RONIN panel probe",
                                                           juce::Colours::black,
@@ -240,7 +240,7 @@ public:
 private:
     void run()
     {
-        auto* editor = dynamic_cast<MS50ModularAudioProcessorEditor*> (window->getContentComponent());
+        auto* editor = dynamic_cast<RoninAudioProcessorEditor*> (window->getContentComponent());
         auto* bay = editor != nullptr ? dynamic_cast<PatchBayView*> (editor->getChildComponent (0)) : nullptr;
         expect (editor != nullptr && bay != nullptr, "editor hosts the patch bay");
         if (bay == nullptr || processor == nullptr)
@@ -253,7 +253,7 @@ private:
         const int factoryCount = publishedCount (*processor);
         expect (factoryCount == 8, "default patch has eight cables");
         expect (bay->visualCount() == factoryCount, "default cables are drawn");
-        // Startup is the Voice program: every face knob starts on the default table, cap and parameter alike.
+        // Startup is the INIT program: every face knob starts on the default table, cap and parameter alike.
         for (int i = 0; i < kPanelKnobCount; ++i)
         {
             auto* parameter = processor->parameterForPanelKnob (kPanelKnobs[i].section, kPanelKnobs[i].label);
@@ -274,9 +274,9 @@ private:
             expect (levelParam->getName (64) == "Output Level", "output level parameter name");
             expect (near (levelParam->getValue(), 0.7f), "output level starts at 0.7");
             expect (near (bay->knobValue (levelKnob), 0.7f), "output level cap starts at 0.7");
-            // A fresh instance is the Voice program, so Effect starts on. The dry checks below turn it off.
+            // A fresh instance is the INIT program, so Effect starts on. The dry checks below turn it off.
             expect (processor->effectIsOn(), "a fresh instance starts with Effect on");
-            expect (processor->getCurrentProgram() == kDefaultFactoryPreset, "a fresh instance is Voice");
+            expect (processor->getCurrentProgram() == kDefaultFactoryPreset, "a fresh instance is INIT");
             effect->setValueNotifyingHost (0.0f);
             const float dryUnity = hostLeftAfter (*processor, 0.5f, 0.0f);
             expect (near (dryUnity, 0.5f), "default output level is unity on the dry path");
@@ -503,10 +503,10 @@ private:
                 juce::PNGImageFormat format;
                 format.writeImageToStream (image.getClippedImage (knobBox.getIntersection (image.getBounds())), stream);
             };
-            writeCrop (lowPaint, "/tmp/ms50_knob_low.png");
+            writeCrop (lowPaint, "/tmp/ronin_knob_low.png");
             dragKnobLocal (*bay, kPanelKnobs[cutoff].cx, kPanelKnobs[cutoff].cy, -100.0f, false);
             expect (near (bay->knobValue (cutoff), 0.5f), "drag up 100px from 0 is half travel");
-            writeCrop (paintBay (*bay), "/tmp/ms50_knob_mid.png");
+            writeCrop (paintBay (*bay), "/tmp/ronin_knob_mid.png");
         }
         clickAt (*bay, kPanelKnobs[ratio].cx, kPanelKnobs[ratio].cy);
         expect (bay->knobValue (ratio) == 1.0f, "divider click steps from /2 to /4");
@@ -609,7 +609,7 @@ private:
             const auto lcd1 = bay->designToLocal (kPresetLcdX + kPresetLcdW, kPresetLcdY + kPresetLcdH);
             const juce::Rectangle<int> lcdBox (static_cast<int> (lcd0.x), static_cast<int> (lcd0.y),
                                               static_cast<int> (lcd1.x - lcd0.x), static_cast<int> (lcd1.y - lcd0.y));
-            juce::File lcdFile ("/tmp/ms50_lcd_off.png");
+            juce::File lcdFile ("/tmp/ronin_lcd_off.png");
             lcdFile.deleteFile();
             juce::FileOutputStream lcdStream (lcdFile);
             if (lcdStream.openedOk())
@@ -631,7 +631,7 @@ private:
         juce::Image snapshot (juce::Image::ARGB, bay->getWidth(), bay->getHeight(), true);
         juce::Graphics graphics (snapshot);
         bay->paintEntireComponent (graphics, true);
-        juce::File png ("/tmp/ms50_panel_probe.png");
+        juce::File png ("/tmp/ronin_panel_probe.png");
         png.deleteFile();
         juce::FileOutputStream stream (png);
         if (stream.openedOk())
@@ -654,7 +654,7 @@ private:
             const auto capPixel = snapshot.getPixelAt (capX, capY);
             expect (capPixel.getRed() > 180 && capPixel.getGreen() > 170 && capPixel.getBlue() > 140,
                     "hold key is the cream cap");
-            juce::File upFile ("/tmp/ms50_hold_up.png");
+            juce::File upFile ("/tmp/ronin_hold_up.png");
             upFile.deleteFile();
             juce::FileOutputStream upStream (upFile);
             if (upStream.openedOk())
@@ -673,7 +673,7 @@ private:
             juce::Graphics heldGraphics (heldShot);
             bay->paintEntireComponent (heldGraphics, true);
             const auto downClip = heldShot.getClippedImage (crop.getIntersection (heldShot.getBounds()));
-            juce::File downFile ("/tmp/ms50_hold_down.png");
+            juce::File downFile ("/tmp/ronin_hold_down.png");
             downFile.deleteFile();
             juce::FileOutputStream downStream (downFile);
             if (downStream.openedOk())
@@ -767,13 +767,13 @@ private:
         const float row0Y = kPresetBezelY + kPresetBezelH + 3.0f + 5.0f + 10.5f;
         clickAt (*bay, kPresetBezelX + 20.0f, row0Y);
         expect (! bay->presetMenuOpen(), "choosing a preset closes the list");
-        expect (processor->getCurrentProgram() == 0, "the first preset is Dry");
+        expect (processor->getCurrentProgram() == kInitPreset, "the first preset is INIT");
         checkVcaKnobs (*bay, row0Y);
         clickAt (*bay, kPresetBezelX + 12.0f, kPresetBezelY + kPresetBezelH * 0.5f);
         clickAt (*bay, kPresetBezelX + 20.0f, row0Y);
-        expect (processor->getCurrentProgram() == 0, "the first preset is Dry again");
-        expect (bay->outputMix() == 0.0f, "dry preset turns the effect off");
-        expect (publishedCount (*processor) == 2, "dry replaces the cables");
+        expect (processor->getCurrentProgram() == kInitPreset, "the first preset is INIT again");
+        expect (bay->outputMix() != 0.0f, "INIT leaves the effect on");
+        expect (publishedCount (*processor) == 8, "INIT replaces the cables with its eight");
         if (auto* restoredLevel = processor->parameterForPanelKnob ("OUTPUT", "LEVEL"))
             expect (near (restoredLevel->getValue(), 0.7f), "preset restore puts output level back at 0.7");
         if (auto* restoredMix = processor->parameterForPanelKnob ("OUTPUT", "MIX"))
@@ -783,7 +783,7 @@ private:
     }
 
     // VCA 1 and VCA 2 Initial and Mod: bound to the module, double-click returns the module default,
-    // and a preset that opens VCA 1 shows that value on the knob.
+    // and loading INIT puts a raised VCA 1 Initial back at 0 on the knob.
     void checkVcaKnobs (PatchBayView& bay, float row0Y)
     {
         struct VcaKnob { const char* section; const char* label; float moduleDefault; };
@@ -800,7 +800,7 @@ private:
                 continue;
             }
             expect (near (kPanelKnobs[knob].valueDefault, v.moduleDefault), "panel default is the module default");
-            expect (near (bay.knobValue (knob), v.moduleDefault), "Dry shows the module default");
+            expect (near (bay.knobValue (knob), v.moduleDefault), "INIT shows the module default");
             dragKnobLocal (bay, kPanelKnobs[knob].cx, kPanelKnobs[knob].cy, v.moduleDefault > 0.5f ? 60.0f : -60.0f, false);
             expect (! near (parameter->getValue(), v.moduleDefault), "dragging the knob moves its parameter");
             doubleClickKnob (bay, knob);
@@ -810,17 +810,16 @@ private:
 
         const int initial = panelKnobIndex ("VCA 1", "INITIAL");
         auto* initialParam = processor->parameterForPanelKnob ("VCA 1", "INITIAL");
-        clickAt (bay, kPresetBezelX + 12.0f, kPresetBezelY + kPresetBezelH * 0.5f);
-        clickAt (bay, kPresetBezelX + 20.0f, row0Y + 21.0f * static_cast<float> (kFilterLoopPreset));
-        expect (processor->getCurrentProgram() == kFilterLoopPreset, "Filter loop preset loads");
-        expect (near (factoryVca1Initial (kFilterLoopPreset), 0.7f), "Filter loop sets VCA 1 Initial to 0.7");
+        expect (near (factoryVca1Initial (kInitPreset), 0.0f), "INIT leaves VCA 1 Initial at 0");
         if (initial >= 0 && initialParam != nullptr)
         {
-            expect (near (initialParam->getValue(), 0.7f), "preset puts 0.7 on the VCA 1 Initial parameter");
-            expect (near (bay.knobValue (initial), 0.7f), "preset shows 0.7 on the VCA 1 Initial knob");
-            doubleClickKnob (bay, initial);
-            expect (near (bay.knobValue (initial), 0.0f), "double-click returns VCA 1 Initial to 0");
-            expect (near (initialParam->getValue(), 0.0f), "double-click resets the VCA 1 Initial parameter");
+            dragKnobLocal (bay, kPanelKnobs[initial].cx, kPanelKnobs[initial].cy, -60.0f, false);
+            expect (initialParam->getValue() > 0.05f, "dragging raises VCA 1 Initial");
+            clickAt (bay, kPresetBezelX + 12.0f, kPresetBezelY + kPresetBezelH * 0.5f);
+            clickAt (bay, kPresetBezelX + 20.0f, row0Y);
+            expect (processor->getCurrentProgram() == kInitPreset, "INIT loads from the list");
+            expect (near (initialParam->getValue(), 0.0f), "INIT puts the VCA 1 Initial parameter back at 0");
+            expect (near (bay.knobValue (initial), 0.0f), "INIT shows 0 on the VCA 1 Initial knob");
         }
     }
 
@@ -834,7 +833,7 @@ private:
         quit();
     }
 
-    std::unique_ptr<MS50ModularAudioProcessor> processor;
+    std::unique_ptr<RoninAudioProcessor> processor;
     std::unique_ptr<juce::DocumentWindow> window;
 };
 

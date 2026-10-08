@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(MS50Modular VERSION 0.1.0 LANGUAGES C CXX)
+project(Ronin VERSION 0.1.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -11,7 +11,7 @@ FetchContent_Declare(
   GIT_SHALLOW TRUE)
 FetchContent_MakeAvailable(JUCE)
 
-juce_add_plugin(MS50Modular
+juce_add_plugin(Ronin
   COMPANY_NAME "Martial Systems"
   BUNDLE_ID com.martialsystems.ronin
   IS_SYNTH FALSE
@@ -21,16 +21,16 @@ juce_add_plugin(MS50Modular
   EDITOR_WANTS_KEYBOARD_FOCUS FALSE
   COPY_PLUGIN_AFTER_BUILD FALSE
   PLUGIN_MANUFACTURER_CODE Psnl
-  PLUGIN_CODE Ms50
+  PLUGIN_CODE Rnin
   FORMATS VST3
   PRODUCT_NAME "RONIN")
 
-juce_add_binary_data(MS50PanelAssets
+juce_add_binary_data(RoninPanelAssets
   HEADER_NAME PanelAssets.h
   NAMESPACE PanelAssets
   SOURCES panel/assets/panel_bg.svg)
 
-target_sources(MS50Modular PRIVATE
+target_sources(Ronin PRIVATE
   Source/PluginProcessor.cpp
   Source/PluginEditor.cpp
   Source/Modular/Module.cpp
@@ -54,20 +54,20 @@ target_sources(MS50Modular PRIVATE
   Source/UI/PatchBayLogic.cpp
   Source/UI/PatchBayView.cpp)
 
-target_include_directories(MS50Modular PRIVATE Source)
+target_include_directories(Ronin PRIVATE Source)
 
-target_compile_definitions(MS50Modular PUBLIC
+target_compile_definitions(Ronin PUBLIC
   JUCE_WEB_BROWSER=0
   JUCE_USE_CURL=0
   JUCE_VST3_CAN_REPLACE_VST2=0)
 
-target_link_libraries(MS50Modular PRIVATE
-  MS50PanelAssets
+target_link_libraries(Ronin PRIVATE
+  RoninPanelAssets
   juce::juce_audio_utils
   juce::juce_recommended_config_flags
   juce::juce_recommended_warning_flags)
 
-add_executable(MS50ModularTests
+add_executable(RoninTests
   Source/Tests/GraphTests.cpp
   Source/Tests/Step3Tests.cpp
   Source/Tests/SineThroughFxTests.cpp
@@ -112,9 +112,9 @@ add_executable(MS50ModularTests
   Source/Modular/SampleHold.cpp
   Source/UI/PatchBayLogic.cpp)
 
-juce_add_gui_app(MS50PanelProbe PRODUCT_NAME "MS50PanelProbe")
+juce_add_gui_app(RoninPanelProbe PRODUCT_NAME "RoninPanelProbe")
 
-target_sources(MS50PanelProbe PRIVATE
+target_sources(RoninPanelProbe PRIVATE
   tools/PanelProbe.cpp
   Source/PluginProcessor.cpp
   Source/PluginEditor.cpp
@@ -139,25 +139,25 @@ target_sources(MS50PanelProbe PRIVATE
   Source/UI/PatchBayLogic.cpp
   Source/UI/PatchBayView.cpp)
 
-target_include_directories(MS50PanelProbe PRIVATE Source)
+target_include_directories(RoninPanelProbe PRIVATE Source)
 
-target_compile_definitions(MS50PanelProbe PRIVATE
+target_compile_definitions(RoninPanelProbe PRIVATE
   JUCE_WEB_BROWSER=0
   JUCE_USE_CURL=0)
 
-target_link_libraries(MS50PanelProbe PRIVATE
-  MS50PanelAssets
+target_link_libraries(RoninPanelProbe PRIVATE
+  RoninPanelAssets
   juce::juce_audio_utils
   juce::juce_recommended_config_flags
   juce::juce_recommended_warning_flags)
 
-target_include_directories(MS50ModularTests PRIVATE Source)
+target_include_directories(RoninTests PRIVATE Source)
 
-target_compile_features(MS50ModularTests PRIVATE cxx_std_20)
+target_compile_features(RoninTests PRIVATE cxx_std_20)
 
-target_compile_definitions(MS50ModularTests PRIVATE
-  MS50_PATCH_GRAPH_SOURCE="${CMAKE_SOURCE_DIR}/Source/Modular/PatchGraph.cpp"
-  MS50_PROCESSOR_SOURCE="${CMAKE_SOURCE_DIR}/Source/PluginProcessor.cpp"
-  MS50_PATCH_BAY_VIEW_SOURCE="${CMAKE_SOURCE_DIR}/Source/UI/PatchBayView.cpp")
+target_compile_definitions(RoninTests PRIVATE
+  RONIN_PATCH_GRAPH_SOURCE="${CMAKE_SOURCE_DIR}/Source/Modular/PatchGraph.cpp"
+  RONIN_PROCESSOR_SOURCE="${CMAKE_SOURCE_DIR}/Source/PluginProcessor.cpp"
+  RONIN_PATCH_BAY_VIEW_SOURCE="${CMAKE_SOURCE_DIR}/Source/UI/PatchBayView.cpp")
 
-target_compile_options(MS50ModularTests PRIVATE -Wall -Wextra -Wpedantic)
+target_compile_options(RoninTests PRIVATE -Wall -Wextra -Wpedantic)

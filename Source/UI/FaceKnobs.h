@@ -137,7 +137,7 @@ inline FaceKnobBinding faceKnobBinding (const char* section, const char* label)
     if (faceKnobText (section, "OUTPUT") && faceKnobText (label, "LEVEL"))
         return { FaceKnob::OutputLevel, -1, 0.0f, 1.0f, PanelDefault::kOutputLevel, "outputLevel", "Output Level" };
 
-    // Gate detector for EXT IN GATE and the HOLD key's preset patches (Voice, Hold).
+    // Gate detector for EXT IN GATE, which the INIT patch uses to trigger EG 1.
     if (faceKnobText (section, "EXT IN") && faceKnobText (label, "THRESHOLD"))
         return { FaceKnob::ExtInThreshold, 0, 0.0f, 1.0f, PanelDefault::kExtInThreshold, "extInThreshold", "Ext In Threshold" };
     if (faceKnobText (section, "EXT IN") && faceKnobText (label, "RELEASE"))

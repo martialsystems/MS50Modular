@@ -323,7 +323,7 @@ int testRejectCycle()
 
 bool processSourceIsFixed()
 {
-    const char* path = MS50_PATCH_GRAPH_SOURCE;
+    const char* path = RONIN_PATCH_GRAPH_SOURCE;
     std::ifstream input (path);
     if (! input)
     {
@@ -573,10 +573,10 @@ int testSampleHoldExtClockWins();
 int testSampleHoldRateChangesInternalClock();
 int testMeterFollowsSelectedJack();
 int testFactoryPresetCount();
-int testPresetNoiseToMixerRoundTrip();
+int testInitPresetRoundTrip();
 int testPresetBadVersionStillRejected();
-int testHoldPreset();
-int testSelfModPresets();
+int testInitPlaysTheInput();
+int testSelfPatchFeedbackRules();
 int testOneDefaultTable();
 int testPresetRoundTrip();
 int testPresetRejectsBadVersion();
@@ -684,10 +684,10 @@ int main()
     failed += testSampleHoldRateChangesInternalClock();
     failed += testMeterFollowsSelectedJack();
     failed += testFactoryPresetCount();
-    failed += testPresetNoiseToMixerRoundTrip();
+    failed += testInitPresetRoundTrip();
     failed += testPresetBadVersionStillRejected();
-    failed += testHoldPreset();
-    failed += testSelfModPresets();
+    failed += testInitPlaysTheInput();
+    failed += testSelfPatchFeedbackRules();
     failed += testOneDefaultTable();
     failed += testPresetRoundTrip();
     failed += testPresetRejectsBadVersion();
