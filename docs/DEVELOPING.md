@@ -9,13 +9,13 @@ Read this before changing code. The DSP behaviour is specified in `docs/SCHEMATI
 ```text
 README.md                 product page
 LICENSE                   copyright and trademark notice
-CMakeLists.txt            plugin (target MS50Modular, product name RONIN), tests, panel probe
+CMakeLists.txt            plugin (target Ronin, product name RONIN), tests, panel probe
 Source/
   PluginProcessor.h/.cpp
   PluginEditor.h/.cpp
   Modular/                graph and modules, no JUCE types in process()
   UI/                     panel patch bay
-  Tests/                  MS50ModularTests
+  Tests/                  RoninTests
 panel/                    layout, SVG, geometry emitter
 tools/PanelProbe.cpp      standalone window check
 tools/vst3_load_check.cpp loads a built bundle and processes a dry block
@@ -24,20 +24,20 @@ scripts/sine_through_fx.py     plays a sine through a built bundle at mix 0
 docs/                     the developer documents above
 ```
 
-Internal names (the CMake targets, `MS50ModularAudioProcessor`, the `MS-50/` jack-id prefix in the web rack) predate the RONIN name and stay, so saved sessions and patches keep loading.
+Internal names follow the product name: the CMake targets (`Ronin`, `RoninTests`, `RoninPanelProbe`), `RoninAudioProcessor`, and the `RONIN/` jack-id prefix in the web rack. The state blob magic is `RNIN`.
 
 ## Build and test
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --target MS50ModularTests MS50Modular_VST3 MS50PanelProbe
-./build/MS50ModularTests              # exit 0; look for SINE_DRY PASS
-xvfb-run -a build/MS50PanelProbe_artefacts/Release/MS50PanelProbe   # Linux; prints PROBE PASS
+cmake --build build --target RoninTests Ronin_VST3 RoninPanelProbe
+./build/RoninTests              # exit 0; look for SINE_DRY PASS
+xvfb-run -a build/RoninPanelProbe_artefacts/Release/RoninPanelProbe   # Linux; prints PROBE PASS
 ```
 
 Requirements: CMake 3.22 or newer, a C++20 compiler and git. JUCE 8.0.4 is fetched by CMake, not vendored. Format: VST3. `IS_SYNTH` false. MIDI input off.
 
-FL Studio on macOS does not open the Debug bundle. After a VST3 change, quit FL Studio and Plugin Manager, then run `scripts/install_fl_plugin.sh`, then Find plugins in FL Studio. The script publishes one universal Release bundle through `~/Library/Audio/Plug-Ins/VST3/RONIN.vst3` and removes the old `MS-50 Modular.vst3` link and scan records. The procedure is in `docs/BUILD_GUIDE.md` under FL Studio install (2026-10-05).
+FL Studio on macOS does not open the Debug bundle. After a VST3 change, quit FL Studio and Plugin Manager, then run `scripts/install_fl_plugin.sh`, then Find plugins in FL Studio. The script publishes one universal Release bundle through `~/Library/Audio/Plug-Ins/VST3/RONIN.vst3`. The procedure is in `docs/BUILD_GUIDE.md` under FL Studio install (2026-10-05).
 
 ## Work rules for coding agents
 

@@ -323,7 +323,7 @@ int testRejectCycle()
 
 bool processSourceIsFixed()
 {
-    const char* path = MS50_PATCH_GRAPH_SOURCE;
+    const char* path = RONIN_PATCH_GRAPH_SOURCE;
     std::ifstream input (path);
     if (! input)
     {

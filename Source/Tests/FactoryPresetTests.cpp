@@ -222,23 +222,23 @@ int testFactoryPresetCount()
     check (cablesMatch (loaded.graph, kPresetDry, 2), "Dry keeps only the left and right cables");
     check (! factoryPresetEffect (0), "Dry is effect off");
 
-    const std::string processor = readFile (MS50_PROCESSOR_SOURCE);
-    const std::string programs = functionBody (processor, "int MS50ModularAudioProcessor::getNumPrograms()");
-    const std::string ctor = functionBody (processor, "MS50ModularAudioProcessor::MS50ModularAudioProcessor()");
-    const std::string choose = functionBody (processor, "void MS50ModularAudioProcessor::setCurrentProgram");
+    const std::string processor = readFile (RONIN_PROCESSOR_SOURCE);
+    const std::string programs = functionBody (processor, "int RoninAudioProcessor::getNumPrograms()");
+    const std::string ctor = functionBody (processor, "RoninAudioProcessor::RoninAudioProcessor()");
+    const std::string choose = functionBody (processor, "void RoninAudioProcessor::setCurrentProgram");
     check (programs.find ("kFactoryPresetCount") != std::string::npos, "the host list reports the factory count");
-    const std::string programKnobs = functionBody (processor, "void MS50ModularAudioProcessor::applyProgramParameters");
+    const std::string programKnobs = functionBody (processor, "void RoninAudioProcessor::applyProgramParameters");
     check (programKnobs.find ("factoryProgramKnobs") != std::string::npos, "a program restores its own host knobs");
     check (ctor.find ("setCurrentProgram (kDefaultFactoryPreset)") != std::string::npos,
            "a fresh instance loads Voice the same way choosing it does");
     check (ctor.find ("connectFactoryCables") == std::string::npos, "construction does not patch its own cable list");
     check (choose.find ("loadFactoryPreset") != std::string::npos, "choosing a program loads that preset");
     check (processor.find ("vca1Initial") != std::string::npos, "session state keeps VCA 1 Initial");
-    const std::string restore = functionBody (processor, "void MS50ModularAudioProcessor::setStateInformation");
+    const std::string restore = functionBody (processor, "void RoninAudioProcessor::setStateInformation");
     check (restore.find ("vca1Initial") != std::string::npos, "session restore reads VCA 1 Initial");
     check (restore.find ("kKnobInitial, 0.0f") != std::string::npos, "an old session leaves VCA 1 Initial at 0");
 
-    std::string header = MS50_PROCESSOR_SOURCE;
+    std::string header = RONIN_PROCESSOR_SOURCE;
     const auto dot = header.rfind ('.');
     check (dot != std::string::npos, "processor path");
     if (dot != std::string::npos)
@@ -246,7 +246,7 @@ int testFactoryPresetCount()
     check (readFile (header.c_str()).find ("currentProgram_ = kDefaultFactoryPreset") != std::string::npos,
            "the current program starts on Voice");
 
-    std::string doc = MS50_PROCESSOR_SOURCE;
+    std::string doc = RONIN_PROCESSOR_SOURCE;
     const auto source = doc.rfind ("/Source/");
     check (source != std::string::npos, "docs path");
     if (source != std::string::npos)
@@ -461,7 +461,7 @@ int testHoldPreset()
     check (loadFactoryPreset (rack.graph, kHoldPreset), "Hold loads after Feedback");
     check (std::fabs (rack.vca1.initial()) < 1.0e-6f, "Hold clears the Feedback initial");
 
-    std::string view = MS50_PROCESSOR_SOURCE;
+    std::string view = RONIN_PROCESSOR_SOURCE;
     const auto source = view.rfind ("/Source/");
     check (source != std::string::npos, "panel path");
     if (source != std::string::npos)
@@ -485,8 +485,8 @@ void checkNear (float value, float want, const char* message)
 // all read Source/Modular/PanelDefaults.h. A fresh instance is Voice, so they must agree.
 int testOneDefaultTable()
 {
-    const std::string processor = readFile (MS50_PROCESSOR_SOURCE);
-    const std::string restore = functionBody (processor, "void MS50ModularAudioProcessor::applyProgramParameters");
+    const std::string processor = readFile (RONIN_PROCESSOR_SOURCE);
+    const std::string restore = functionBody (processor, "void RoninAudioProcessor::applyProgramParameters");
     for (int i = 0; i < kPanelKnobCount; ++i)
     {
         const PanelKnobRec& knob = kPanelKnobs[i];
@@ -549,7 +549,7 @@ int testOneDefaultTable()
     check (std::fabs (ext.presetKnob (ExtIn::kKnobRelease) - fallback ("EXT IN", "RELEASE")) < 1.0e-4f,
            "Ext In release default is the module's 80 ms");
 
-    std::string layout = MS50_PROCESSOR_SOURCE;
+    std::string layout = RONIN_PROCESSOR_SOURCE;
     const auto source = layout.rfind ("/Source/");
     if (source != std::string::npos)
     {
@@ -677,15 +677,15 @@ int testSelfModPresets()
     checkNear (factoryIntegratorTime (kHoldPreset), 0.50f, "Hold integrator time stays 0.50");
     checkNear (factoryIntegratorTime (kDelayedBouncePreset), kDelayedBounceTime, "Delayed bounce time is 0.6");
 
-    const std::string processor = readFile (MS50_PROCESSOR_SOURCE);
-    const std::string restore = functionBody (processor, "void MS50ModularAudioProcessor::applyProgramParameters");
+    const std::string processor = readFile (RONIN_PROCESSOR_SOURCE);
+    const std::string restore = functionBody (processor, "void RoninAudioProcessor::applyProgramParameters");
     check (restore.find ("factoryProgramKnobs") != std::string::npos, "programs still restore the shared knob row");
     check (restore.find ("factoryMgRate") != std::string::npos, "programs restore the MG rate");
     check (restore.find ("factorySampleHoldRate") != std::string::npos, "programs restore the S&H rate");
     check (restore.find ("factoryIntegratorTime") != std::string::npos, "programs restore the integrator time");
     check (restore.find ("outputLevel_, PanelDefault::kOutputLevel") != std::string::npos, "Output Level is the default table");
     check (restore.find ("outputMix_, PanelDefault::kOutputMix") != std::string::npos, "Output Mix is the default table");
-    std::string presetHeader = MS50_PROCESSOR_SOURCE;
+    std::string presetHeader = RONIN_PROCESSOR_SOURCE;
     const auto presetSlash = presetHeader.rfind ('/');
     check (presetSlash != std::string::npos, "factory header path");
     if (presetSlash != std::string::npos)
@@ -732,8 +732,8 @@ int testSelfModPresets()
 
     unsigned char blob[4096];
     const int filterBytes = rack.graph.getState (blob, static_cast<int> (sizeof blob));
-    check (filterBytes > 16 && blob[0] == 'M' && blob[1] == 'S' && blob[2] == '5' && blob[3] == '0',
-           "Filter loop state magic stays MS50");
+    check (filterBytes > 16 && blob[0] == 'R' && blob[1] == 'N' && blob[2] == 'I' && blob[3] == 'N',
+           "Filter loop state magic is RNIN");
     check (blob[4] == 1, "Filter loop saves as version 1");
     Rack filterAgain;
     filterAgain.addAll();
@@ -928,7 +928,7 @@ int testSelfModPresets()
     checkNear (rack.vcf.presetKnob (Vcf::kKnobPeak), kHoldVcfPeak, "Hold still writes peak");
     checkNear (rack.vco.presetKnob (Vco::kKnobScale), kHoldVcoRange, "Hold still writes range");
 
-    std::string doc = MS50_PROCESSOR_SOURCE;
+    std::string doc = RONIN_PROCESSOR_SOURCE;
     const auto source = doc.rfind ("/Source/");
     check (source != std::string::npos, "presets doc path");
     if (source != std::string::npos)
@@ -940,7 +940,7 @@ int testSelfModPresets()
         for (std::size_t pos = 0; (pos = text.find ("With no Hold press", pos)) != std::string::npos; pos += 1)
             ++heard;
         check (heard == 6, "each self-mod line says what is heard with no Hold press");
-        doc = MS50_PROCESSOR_SOURCE;
+        doc = RONIN_PROCESSOR_SOURCE;
         doc.replace (source, std::string::npos, "/Source/UI/PatchBayView.cpp");
         const std::string view = readFile (doc.c_str());
         check (view.find ("\"FILTER LOOP\"") != std::string::npos, "the preset screen has FILTER LOOP");

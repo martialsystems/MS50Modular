@@ -31,7 +31,7 @@ bool typesAllowed (PortType from, PortType to)
     return kAllowed[typeIndex (from)][typeIndex (to)];
 }
 
-constexpr char kMagic[4] = { 'M', 'S', '5', '0' };
+constexpr char kMagic[4] = { 'R', 'N', 'I', 'N' };
 
 struct ByteCursor {
     const std::uint8_t* cursor = nullptr;

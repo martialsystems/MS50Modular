@@ -51,7 +51,7 @@ public:
     static constexpr int kStateVersion = 1;
     static constexpr int kMaxPresetKnobs = 8;
 
-    // Little-endian MS50 blob: magic, version, module count, cable count,
+    // Little-endian RONIN blob (magic "RNIN"): magic, version, module count, cable count,
     // then each module's knob floats and scale index, then each cable's four ids.
     // No color, no stack order, no filter memory, no noise seed.
     // Returns the bytes written, or 0 when the buffer is too small.

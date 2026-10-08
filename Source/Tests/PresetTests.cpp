@@ -124,7 +124,7 @@ bool cablesMatch (const PatchGraph& a, const PatchGraph& b)
 
 int scaleIndexInBlob (const unsigned char* blob, int size, int moduleIndex)
 {
-    if (blob == nullptr || size < 16 || std::memcmp (blob, "MS50", 4) != 0)
+    if (blob == nullptr || size < 16 || std::memcmp (blob, "RNIN", 4) != 0)
         return -2;
     const unsigned char* cursor = blob + 16;
     const unsigned char* end = blob + size;

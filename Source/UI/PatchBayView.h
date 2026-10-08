@@ -15,7 +15,7 @@ class PatchBayView : public juce::Component,
                      private juce::Timer
 {
 public:
-    explicit PatchBayView (MS50ModularAudioProcessor&);
+    explicit PatchBayView (RoninAudioProcessor&);
     ~PatchBayView() override;
 
     void paint (juce::Graphics&) override;
@@ -95,7 +95,7 @@ private:
     float panelScale() const;
     juce::Point<float> panelOrigin() const;
 
-    MS50ModularAudioProcessor& audioProcessor;
+    RoninAudioProcessor& audioProcessor;
     std::unique_ptr<juce::Drawable> panel_;
     std::unique_ptr<StackMenu> menu_;
     VisualCable cables_[kPatchBayMaxCables] {};

@@ -33,10 +33,10 @@ You need CMake 3.22+, a C++20 compiler and git. JUCE 8 is fetched automatically.
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --target MS50Modular_VST3
+cmake --build build --target Ronin_VST3
 ```
 
-The plugin lands in `build/MS50Modular_artefacts/Release/VST3/RONIN.vst3`. On macOS with FL Studio, `scripts/install_fl_plugin.sh` builds the universal bundle and installs it for you. For tests, the panel probe and the developer documents, see `docs/DEVELOPING.md`.
+The plugin lands in `build/Ronin_artefacts/Release/VST3/RONIN.vst3`. On macOS with FL Studio, `scripts/install_fl_plugin.sh` builds the universal bundle and installs it for you. For tests, the panel probe and the developer documents, see `docs/DEVELOPING.md`.
 
 ## The Jidai Collection
 
@@ -49,4 +49,4 @@ The Jidai Collection is Martial Systems' line of patchable instruments. Its piec
 
 Copyright © 2026 Martial Systems LLC. All rights reserved. See `LICENSE`.
 
-RONIN is inspired by the Korg MS-50. Korg and MS-50 are trademarks of their respective owners. Martial Systems is not affiliated with or endorsed by Korg.
+RONIN is inspired by classic Korg gear. Korg is a trademark of its owner. Martial Systems is not affiliated with or endorsed by Korg.

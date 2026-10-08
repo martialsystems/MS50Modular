@@ -4,7 +4,7 @@ Copyright (c) 2026 Martial Systems LLC. All rights reserved. RONIN is part of th
 
 Date: 2026-09-21.
 
-Automated tests live in `Source/Tests/GraphTests.cpp` and are run with the `MS50ModularTests` target from step 2 on. Host checks are done in a real plugin host after the step that needs them. This environment's design pack does not include a host, so a step that says "host" is not done until a person or an agent with a host has done it and written the host name.
+Automated tests live in `Source/Tests/GraphTests.cpp` and are run with the `RoninTests` target from step 2 on. Host checks are done in a real plugin host after the step that needs them. This environment's design pack does not include a host, so a step that says "host" is not done until a person or an agent with a host has done it and written the host name.
 
 Stand-in ids are defined in `docs/METHODOLOGY.md`. A test that encodes a stand-in number must name the id in a comment on the assertion.
 
@@ -33,7 +33,7 @@ After step 3, and again after steps 6, 8, and 18:
 Command:
 
 ```bash
-cmake --build build --config Debug --target MS50ModularTests && ./build/MS50ModularTests
+cmake --build build --config Debug --target RoninTests && ./build/RoninTests
 ```
 
 Agents must treat `SINE_* FAIL` as a step failure. `SINE_HOST SKIP` is allowed. After step 8 and later, keep `testSineDryStereoPasses`. New FX tests must not delete the dry sine tests.
@@ -118,7 +118,7 @@ Unpatch: drag a drawn cable onto empty space, or right-click it. A jack on the 1
 
 `testTwoLoopsDoNotAllocate`: two feedback loops through one module delay only the newest cable and process with no allocation.
 
-The standalone window check is `MS50PanelProbe`. It turns a column knob without publishing, steps the divider switch, stacks, unplugs, refuses an unmapped jack, opens the chooser, reorders without publishing, and right-clicks a cable.
+The standalone window check is `RoninPanelProbe`. It turns a column knob without publishing, steps the divider switch, stacks, unplugs, refuses an unmapped jack, opens the chooser, reorders without publishing, and right-clicks a cable.
 
 *   A drag may start on either jack. The engine orients the link.
 *   Mouse-up on an illegal pair does not connect.

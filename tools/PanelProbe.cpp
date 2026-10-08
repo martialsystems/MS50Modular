@@ -163,13 +163,13 @@ float rockerBrightness (PatchBayView& bay, float designX, float designY)
     return static_cast<float> (pixel.getRed() + pixel.getGreen() + pixel.getBlue());
 }
 
-int publishedCount (MS50ModularAudioProcessor& processor)
+int publishedCount (RoninAudioProcessor& processor)
 {
     Cable cables[kPatchBayMaxCables] {};
     return processor.copyPublishedCables (cables, kPatchBayMaxCables);
 }
 
-float hostLeftAfter (MS50ModularAudioProcessor& processor, float left, float right)
+float hostLeftAfter (RoninAudioProcessor& processor, float left, float right)
 {
     processor.prepareToPlay (48000.0, 64);
     juce::AudioBuffer<float> buffer (2, 64);
@@ -210,13 +210,13 @@ bool cablePixelBright (juce::Component& component, juce::Point<float> local)
 class ProbeApp : public juce::JUCEApplication
 {
 public:
-    const juce::String getApplicationName() override { return "MS50PanelProbe"; }
+    const juce::String getApplicationName() override { return "RoninPanelProbe"; }
     const juce::String getApplicationVersion() override { return "1"; }
     bool moreThanOneInstanceAllowed() override { return true; }
 
     void initialise (const juce::String&) override
     {
-        processor = std::make_unique<MS50ModularAudioProcessor>();
+        processor = std::make_unique<RoninAudioProcessor>();
         auto* created = processor->createEditor();
         window = std::make_unique<juce::DocumentWindow> ("RONIN panel probe",
                                                           juce::Colours::black,
@@ -240,7 +240,7 @@ public:
 private:
     void run()
     {
-        auto* editor = dynamic_cast<MS50ModularAudioProcessorEditor*> (window->getContentComponent());
+        auto* editor = dynamic_cast<RoninAudioProcessorEditor*> (window->getContentComponent());
         auto* bay = editor != nullptr ? dynamic_cast<PatchBayView*> (editor->getChildComponent (0)) : nullptr;
         expect (editor != nullptr && bay != nullptr, "editor hosts the patch bay");
         if (bay == nullptr || processor == nullptr)
@@ -503,10 +503,10 @@ private:
                 juce::PNGImageFormat format;
                 format.writeImageToStream (image.getClippedImage (knobBox.getIntersection (image.getBounds())), stream);
             };
-            writeCrop (lowPaint, "/tmp/ms50_knob_low.png");
+            writeCrop (lowPaint, "/tmp/ronin_knob_low.png");
             dragKnobLocal (*bay, kPanelKnobs[cutoff].cx, kPanelKnobs[cutoff].cy, -100.0f, false);
             expect (near (bay->knobValue (cutoff), 0.5f), "drag up 100px from 0 is half travel");
-            writeCrop (paintBay (*bay), "/tmp/ms50_knob_mid.png");
+            writeCrop (paintBay (*bay), "/tmp/ronin_knob_mid.png");
         }
         clickAt (*bay, kPanelKnobs[ratio].cx, kPanelKnobs[ratio].cy);
         expect (bay->knobValue (ratio) == 1.0f, "divider click steps from /2 to /4");
@@ -609,7 +609,7 @@ private:
             const auto lcd1 = bay->designToLocal (kPresetLcdX + kPresetLcdW, kPresetLcdY + kPresetLcdH);
             const juce::Rectangle<int> lcdBox (static_cast<int> (lcd0.x), static_cast<int> (lcd0.y),
                                               static_cast<int> (lcd1.x - lcd0.x), static_cast<int> (lcd1.y - lcd0.y));
-            juce::File lcdFile ("/tmp/ms50_lcd_off.png");
+            juce::File lcdFile ("/tmp/ronin_lcd_off.png");
             lcdFile.deleteFile();
             juce::FileOutputStream lcdStream (lcdFile);
             if (lcdStream.openedOk())
@@ -631,7 +631,7 @@ private:
         juce::Image snapshot (juce::Image::ARGB, bay->getWidth(), bay->getHeight(), true);
         juce::Graphics graphics (snapshot);
         bay->paintEntireComponent (graphics, true);
-        juce::File png ("/tmp/ms50_panel_probe.png");
+        juce::File png ("/tmp/ronin_panel_probe.png");
         png.deleteFile();
         juce::FileOutputStream stream (png);
         if (stream.openedOk())
@@ -654,7 +654,7 @@ private:
             const auto capPixel = snapshot.getPixelAt (capX, capY);
             expect (capPixel.getRed() > 180 && capPixel.getGreen() > 170 && capPixel.getBlue() > 140,
                     "hold key is the cream cap");
-            juce::File upFile ("/tmp/ms50_hold_up.png");
+            juce::File upFile ("/tmp/ronin_hold_up.png");
             upFile.deleteFile();
             juce::FileOutputStream upStream (upFile);
             if (upStream.openedOk())
@@ -673,7 +673,7 @@ private:
             juce::Graphics heldGraphics (heldShot);
             bay->paintEntireComponent (heldGraphics, true);
             const auto downClip = heldShot.getClippedImage (crop.getIntersection (heldShot.getBounds()));
-            juce::File downFile ("/tmp/ms50_hold_down.png");
+            juce::File downFile ("/tmp/ronin_hold_down.png");
             downFile.deleteFile();
             juce::FileOutputStream downStream (downFile);
             if (downStream.openedOk())
@@ -834,7 +834,7 @@ private:
         quit();
     }
 
-    std::unique_ptr<MS50ModularAudioProcessor> processor;
+    std::unique_ptr<RoninAudioProcessor> processor;
     std::unique_ptr<juce::DocumentWindow> window;
 };
 

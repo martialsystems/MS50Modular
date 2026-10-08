@@ -25,11 +25,11 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
-class MS50ModularAudioProcessor : public juce::AudioProcessor
+class RoninAudioProcessor : public juce::AudioProcessor
 {
 public:
-    MS50ModularAudioProcessor();
-    ~MS50ModularAudioProcessor() override;
+    RoninAudioProcessor();
+    ~RoninAudioProcessor() override;
 
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
@@ -174,5 +174,5 @@ private:
     int currentProgram_ = kDefaultFactoryPreset;
     juce::String presetError_;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MS50ModularAudioProcessor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (RoninAudioProcessor)
 };

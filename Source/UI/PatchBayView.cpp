@@ -569,7 +569,7 @@ private:
     bool dragMoved = false;
 };
 
-PatchBayView::PatchBayView (MS50ModularAudioProcessor& processor)
+PatchBayView::PatchBayView (RoninAudioProcessor& processor)
     : audioProcessor (processor)
 {
     setWantsKeyboardFocus (true);
