@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
+#include "Modular/FloatCompare.h"
+#include "Tests/TestSuite.h"
 #include "Modular/EffectSwitch.h"
 #include "Modular/ExtIn.h"
 #include "Modular/OutputModule.h"
@@ -273,13 +275,13 @@ int testVcfPanelJacks()
     check (peak.knob == FaceKnob::VcfPeak && std::strcmp (peak.parameterName, "VCF Peak") == 0, "peak name");
     check (amount.knob == FaceKnob::VcfAmount && std::strcmp (amount.parameterName, "VCF Cutoff Amount") == 0,
            "amount name");
-    check (cutoff.minimum == 0.0f && cutoff.maximum == 1.0f && cutoff.fallback == 0.45f, "cutoff range");
-    check (peak.fallback == 0.20f && amount.fallback == 0.40f, "peak and amount defaults");
+    check (ronin::exactlyEqual (cutoff.minimum, 0.0f) && ronin::exactlyEqual (cutoff.maximum, 1.0f) && ronin::exactlyEqual (cutoff.fallback, 0.45f), "cutoff range");
+    check (ronin::exactlyEqual (peak.fallback, 0.20f) && ronin::exactlyEqual (amount.fallback, 0.40f), "peak and amount defaults");
     const FaceKnobBinding mix = faceKnobBinding ("OUTPUT", "MIX");
-    check (mix.knob == FaceKnob::OutputMix && mix.fallback == 1.0f, "output mix is a host knob");
+    check (mix.knob == FaceKnob::OutputMix && ronin::exactlyEqual (mix.fallback, 1.0f), "output mix is a host knob");
     check (faceKnobBinding ("DIV", "RATIO SWITCH").knob == FaceKnob::DividerRatio, "divider switch is a host setting");
-    check (outputMixAfterSwitch (false, 1.0f) == 0.0f, "effect off ignores mix");
-    check (outputMixForEffect (false) == 0.0f && outputMixForEffect (true) == 1.0f, "default mix is dry off and wet on");
+    check (ronin::exactlyEqual (outputMixAfterSwitch (false, 1.0f), 0.0f), "effect off ignores mix");
+    check (ronin::exactlyEqual (outputMixForEffect (false), 0.0f) && ronin::exactlyEqual (outputMixForEffect (true), 1.0f), "default mix is dry off and wet on");
     return finish ("testVcfPanelJacks");
 }
 
@@ -292,7 +294,7 @@ int testVcfHasNoHighpassSwitch()
     return finish ("testVcfHasNoHighpassSwitch");
 }
 
-double bandEnergy (const float* frame, int n, int bin)
+static double bandEnergy (const float* frame, int n, int bin)
 {
     double re = 0.0;
     double im = 0.0;
@@ -307,7 +309,7 @@ double bandEnergy (const float* frame, int n, int bin)
     return std::sqrt (re * re + im * im);
 }
 
-float spectralCentroid (float amplitude)
+static float spectralCentroid (float amplitude)
 {
     Vcf vcf;
     vcf.prepare (kRate);

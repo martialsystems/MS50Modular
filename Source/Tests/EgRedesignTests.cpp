@@ -3,6 +3,8 @@
 // jidai-audit/verify/verify_ronin.py (eg_time_labels, proposed_eg_float32, eg_knob_migration) and
 // verify_crossunit.py (threshold_chatter_2Hz_sine_plus_50mV_noise).
 
+#include "Modular/FloatCompare.h"
+#include "Tests/TestSuite.h"
 #include "Modular/EgLaw.h"
 #include "Modular/Eg1.h"
 #include "Modular/Eg2.h"
@@ -87,10 +89,10 @@ int testEgNoStallInFloat()
             eg.setKnob (Eg1::kKnobAttack, knob);
             eg.setKnob (Eg1::kKnobDecay, 0.0f);
             eg.setKnob (Eg1::kKnobSustain, 0.6f);
-            const double T = EgLaw::secondsFor (knob);
+            const double T = EgLaw::secondsFor (static_cast<double> (knob));
             const long n = attackSamples (eg, static_cast<long> ((T + 1.0) * rate));
             check (n > 0, "long attack reaches 5 V (no float stall)");
-            check (std::fabs (n / rate - T) <= 2.0 / rate, "attack time equals its label");
+            check (std::fabs (static_cast<double> (n) / rate - T) <= 2.0 / rate, "attack time equals its label");
             for (int i = 0; i < static_cast<int> (0.01 * rate); ++i)
             {
                 eg.portValue[Eg1::kTrig] = 0.0f;
@@ -109,7 +111,7 @@ int testEgLabelsAreRealTime()
     const double rate = 48000.0;
     for (float knob : { 0.0f, 0.25f, 0.5f, 0.75f })
     {
-        const double T = EgLaw::secondsFor (knob);
+        const double T = EgLaw::secondsFor (static_cast<double> (knob));
         Eg1 eg;
         eg.prepare (rate);
         eg.setKnob (Eg1::kKnobAttack, knob);
@@ -117,7 +119,7 @@ int testEgLabelsAreRealTime()
         eg.setKnob (Eg1::kKnobRelease, knob);
         eg.setKnob (Eg1::kKnobSustain, 0.0f);
         const long a = attackSamples (eg, static_cast<long> ((T + 1.0) * rate));
-        check (std::fabs (a / rate - T) <= 1.5 / rate + 1.0e-9, "attack 0 -> 5 V takes the label time");
+        check (std::fabs (static_cast<double> (a) / rate - T) <= 1.5 / rate + 1.0e-9, "attack 0 -> 5 V takes the label time");
 
         // Decay with sustain 0: a full 5 V swing to within 1 % (0.05 V) takes the label time.
         long d = 0;
@@ -127,7 +129,7 @@ int testEgLabelsAreRealTime()
             eg.processSample();
             ++d;
         }
-        check (std::fabs (d / rate - T) <= 1.5 / rate + 1.0e-9, "decay 5 V -> 1 % takes the label time");
+        check (std::fabs (static_cast<double> (d) / rate - T) <= 1.5 / rate + 1.0e-9, "decay 5 V -> 1 % takes the label time");
 
         // Release from 5 V: retrigger to the top, then lift.
         Eg1 rel;
@@ -143,7 +145,7 @@ int testEgLabelsAreRealTime()
             rel.processSample();
             ++r;
         } while (rel.portValue[Eg1::kOutA] > 0.05f && r < static_cast<long> ((T + 1.0) * rate));
-        check (std::fabs (r / rate - T) <= 1.5 / rate + 1.0e-9, "release 5 V -> 1 % takes the label time");
+        check (std::fabs (static_cast<double> (r) / rate - T) <= 1.5 / rate + 1.0e-9, "release 5 V -> 1 % takes the label time");
     }
 
     // proposed_eg_float32: T = 1 s, sustain 0.6, decay to 1 % of 5 V above sustain = 0.8008 s.
@@ -153,7 +155,7 @@ int testEgLabelsAreRealTime()
     eg.setKnob (Eg1::kKnobDecay, static_cast<float> (EgLaw::knobForSeconds (1.0)));
     eg.setKnob (Eg1::kKnobSustain, 0.6f);
     const long a = attackSamples (eg, 2 * 48000);
-    check (std::fabs (a / rate - 1.0) < 0.001, "T = 1 s attack is 1.000 s");
+    check (std::fabs (static_cast<double> (a) / rate - 1.0) < 0.001, "T = 1 s attack is 1.000 s");
     long d = 0;
     while (eg.portValue[Eg1::kOutA] - 3.0f > 0.05f && d < 3 * 48000)
     {
@@ -161,7 +163,7 @@ int testEgLabelsAreRealTime()
         eg.processSample();
         ++d;
     }
-    check (std::fabs (d / rate - 0.8008) < 0.001, "T = 1 s decay to 1 % above sustain is 0.8008 s");
+    check (std::fabs (static_cast<double> (d) / rate - 0.8008) < 0.001, "T = 1 s decay to 1 % above sustain is 0.8008 s");
     return finish ("testEgLabelsAreRealTime");
 }
 
@@ -174,7 +176,7 @@ int testEgKnobLawAndMigration()
     check (std::fabs (EgLaw::secondsFor (EgLaw::migrateAttackKnob (0.5)) - 0.6215) < 5.0e-5, "M-R1 0.5 keeps 0.6215 s");
     check (std::fabs (EgLaw::migrateAttackKnob (0.25) - 0.3753) < 5.0e-5, "M-R1 attack 0.25 -> 0.3753");
     check (std::fabs (EgLaw::migrateAttackKnob (0.735) - 0.7814) < 5.0e-5, "M-R1 attack 0.735 -> 0.7814");
-    check (EgLaw::migrateAttackKnob (1.0) == 1.0, "M-R1 attack 1.0 (62 s) clamps to 60 s");
+    check (ronin::exactlyEqual (EgLaw::migrateAttackKnob (1.0), 1.0), "M-R1 attack 1.0 (62 s) clamps to 60 s");
     check (std::fabs (EgLaw::migrateDecayReleaseKnob (0.5) - 0.5574) < 5.0e-5, "M-R1 D/R 0.5 -> 0.5574");
     check (std::fabs (EgLaw::migrateDecayReleaseKnob (1.0) - 0.9760) < 5.0e-5, "M-R1 D/R 1.0 -> 0.9760");
     check (std::fabs (EgLaw::migrateDecayReleaseKnob (0.0) - 0.1388) < 5.0e-5, "M-R1 D/R 0.0 -> 0.1388");
@@ -325,10 +327,10 @@ int testEg2LabelsAndDelayTrig()
         }
         const long width = std::lround (0.001 * rate) > 1 ? std::lround (0.001 * rate) : 1;
         check (pulseLen == width, "DelayTrig lasts max(1, round(0.001 sr)) samples");
-        check (std::fabs (pulseStart / rate - 0.010) <= 1.5 / rate, "DelayTrig fires at the end of hold");
-        check (pulseLevel == 5.0f, "DelayTrig is a 5 V pulse (JCS R2)");
+        check (std::fabs (static_cast<double> (pulseStart) / rate - 0.010) <= 1.5 / rate, "DelayTrig fires at the end of hold");
+        check (ronin::exactlyEqual (pulseLevel, 5.0f), "DelayTrig is a 5 V pulse (JCS R2)");
         const double T = EgLaw::secondsFor (0.5);
-        check (attackStart > 0 && std::fabs ((peakAt - attackStart + 1) / rate - T) <= 2.0 / rate,
+        check (attackStart > 0 && std::fabs (static_cast<double> (peakAt - attackStart + 1) / rate - T) <= 2.0 / rate,
                "EG 2 attack takes its label time");
     }
     return finish ("testEg2LabelsAndDelayTrig");
@@ -342,7 +344,7 @@ int testKnobUnits()
     check (knobunits::realUnits ("EG 1", "ATTACK", 1.0f) == "60.0 s", "EG full scale reads 60.0 s");
     check (knobunits::realUnits ("EG 1", "ATTACK", 1.0f, true) == "60000 ms", "ms display stays in ms");
     check (knobunits::realUnits ("EG 1", "SUSTAIN", 1.0f) == "5.00 V", "sustain reads volts");
-    check (knobunits::realUnits ("VCF", "CUTOFF", 0.5846f) == knobunits::hz (Vcf::knobHzFor (0.5846f)),
+    check (knobunits::realUnits ("VCF", "CUTOFF", 0.5846f) == knobunits::hz (Vcf::knobHzFor (static_cast<double> (0.5846f))),
            "cutoff read-out is the VCF knob law");
     check (knobunits::realUnits ("VCO", "FINE", 0.5f) == "+0 c", "fine centre reads +0 c");
     check (knobunits::noteName (130.8128) == "C3 +0 c", "130.81 Hz is C3");

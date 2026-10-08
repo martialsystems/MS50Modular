@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
+#include "Modular/FloatCompare.h"
+#include "Tests/TestSuite.h"
 #include "Modular/DefaultPatch.h"
 #include "Modular/EffectSwitch.h"
 #include "Modular/Eg1.h"
@@ -199,7 +201,7 @@ int testOutputLevelScalesDry()
     check (level.knob == FaceKnob::OutputLevel, "output level is a host knob");
     check (std::strcmp (level.parameterId, "outputLevel") == 0, "parameter id");
     check (std::strcmp (level.parameterName, "Output Level") == 0, "parameter name");
-    check (level.minimum == 0.0f && level.maximum == 1.0f, "travel stays 0 to 1");
+    check (ronin::exactlyEqual (level.minimum, 0.0f) && ronin::exactlyEqual (level.maximum, 1.0f), "travel stays 0 to 1");
     check (std::fabs (level.fallback - 0.7f) < 1.0e-6f, "default is 0.7");
     check (near (outputLevelGain (level.fallback), 1.0f), "default level is unity gain");
     check (near (outputLevelGain (1.0f), 2.0f), "full level is twice as loud");

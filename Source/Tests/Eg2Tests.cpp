@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
+#include "Modular/FloatCompare.h"
+#include "Tests/TestSuite.h"
 #include "Modular/Eg2.h"
 #include "UI/FaceKnobs.h"
 #include "UI/PatchBayLogic.h"
@@ -55,9 +57,9 @@ int testEg2HasNoSustainKnob()
     const FaceKnobBinding attack = faceKnobBinding ("EG 2", "ATTACK");
     const FaceKnobBinding release = faceKnobBinding ("EG 2", "RELEASE");
     check (hold.knob == FaceKnob::Eg2Hold && std::strcmp (hold.parameterName, "EG 2 Hold") == 0, "hold name");
-    check (hold.fallback == 0.30f && delay.fallback == 0.0f, "hold and delay faceplate");
-    check (attack.knob == FaceKnob::Eg2Attack && attack.fallback == 0.2079f, "attack faceplate");
-    check (release.knob == FaceKnob::Eg2Release && release.fallback == 0.39f, "release faceplate");
+    check (ronin::exactlyEqual (hold.fallback, 0.30f) && ronin::exactlyEqual (delay.fallback, 0.0f), "hold and delay faceplate");
+    check (attack.knob == FaceKnob::Eg2Attack && ronin::exactlyEqual (attack.fallback, 0.2079f), "attack faceplate");
+    check (release.knob == FaceKnob::Eg2Release && ronin::exactlyEqual (release.fallback, 0.39f), "release faceplate");
     return finish ("testEg2HasNoSustainKnob");
 }
 
@@ -189,7 +191,7 @@ int testEg2PanelJacks()
 
     Eg2 eg;
     check (eg.port (Eg2::kDelayTrig).type == PortType::Gate, "delay trig is a gate");
-    check (eg.port (Eg2::kTrig).rest == 5.0f, "trig rests at +5 V");
+    check (ronin::exactlyEqual (eg.port (Eg2::kTrig).rest, 5.0f), "trig rests at +5 V");
 
     PanelLink refused;
     check (orientPanelJacks (delay, trig, 0, 1, 2, refused) == PanelLinkResult::Unmapped,

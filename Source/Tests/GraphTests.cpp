@@ -1,7 +1,9 @@
 // Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
+#include "Modular/FloatCompare.h"
 #include "Modular/OutputModule.h"
 #include "Modular/PatchGraph.h"
+#include "Tests/TestSuite.h"
 
 #include <atomic>
 #include <cstdio>
@@ -151,7 +153,7 @@ int testInputSumsTwoCables()
     check (graph.attemptConnect (ib, 1, id, 0) == PatchGraph::ConnectResult::Ok, "second into dest");
     graph.prepare (48000.0);
     graph.process();
-    check (dest.portValue[0] == 1.5f, "dest input is 1.5");
+    check (ronin::exactlyEqual (dest.portValue[0], 1.5f), "dest input is 1.5");
     return finish ("testInputSumsTwoCables");
 }
 
@@ -204,8 +206,8 @@ int testFanOutAllowed()
 
     graph.prepare (48000.0);
     graph.process();
-    check (b.portValue[1] == 0.25f, "B received fan-out");
-    check (c.portValue[1] == 0.25f, "C received fan-out");
+    check (ronin::exactlyEqual (b.portValue[1], 0.25f), "B received fan-out");
+    check (ronin::exactlyEqual (c.portValue[1], 0.25f), "C received fan-out");
     return finish ("testFanOutAllowed");
 }
 
@@ -387,7 +389,7 @@ int testSnapshotSwapDoesNotAllocate()
     for (int sample = 0; sample < 1000; ++sample)
         graph.process();
     check (gAllocations.load (std::memory_order_relaxed) == 0, "allocation counter stayed 0");
-    check (b.portValue[1] == 0.5f, "GainModule copied the value");
+    check (ronin::exactlyEqual (b.portValue[1], 0.5f), "GainModule copied the value");
     return finish ("testSnapshotSwapDoesNotAllocate");
 }
 
@@ -485,129 +487,6 @@ int testPublishedSnapshotCopy()
 }
 
 }
-
-int testDryMixPassesStereo();
-int testExtInMonoAveragesStereo();
-int testWetMixIgnoresDry();
-int testLevelZeroIsSilence();
-int testLeftOnlyStaysLeft();
-int testSineDryStereoPasses();
-int testOutputLevelScalesDry();
-int testOutputMixBlendsWet();
-int testEffectOnIsWet();
-int testSineLeftOnlyStaysLeft();
-int testSineWetUnpatchedIsSilence();
-int testSineRmsInRange();
-int testNoiseBothJacksMove();
-int testNoiseSeedRepeats();
-int testNoisePinkIsDarkerThanWhite();
-int testNoiseHasNoKnobs();
-int testPanelStackRule();
-int testPanelKnobs();
-int testVcfPassesDcOrLow();
-int testVcfPeakIncreasesResonance();
-int testVcfPositiveCvRaisesCutoff();
-int testVcfWetPathQuieterAtLowCutoff();
-int testVcfPanelJacks();
-int testVcfHasNoHighpassSwitch();
-int testVcfStaysFiniteWhenDrivenHard();
-int testVcfHotInputMovesSpectrum();
-int testVca1SilentWithoutEnv();
-int testVca1IntensityScalesOutput();
-int testVca1LowCutDarkens();
-int testVca1NegativeEnvIsClosed();
-int testVca2PassesDc();
-int testVca2ControlDoesNotClick();
-int testVca2NoKnobs();
-int testVcaPanelJacks();
-int testVcaFactoryWetIsSilent();
-int testEg1SustainLevel();
-int testEg1OutBIsNegation();
-int testEg1ReleasesWhenTriggerLifts();
-int testEg1HasDecay();
-int testEg1ThreeJacks();
-int testEg1UnpatchedTrigIsIdle();
-int testEg1PromotedGate();
-int testEg1FactoryPatch();
-int testExtInGateFiresAboveThreshold();
-int testExtInButtonForcesGate();
-int testExtInButtonOpensVoice();
-int testExtInFollowerOpensEgWithoutButton();
-int testMgPulseIsUnipolar();
-int testMgTriangleIsBipolar2V5();
-int testMgFreqEndpoints();
-int testMgPwAffectsPulseAndTriangle();
-int testMgSawJacksOpposite();
-int testMgPanelJacks();
-int testScaleDoesNotChangeOctJack();
-int testOctIsOneVoltPerOctave();
-int testHzPerVoltIsLinear();
-int testThreeOutputsAlwaysRun();
-int testPwmMovesDutyNotPitch();
-int testVcoPanelJacks();
-int testEg2HasNoSustainKnob();
-int testEg2ReturnsToZeroWithoutAPlateau();
-int testEg2DelayTrigAfterHold();
-int testEg2NegIsNegation();
-int testEg2Restart();
-int testEg2PanelJacks();
-int testRingFourQuadrant();
-int testRingZeroKills();
-int testRingPassesDcProduct();
-int testRingHasNoKnobs();
-int testRingPanelJacks();
-int testDividerOnlyTwoAndFour();
-int testDividerSquareCounts();
-int testDividerIgnoresTinySignal();
-int testInverterNegatesDc();
-int testInverterNegatesAudio();
-int testInverterHasNoKnobs();
-int testIntegratorSettlesToInput();
-int testIntegratorSameSign();
-int testIntegratorSlowIsSlower();
-int testIntegratorIsItsOwnModule();
-int testMixerSumsThree();
-int testMixerIsInverted();
-int testMixerLevelZeroMutesThatInput();
-int testSampleHoldHoldsBetweenClocks();
-int testSampleHoldExtClockWins();
-int testSampleHoldRateChangesInternalClock();
-int testMeterFollowsSelectedJack();
-int testFactoryPresetCount();
-int testInitPresetRoundTrip();
-int testPresetBadVersionStillRejected();
-int testInitPlaysTheInput();
-int testSelfPatchFeedbackRules();
-int testOneDefaultTable();
-int testPresetRoundTrip();
-int testPresetRejectsBadVersion();
-int testFeedbackIsOneSample();
-int testEgNoStallInFloat();
-int testEgLabelsAreRealTime();
-int testEgKnobLawAndMigration();
-int testEgSnapAndSustainSlew();
-int testEgTrigHysteresis();
-int testEg2LabelsAndDelayTrig();
-int testTriDefaultIsTriangle();
-int testParabolaSelectableModule();
-int testSawPulsePolyBlepKept();
-int testFootageSwitchesAtWrap();
-int testHalfbandSpec();
-int testHqSubSampleOrder();
-int testJackIdSlashRoundTrip();
-int testMgPolyBlep();
-int testKnobSmoothing();
-int testIntegratorDoubleFlushCached();
-int testSchmittInputs();
-int testGraphFeedbackOneSampleNoDoubleRun();
-int testGraphStrigScopeAndLegacyInvert();
-int testGraphTypedRestNoLatch();
-int testDrivePull();
-int testHzvJackRoleLin();
-int testExtInGateHysteresis();
-int testKnobUnits();
-int testKnobTypeValue();
-int testGraphOverRangeR15();
 
 int main()
 {

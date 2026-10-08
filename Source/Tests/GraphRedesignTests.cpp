@@ -2,6 +2,8 @@
 // RONIN_Redesign §3.9 / §5.12: graph JCS R9 (every feedback cable one sample, no double run),
 // R3s (S-trig conversion only into EG Trig, legacyInvert per migrated cable), R10 (typed rest, no latching).
 
+#include "Modular/FloatCompare.h"
+#include "Tests/TestSuite.h"
 #include "Modular/Eg1.h"
 #include "Modular/Eg2.h"
 #include "Modular/PatchGraph.h"
@@ -101,7 +103,7 @@ int testGraphFeedbackOneSampleNoDoubleRun()
     self.prepare (48000.0);
     loop.portValue[1] = 0.0f;
     self.process();
-    check (loop.portValue[1] == 0.0f && loop.runs == 1, "self loop: one run, starts at 0");
+    check (ronin::exactlyEqual (loop.portValue[1], 0.0f) && loop.runs == 1, "self loop: one run, starts at 0");
 
     // Loop timing: src (1.0) -> A -> B -> A. A at sample n = 1 + B[n-1]; B[n] = A[n].
     PatchGraph timing;
@@ -116,11 +118,11 @@ int testGraphFeedbackOneSampleNoDoubleRun()
     timing.connect (itb, 1, ita, 0);
     timing.prepare (48000.0);
     timing.process();
-    check (ta.portValue[1] == 1.0f && tb.portValue[1] == 1.0f, "sample 0: B hears A at once");
+    check (ronin::exactlyEqual (ta.portValue[1], 1.0f) && ronin::exactlyEqual (tb.portValue[1], 1.0f), "sample 0: B hears A at once");
     timing.process();
-    check (ta.portValue[1] == 2.0f, "sample 1: A hears B one sample late");
+    check (ronin::exactlyEqual (ta.portValue[1], 2.0f), "sample 1: A hears B one sample late");
     timing.process();
-    check (ta.portValue[1] == 3.0f, "sample 2: the loop accumulates one step per sample");
+    check (ronin::exactlyEqual (ta.portValue[1], 3.0f), "sample 2: the loop accumulates one step per sample");
     return finish ("testGraphFeedbackOneSampleNoDoubleRun");
 }
 
@@ -139,12 +141,12 @@ int testGraphStrigScopeAndLegacyInvert()
 
     gate.level = 5.0f;
     graph.process();
-    check (eg.portValue[Eg1::kTrig] == 0.0f, "R3s: a high gate into EG TRIG is held (0 V)");
-    check (vca.portValue[Vca1::kEnv] == 5.0f, "R3s: a high gate into VCA ENV is raw +5 V (was 0 V)");
+    check (ronin::exactlyEqual (eg.portValue[Eg1::kTrig], 0.0f), "R3s: a high gate into EG TRIG is held (0 V)");
+    check (ronin::exactlyEqual (vca.portValue[Vca1::kEnv], 5.0f), "R3s: a high gate into VCA ENV is raw +5 V (was 0 V)");
     gate.level = 0.0f;
     graph.process();
-    check (eg.portValue[Eg1::kTrig] == 5.0f, "R3s: a low gate into EG TRIG is released (+5 V)");
-    check (vca.portValue[Vca1::kEnv] == 0.0f, "R3s: a low gate into VCA ENV is raw 0 V");
+    check (ronin::exactlyEqual (eg.portValue[Eg1::kTrig], 5.0f), "R3s: a low gate into EG TRIG is released (+5 V)");
+    check (ronin::exactlyEqual (vca.portValue[Vca1::kEnv], 0.0f), "R3s: a low gate into VCA ENV is raw 0 V");
 
     // A migrated format-1 cable keeps the old S-15 inversion (JCS M3).
     Cable cables[2];
@@ -156,10 +158,10 @@ int testGraphStrigScopeAndLegacyInvert()
     check (back[1].legacyInvert && ! back[0].legacyInvert, "the flag survives publish");
     gate.level = 5.0f;
     graph.process();
-    check (vca.portValue[Vca1::kEnv] == 0.0f, "legacyInvert: high gate into VCA ENV is 0 V, the old sound");
+    check (ronin::exactlyEqual (vca.portValue[Vca1::kEnv], 0.0f), "legacyInvert: high gate into VCA ENV is 0 V, the old sound");
     gate.level = 0.0f;
     graph.process();
-    check (vca.portValue[Vca1::kEnv] == 5.0f, "legacyInvert: low gate into VCA ENV is +5 V, the old sound");
+    check (ronin::exactlyEqual (vca.portValue[Vca1::kEnv], 5.0f), "legacyInvert: low gate into VCA ENV is +5 V, the old sound");
 
     // New cables never get the flag.
     graph.disconnect (ig, 0, iv, Vca1::kEnv);
@@ -171,8 +173,8 @@ int testGraphStrigScopeAndLegacyInvert()
     // EG 2 DelayTrig (Gate) into EG 1 Trig is converted; EXT IN-style S-trig volts pass as written.
     PortDesc strigOut { "Gate", PortType::Gate, PortDir::Out, 5.0f, true };
     PortDesc trigIn = eg.port (Eg1::kTrig);
-    check (PatchGraph::cableVolts (0.0f, strigOut, trigIn, false) == 0.0f, "S-trig source passes as written (held)");
-    check (PatchGraph::cableVolts (5.0f, strigOut, trigIn, true) == 5.0f, "S-trig source is never inverted");
+    check (ronin::exactlyEqual (PatchGraph::cableVolts (0.0f, strigOut, trigIn, false), 0.0f), "S-trig source passes as written (held)");
+    check (ronin::exactlyEqual (PatchGraph::cableVolts (5.0f, strigOut, trigIn, true), 5.0f), "S-trig source is never inverted");
     return finish ("testGraphStrigScopeAndLegacyInvert");
 }
 
@@ -191,13 +193,13 @@ int testGraphTypedRestNoLatch()
     gate.level = 5.0f;
     for (int i = 0; i < 10; ++i)
         graph.process();
-    check (eg.portValue[Eg1::kTrig] == 0.0f && vca.portValue[Vca1::kEnv] == 5.0f, "patched values arrive");
+    check (ronin::exactlyEqual (eg.portValue[Eg1::kTrig], 0.0f) && ronin::exactlyEqual (vca.portValue[Vca1::kEnv], 5.0f), "patched values arrive");
 
     graph.disconnect (ig, 0, ie, Eg1::kTrig);
     graph.disconnect (ig, 0, iv, Vca1::kEnv);
     graph.process();
-    check (eg.portValue[Eg1::kTrig] == jcs::kStrigRest, "R10: unpatched S-trig rests at +5 V");
-    check (vca.portValue[Vca1::kEnv] == 0.0f, "R10: unpatched CV rests at 0 V, nothing latches");
+    check (ronin::exactlyEqual (eg.portValue[Eg1::kTrig], jcs::kStrigRest), "R10: unpatched S-trig rests at +5 V");
+    check (ronin::exactlyEqual (vca.portValue[Vca1::kEnv], 0.0f), "R10: unpatched CV rests at 0 V, nothing latches");
     check (! eg.inputConnected[Eg1::kTrig], "inputConnected clears");
     return finish ("testGraphTypedRestNoLatch");
 }

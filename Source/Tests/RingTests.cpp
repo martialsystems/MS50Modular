@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
+#include "Modular/FloatCompare.h"
+#include "Tests/TestSuite.h"
 #include "Modular/PatchGraph.h"
 #include "Modular/Ring.h"
 #include "UI/FaceKnobs.h"
@@ -81,9 +83,9 @@ int testRingZeroKills()
     Ring ring;
     ring.prepare (48000.0);
     drive (ring, 5.0f, 0.0f);
-    check (ring.portValue[Ring::kOut] == 0.0f, "B at 0 kills the product");
+    check (ronin::exactlyEqual (ring.portValue[Ring::kOut], 0.0f), "B at 0 kills the product");
     drive (ring, 0.0f, -3.0f);
-    check (ring.portValue[Ring::kOut] == 0.0f, "A at 0 kills the product");
+    check (ronin::exactlyEqual (ring.portValue[Ring::kOut], 0.0f), "A at 0 kills the product");
     return finish ("testRingZeroKills");
 }
 

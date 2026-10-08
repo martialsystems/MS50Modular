@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
+#include "Modular/FloatCompare.h"
 #include "PluginEditor.h"
 #include "PluginProcessor.h"
 #include "UI/PatchBayLogic.h"
@@ -382,7 +383,7 @@ private:
                             continue;
                         for (int i = 0; i < 128; ++i)
                         {
-                            const double x = buffer.getSample (0, i);
+                            const double x = static_cast<double> (buffer.getSample (0, i));
                             energy += x * x;
                         }
                         count += 128;
@@ -493,7 +494,7 @@ private:
         wheelOnKnob (*bay, kPanelKnobs[cutoff].cx, kPanelKnobs[cutoff].cy, 1.0f);
         expect (near (bay->knobValue (cutoff), cutoffDefault + 0.5f), "wheel up turns cutoff");
         dragKnobLocal (*bay, kPanelKnobs[cutoff].cx, kPanelKnobs[cutoff].cy, -5000.0f, false);
-        expect (bay->knobValue (cutoff) == 1.0f, "cutoff clamps at 1");
+        expect (ronin::exactlyEqual (bay->knobValue (cutoff), 1.0f), "cutoff clamps at 1");
         const auto turnedPaint = paintBay (*bay);
         const auto capCentre = bay->designToLocal (kPanelKnobs[cutoff].cx, kPanelKnobs[cutoff].cy);
         const auto capEdge = bay->designToLocal (kPanelKnobs[cutoff].cx + kPanelKnobs[cutoff].radius + 8.0f,
@@ -551,14 +552,14 @@ private:
             writeCrop (paintBay (*bay), "/tmp/ronin_knob_mid.png");
         }
         clickAt (*bay, kPanelKnobs[ratio].cx, kPanelKnobs[ratio].cy);
-        expect (bay->knobValue (ratio) == 1.0f, "divider click steps from /2 to /4");
+        expect (ronin::exactlyEqual (bay->knobValue (ratio), 1.0f), "divider click steps from /2 to /4");
         expect (bay->knobReadout().contains ("4") && ! bay->knobReadout().contains ("16"), "switch readout shows 4");
         if (auto* ratioParam = processor->parameterForPanelKnob ("DIV", "RATIO SWITCH"))
             expect (near (ratioParam->getValue(), 1.0f), "the switch is saved as a host setting");
         else
             expect (false, "the switch is saved as a host setting");
         dragKnobLocal (*bay, kPanelKnobs[ratio].cx, kPanelKnobs[ratio].cy, 120.0f, false);
-        expect (bay->knobValue (ratio) == 0.0f, "divider drag snaps back to /2");
+        expect (ronin::exactlyEqual (bay->knobValue (ratio), 0.0f), "divider drag snaps back to /2");
         expect (publishedCount (*processor) == cablesBefore, "turning knobs does not publish");
         expect (std::fabs (bay->outputMix() - mixBefore) < 1.0e-6f, "column knobs leave Output mix alone");
         expect (! bay->menuOpen(), "turning knobs does not open the chooser");
@@ -633,14 +634,14 @@ private:
         const float onX = kPowerX + kPowerW * 0.75f;
         const float offX = kPowerX + kPowerW * 0.25f;
         clickAt (*bay, onX, powerY);
-        expect (bay->outputMix() == 1.0f, "power rocker turns on");
+        expect (ronin::exactlyEqual (bay->outputMix(), 1.0f), "power rocker turns on");
         expect (processor->effectIsOn(), "right half is wet");
         expect (rockerBrightness (*bay, onX, powerY) > rockerBrightness (*bay, offX, powerY) + 20.0f,
                 "raised end points at ON");
         clickAt (*bay, onX, powerY);
-        expect (bay->outputMix() == 1.0f, "power rocker on stays on");
+        expect (ronin::exactlyEqual (bay->outputMix(), 1.0f), "power rocker on stays on");
         clickAt (*bay, offX, powerY);
-        expect (bay->outputMix() == 0.0f, "power rocker turns off");
+        expect (ronin::exactlyEqual (bay->outputMix(), 0.0f), "power rocker turns off");
         expect (! processor->effectIsOn(), "left half is dry");
         expect (rockerBrightness (*bay, offX, powerY) > rockerBrightness (*bay, onX, powerY) + 20.0f,
                 "raised end points at OFF");
@@ -665,7 +666,7 @@ private:
         expect (bay->keyPressed (juce::KeyPress (juce::KeyPress::escapeKey)), "escape closes the preset list while power is off");
         expect (! bay->presetMenuOpen(), "preset list is closed while power is off");
         clickAt (*bay, onX, powerY);
-        expect (bay->outputMix() == 1.0f, "power rocker turns back on");
+        expect (ronin::exactlyEqual (bay->outputMix(), 1.0f), "power rocker turns back on");
 
         for (int i = 0; i < 20; ++i)
             bay->advanceCableFrame();
@@ -739,7 +740,7 @@ private:
             expect (! processor->extInButtonHeld(), "mouse up releases the hold");
 
             clickAt (*bay, offX, powerY);
-            expect (bay->outputMix() == 0.0f, "hold check turns the effect off");
+            expect (ronin::exactlyEqual (bay->outputMix(), 0.0f), "hold check turns the effect off");
             bay->mouseDown (down);
             juce::Image offHeld (juce::Image::ARGB, bay->getWidth(), bay->getHeight(), true);
             juce::Graphics offHeldGraphics (offHeld);
@@ -749,7 +750,7 @@ private:
             bay->mouseUp (up);
             expect (! processor->extInButtonHeld(), "mouse up releases the hold while the effect is off");
             clickAt (*bay, onX, powerY);
-            expect (bay->outputMix() == 1.0f, "hold check turns the effect back on");
+            expect (ronin::exactlyEqual (bay->outputMix(), 1.0f), "hold check turns the effect back on");
 
             const auto legend = bay->designToLocal (1325.6f + 10.0f, 287.4f + 4.0f);
             juce::MouseEvent legendDown (source, legend, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
@@ -814,7 +815,7 @@ private:
         clickAt (*bay, kPresetBezelX + 12.0f, kPresetBezelY + kPresetBezelH * 0.5f);
         clickAt (*bay, kPresetBezelX + 20.0f, row0Y);
         expect (processor->getCurrentProgram() == kInitPreset, "the first preset is INIT again");
-        expect (bay->outputMix() != 0.0f, "INIT leaves the effect on");
+        expect (! ronin::exactlyEqual (bay->outputMix(), 0.0f), "INIT leaves the effect on");
         expect (publishedCount (*processor) == 8, "INIT replaces the cables with its eight");
         if (auto* restoredLevel = processor->parameterForPanelKnob ("OUTPUT", "LEVEL"))
             expect (near (restoredLevel->getValue(), 0.7f), "preset restore puts output level back at 0.7");
@@ -991,7 +992,7 @@ private:
             expect (bay.valueEditorOpen(), "right-click on a knob opens the value box");
             expect (bay.valueEditorText().endsWith ("Hz"), "the value box shows real units");
             expect (bay.typeKnobValue (cutoff, "1 kHz"), "typing 1 kHz is accepted");
-            expect (std::fabs (Vcf::knobHzFor (cutoffParam->getValue()) - 1000.0) < 1.0, "1 kHz lands on the knob law");
+            expect (std::fabs (Vcf::knobHzFor (static_cast<double> (cutoffParam->getValue())) - 1000.0) < 1.0, "1 kHz lands on the knob law");
             expect (bay.knobReadout().contains ("1.00 kHz"), "the read-out follows the typed value");
             expect (! bay.typeKnobValue (cutoff, "fast"), "nonsense is refused");
         }

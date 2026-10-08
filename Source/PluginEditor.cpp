@@ -23,7 +23,7 @@ RoninAudioProcessorEditor::RoninAudioProcessorEditor (RoninAudioProcessor& audio
     patch.onCablesChanged = [this] { bay.reloadCablesFromGraph(); };
 
     // Art 1600 x 564 plus the 36 px strip: 1600 x 600 design. Scale steps 75 .. 200 % of 1280.
-    constrainer.setFixedAspectRatio (1600.0 / (564.0 + ronin_ui::kStripH));
+    constrainer.setFixedAspectRatio (1600.0 / (564.0 + static_cast<double> (ronin_ui::kStripH)));
     constrainer.setSizeLimits (960, heightForWidth (960), 2560, heightForWidth (2560));
     setConstrainer (&constrainer);
     setResizable (true, true);

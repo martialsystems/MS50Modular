@@ -773,7 +773,7 @@ void RoninAudioProcessor::loadFormat1 (const juce::XmlElement& xml)
     {
         if (parameter == nullptr || ! xml.hasAttribute (parameter->getParameterID()))
             return;
-        const double old = parameter->convertTo0to1 (parameter->get());
+        const double old = static_cast<double> (parameter->convertTo0to1 (parameter->get()));
         if (attack && patchstate::attackStalledInV1 (old))
             stalled = true;
         const double now = attack ? patchstate::migrateEgAttack (old) : patchstate::migrateEgDecayRelease (old);
@@ -810,7 +810,7 @@ void RoninAudioProcessor::loadFormat1 (const juce::XmlElement& xml)
     const double level = patchstate::referenceLevel (feed);
     if (level > 0.0 && vcfCutoff_ != nullptr)
     {
-        const double old = vcfCutoff_->convertTo0to1 (vcfCutoff_->get());
+        const double old = static_cast<double> (vcfCutoff_->convertTo0to1 (vcfCutoff_->get()));
         const double now = patchstate::compensateCutoff (old, level);
         *vcfCutoff_ = vcfCutoff_->convertFrom0to1 (static_cast<float> (now));
         loadReport_.add ("M-R5: VCF CUTOFF " + juce::String (old, 3) + " -> " + juce::String (now, 3)

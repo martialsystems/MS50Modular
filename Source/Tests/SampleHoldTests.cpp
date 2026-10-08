@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
+#include "Modular/FloatCompare.h"
+#include "Tests/TestSuite.h"
 #include "Modular/SampleHold.h"
 #include "UI/FaceKnobs.h"
 #include "UI/PatchBayLogic.h"
@@ -65,12 +67,12 @@ int testSampleHoldHoldsBetweenClocks()
     module.setKnob (SampleHold::kKnobRate, 1.0f);
 
     stepExt (module, 2.0f, 0.0f);
-    check (module.portValue[SampleHold::kOut] == 0.0f, "no edge yet, hold stays 0");
-    check (module.portValue[SampleHold::kClockOut] == 0.0f, "clock out is low");
+    check (ronin::exactlyEqual (module.portValue[SampleHold::kOut], 0.0f), "no edge yet, hold stays 0");
+    check (ronin::exactlyEqual (module.portValue[SampleHold::kClockOut], 0.0f), "clock out is low");
 
     for (int i = 0; i < 8; ++i)
         stepExt (module, 3.0f + static_cast<float> (i), 0.0f);
-    check (module.portValue[SampleHold::kOut] == 0.0f, "input changes do not leak between clocks");
+    check (ronin::exactlyEqual (module.portValue[SampleHold::kOut], 0.0f), "input changes do not leak between clocks");
 
     stepExt (module, 2.0f, 5.0f);
     check (std::fabs (module.portValue[SampleHold::kOut] - 2.0f) < 1.0e-5f, "rising edge holds the input");
@@ -83,7 +85,7 @@ int testSampleHoldHoldsBetweenClocks()
     for (int i = 0; i < 16; ++i)
         stepExt (module, 4.0f, 0.0f);
     check (std::fabs (module.portValue[SampleHold::kOut] - 2.0f) < 1.0e-5f, "hold stays while the clock is low");
-    check (module.portValue[SampleHold::kClockOut] == 0.0f, "clock out follows the low clock");
+    check (ronin::exactlyEqual (module.portValue[SampleHold::kClockOut], 0.0f), "clock out follows the low clock");
 
     stepExt (module, 4.0f, 5.0f);
     check (std::fabs (module.portValue[SampleHold::kOut] - 4.0f) < 1.0e-5f, "the next rising edge takes the new input");
@@ -100,7 +102,7 @@ int testSampleHoldExtClockWins()
     for (int i = 0; i < 4800; ++i)
     {
         stepExt (module, 1.0f + static_cast<float> (i), 0.0f);
-        if (module.portValue[SampleHold::kOut] != 0.0f || module.portValue[SampleHold::kClockOut] != 0.0f)
+        if (! ronin::exactlyEqual (module.portValue[SampleHold::kOut], 0.0f) || ! ronin::exactlyEqual (module.portValue[SampleHold::kClockOut], 0.0f))
             stolen = true;
     }
     check (! stolen, "a fast internal rate does not sample while ext clock is patched");
@@ -121,7 +123,7 @@ int testSampleHoldRateChangesInternalClock()
     probe.prepare (48000.0);
     check (std::fabs (probe.presetKnob (SampleHold::kKnobRate) - 0.50f) < 1.0e-6f, "rate default");
     const FaceKnobBinding rate = faceKnobBinding ("S&H", "RATE");
-    check (rate.knob == FaceKnob::SampleHoldRate && rate.index == 0 && rate.fallback == 0.50f, "rate host");
+    check (rate.knob == FaceKnob::SampleHoldRate && rate.index == 0 && ronin::exactlyEqual (rate.fallback, 0.50f), "rate host");
     check (std::strcmp (rate.parameterId, "sampleHoldRate") == 0, "rate id");
     check (std::strcmp (rate.parameterName, "S&H Rate") == 0, "rate name");
 
@@ -157,7 +159,7 @@ int testSampleHoldRateChangesInternalClock()
         held.portValue[SampleHold::kIn] = -6.0f;
         const float before = held.portValue[SampleHold::kOut];
         held.processSample();
-        if (held.portValue[SampleHold::kClockOut] >= 1.0f && before == frozen)
+        if (held.portValue[SampleHold::kClockOut] >= 1.0f && ronin::exactlyEqual (before, frozen))
         {
             if (std::fabs (held.portValue[SampleHold::kOut] - frozen) > 1.0e-4f)
                 stayed = false;

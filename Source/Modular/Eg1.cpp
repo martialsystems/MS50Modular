@@ -26,7 +26,7 @@ float Eg1::clamp01 (float value)
 
 double Eg1::secondsForKnob (float knob01)
 {
-    return EgLaw::secondsFor (knob01);
+    return EgLaw::secondsFor (static_cast<double> (knob01));
 }
 
 int Eg1::numPorts() const
@@ -54,9 +54,9 @@ int Eg1::numKnobs() const
 void Eg1::updateCoefficients()
 {
     const double rate = sampleRate > 1.0 ? sampleRate : 48000.0;
-    aAttack_ = EgLaw::coefficient (EgLaw::attackC(), EgLaw::secondsFor (attack01_), rate);
-    aDecay_ = EgLaw::coefficient (EgLaw::decayC(), EgLaw::secondsFor (decay01_), rate);
-    aRelease_ = EgLaw::coefficient (EgLaw::decayC(), EgLaw::secondsFor (release01_), rate);
+    aAttack_ = EgLaw::coefficient (EgLaw::attackC(), EgLaw::secondsFor (static_cast<double> (attack01_)), rate);
+    aDecay_ = EgLaw::coefficient (EgLaw::decayC(), EgLaw::secondsFor (static_cast<double> (decay01_)), rate);
+    aRelease_ = EgLaw::coefficient (EgLaw::decayC(), EgLaw::secondsFor (static_cast<double> (release01_)), rate);
     aSustain_ = EgLaw::coefficient (1.0, EgLaw::kSustainSlewSeconds, rate);
 }
 

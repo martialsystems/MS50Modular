@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
+#include "Modular/FloatCompare.h"
+#include "Tests/TestSuite.h"
 #include "Modular/DefaultPatch.h"
 #include "Modular/Divider.h"
 #include "Modular/Eg1.h"
@@ -145,29 +147,10 @@ std::string functionBody (const std::string& text, const std::string& marker)
     return text.substr (start, end - start + 1);
 }
 
-double vcaOutRms (Rack& rack, int samples)
-{
-    double sum = 0.0;
-    const int skip = samples / 2;
-    int used = 0;
-    for (int i = 0; i < samples; ++i)
-    {
-        rack.graph.process();
-        if (i < skip)
-            continue;
-        const double y = static_cast<double> (rack.vca1.portValue[Vca1::kOut]);
-        sum += y * y;
-        ++used;
-    }
-    if (used <= 0)
-        return 0.0;
-    return std::sqrt (sum / static_cast<double> (used));
-}
-
 }
 
 
-std::string repoFile (const char* relative)
+static std::string repoFile (const char* relative)
 {
     std::string path = RONIN_PROCESSOR_SOURCE;
     const auto source = path.rfind ("/Source/");
@@ -206,7 +189,7 @@ int testFactoryPresetCount()
     check (cablesMatch (loaded.graph, kPresetInit, 8), "INIT cables");
     check (loaded.graph.delayedCableCount() == 0, "INIT clears the delayed cable");
     check (std::fabs (loaded.vca1.initial()) < 1.0e-6f, "INIT clears VCA 1 Initial");
-    check (factoryVca1Initial (kDefaultFactoryPreset) == 0.0f, "INIT does not set VCA 1 Initial");
+    check (ronin::exactlyEqual (factoryVca1Initial (kDefaultFactoryPreset), 0.0f), "INIT does not set VCA 1 Initial");
 
     check (! loadFactoryPreset (loaded.graph, -1), "index -1 does not load");
     check (! loadFactoryPreset (loaded.graph, kFactoryPresetCount), "an index past the bank does not load");
@@ -324,12 +307,6 @@ double takeRms (Rack& rack, int samples, bool host)
     return std::sqrt (sum / static_cast<double> (samples));
 }
 
-void skipSamples (Rack& rack, int samples)
-{
-    for (int i = 0; i < samples; ++i)
-        rack.graph.process();
-}
-
 // INIT is an effect: the host input runs through the VCF and VCA 1, and EG 1 opens them on the Ext In gate.
 int testInitPlaysTheInput()
 {
@@ -378,7 +355,7 @@ int testInitPlaysTheInput()
     return finish ("testInitPlaysTheInput");
 }
 
-void checkNear (float value, float want, const char* message)
+static void checkNear (float value, float want, const char* message)
 {
     if (std::fabs (value - want) > 1.0e-6f)
     {
@@ -403,7 +380,7 @@ int testOneDefaultTable()
             ++gChecks;
             continue;
         }
-        if (binding.fallback != knob.valueDefault)
+        if (! ronin::exactlyEqual (binding.fallback, knob.valueDefault))
         {
             std::printf ("  FAIL %s %s: FaceKnobs %.4f, layout %.4f\n", knob.section, knob.label,
                          static_cast<double> (binding.fallback), static_cast<double> (knob.valueDefault));
@@ -420,32 +397,32 @@ int testOneDefaultTable()
     auto fallback = [] (const char* section, const char* label) { return faceKnobBinding (section, label).fallback; };
     const int init = kDefaultFactoryPreset;
     const FactoryProgramKnobs row = factoryProgramKnobs (init);
-    check (row.vcfCutoff == fallback ("VCF", "CUTOFF") && row.vcfPeak == fallback ("VCF", "PEAK"), "INIT filter is the table");
-    check (row.eg1Attack == fallback ("EG 1", "ATTACK") && row.eg1Decay == fallback ("EG 1", "DECAY")
-               && row.eg1Sustain == fallback ("EG 1", "SUSTAIN") && row.eg1Release == fallback ("EG 1", "RELEASE"),
+    check (ronin::exactlyEqual (row.vcfCutoff, fallback ("VCF", "CUTOFF")) && ronin::exactlyEqual (row.vcfPeak, fallback ("VCF", "PEAK")), "INIT filter is the table");
+    check (ronin::exactlyEqual (row.eg1Attack, fallback ("EG 1", "ATTACK")) && ronin::exactlyEqual (row.eg1Decay, fallback ("EG 1", "DECAY"))
+               && ronin::exactlyEqual (row.eg1Sustain, fallback ("EG 1", "SUSTAIN")) && ronin::exactlyEqual (row.eg1Release, fallback ("EG 1", "RELEASE")),
            "INIT envelope is the table");
-    check (row.vcoRange == fallback ("VCO", "RANGE"), "INIT range is the table");
-    check (factoryMgRate (init) == fallback ("MG", "RATE"), "INIT MG rate is the table");
-    check (factorySampleHoldRate (init) == fallback ("S&H", "RATE"), "INIT S&H rate is the table");
-    check (factoryIntegratorTime (init) == fallback ("INT", "TIME"), "INIT integrator time is the table");
-    check (factoryVca1Initial (init) == fallback ("VCA 1", "INITIAL"), "INIT VCA 1 Initial is the table");
+    check (ronin::exactlyEqual (row.vcoRange, fallback ("VCO", "RANGE")), "INIT range is the table");
+    check (ronin::exactlyEqual (factoryMgRate (init), fallback ("MG", "RATE")), "INIT MG rate is the table");
+    check (ronin::exactlyEqual (factorySampleHoldRate (init), fallback ("S&H", "RATE")), "INIT S&H rate is the table");
+    check (ronin::exactlyEqual (factoryIntegratorTime (init), fallback ("INT", "TIME")), "INIT integrator time is the table");
+    check (ronin::exactlyEqual (factoryVca1Initial (init), fallback ("VCA 1", "INITIAL")), "INIT VCA 1 Initial is the table");
     check (factoryPresetEffect (init), "INIT is effect on");
 
     // The old 0.05 / 0.3 / 0.6 / 0.3 defaults through M-R1 (real-time law, RONIN_Redesign §6).
-    check (fallback ("EG 1", "ATTACK") == 0.2079f && fallback ("EG 1", "DECAY") == 0.39f
-               && fallback ("EG 1", "SUSTAIN") == 0.60f && fallback ("EG 1", "RELEASE") == 0.39f,
+    check (ronin::exactlyEqual (fallback ("EG 1", "ATTACK"), 0.2079f) && ronin::exactlyEqual (fallback ("EG 1", "DECAY"), 0.39f)
+               && ronin::exactlyEqual (fallback ("EG 1", "SUSTAIN"), 0.60f) && ronin::exactlyEqual (fallback ("EG 1", "RELEASE"), 0.39f),
            "fresh EG 1 is 0.2079 / 0.39 / 0.6 / 0.39");
-    check (fallback ("VCF", "CUTOFF") == 0.45f && fallback ("VCF", "PEAK") == 0.20f && fallback ("VCF", "MOD") == 0.40f,
+    check (ronin::exactlyEqual (fallback ("VCF", "CUTOFF"), 0.45f) && ronin::exactlyEqual (fallback ("VCF", "PEAK"), 0.20f) && ronin::exactlyEqual (fallback ("VCF", "MOD"), 0.40f),
            "fresh VCF is 0.45 / 0.2 / 0.4");
-    check (fallback ("MIX", "LEVEL 1") == 0.80f && fallback ("MIX", "LEVEL 2") == 0.80f && fallback ("MIX", "LEVEL 3") == 0.80f,
+    check (ronin::exactlyEqual (fallback ("MIX", "LEVEL 1"), 0.80f) && ronin::exactlyEqual (fallback ("MIX", "LEVEL 2"), 0.80f) && ronin::exactlyEqual (fallback ("MIX", "LEVEL 3"), 0.80f),
            "mixer levels are 0.8");
 
     // The old placeholder cycle repeated 0.50, 0.30, 0.68, 0.42, 0.78 down every column.
     int cycle = 0;
     for (int i = 0; i + 3 < kPanelKnobCount; ++i)
     {
-        if (kPanelKnobs[i].valueDefault == 0.50f && kPanelKnobs[i + 1].valueDefault == 0.30f
-            && kPanelKnobs[i + 2].valueDefault == 0.68f && kPanelKnobs[i + 3].valueDefault == 0.42f)
+        if (ronin::exactlyEqual (kPanelKnobs[i].valueDefault, 0.50f) && ronin::exactlyEqual (kPanelKnobs[i + 1].valueDefault, 0.30f)
+            && ronin::exactlyEqual (kPanelKnobs[i + 2].valueDefault, 0.68f) && ronin::exactlyEqual (kPanelKnobs[i + 3].valueDefault, 0.42f))
             ++cycle;
     }
     check (cycle == 0, "no 0.50 / 0.30 / 0.68 / 0.42 cycle");
@@ -468,7 +445,7 @@ int testOneDefaultTable()
     return finish ("testOneDefaultTable");
 }
 
-int onlyDelayedIndex (const PatchGraph& graph)
+static int onlyDelayedIndex (const PatchGraph& graph)
 {
     const int count = graph.cableCount();
     int found = -1;

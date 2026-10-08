@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
+#include "Modular/FloatCompare.h"
+#include "Tests/TestSuite.h"
 #include "Modular/Divider.h"
 #include "UI/FaceKnobs.h"
 #include "UI/PatchBayLogic.h"
@@ -47,7 +49,7 @@ int testDividerOnlyTwoAndFour()
     check (std::strcmp (divider.port (Divider::kDiv4).name, "Div4") == 0, "div4 name");
     const FaceKnobBinding ratio = faceKnobBinding ("DIV", "RATIO SWITCH");
     check (ratio.knob == FaceKnob::DividerRatio && ratio.index < 0, "ratio switch is a host setting, not a module knob");
-    check (ratio.fallback == 0.0f && std::strcmp (ratio.parameterId, "dividerRatio") == 0, "ratio switch starts on /2");
+    check (ronin::exactlyEqual (ratio.fallback, 0.0f) && std::strcmp (ratio.parameterId, "dividerRatio") == 0, "ratio switch starts on /2");
 
     const int in = panelJackIndex ("DIV", "IN");
     const int div2 = panelJackIndex ("DIV", "/2");
@@ -85,7 +87,7 @@ int testDividerSquareCounts()
         clock (divider, 5.0f);   // a JCS 0/5 V gate (§3.7: exactly 1.0 V no longer clocks, > 1.0 V does)
         const float div2 = divider.portValue[Divider::kDiv2];
         const float div4 = divider.portValue[Divider::kDiv4];
-        if ((div2 != 0.0f && div2 != 5.0f) || (div4 != 0.0f && div4 != 5.0f))
+        if ((! ronin::exactlyEqual (div2, 0.0f) && ! ronin::exactlyEqual (div2, 5.0f)) || (! ronin::exactlyEqual (div4, 0.0f) && ! ronin::exactlyEqual (div4, 5.0f)))
             levelsLegal = false;
         if (div2 > 2.5f && previous2 < 2.5f)
             ++rises2;
@@ -108,7 +110,7 @@ int testDividerIgnoresTinySignal()
     for (int i = 0; i < 64; ++i)
     {
         clock (divider, (i % 2 == 0) ? 0.1f : -0.1f);
-        if (divider.portValue[Divider::kDiv2] != 0.0f || divider.portValue[Divider::kDiv4] != 0.0f)
+        if (! ronin::exactlyEqual (divider.portValue[Divider::kDiv2], 0.0f) || ! ronin::exactlyEqual (divider.portValue[Divider::kDiv4], 0.0f))
             stayedLow = false;
     }
     check (stayedLow, "0.1 V does not clock the divider");
@@ -119,7 +121,7 @@ int testDividerIgnoresTinySignal()
         const float triangle = (i < 8) ? (-2.5f + 5.0f * static_cast<float> (i) / 8.0f)
                                         : (2.5f - 5.0f * static_cast<float> (i - 8) / 8.0f);
         clock (divider, triangle);
-        if (divider.portValue[Divider::kDiv2] == 5.0f)
+        if (ronin::exactlyEqual (divider.portValue[Divider::kDiv2], 5.0f))
             crossed = true;
     }
     check (crossed, "a ±2.5 V triangle crosses the Schmitt window");

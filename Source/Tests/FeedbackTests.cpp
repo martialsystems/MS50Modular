@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
+#include "Modular/FloatCompare.h"
+#include "Tests/TestSuite.h"
 #include "Modular/DefaultPatch.h"
 #include "Modular/Eg1.h"
 #include "Modular/ExtIn.h"
@@ -110,16 +112,16 @@ int testFeedbackIsOneSample()
 
     loop.prepare (48000.0);
     loop.process();
-    check (gain.portValue[1] == 1.0f, "first sample is the impulse alone");
+    check (ronin::exactlyEqual (gain.portValue[1], 1.0f), "first sample is the impulse alone");
     gain.portValue[1] = 0.0f;
     loop.process();
-    check (gain.portValue[1] == 1.0f, "impulse returns on the next sample");
+    check (ronin::exactlyEqual (gain.portValue[1], 1.0f), "impulse returns on the next sample");
 
     gain.portValue[1] = 0.0f;
     SilentModule idle;
     loop.addModule (idle);
     loop.process();
-    check (gain.portValue[1] == 1.0f, "republish keeps the delayed sample");
+    check (ronin::exactlyEqual (gain.portValue[1], 1.0f), "republish keeps the delayed sample");
 
     PatchGraph pair;
     ImpulseModule pairImpulse;
@@ -137,11 +139,11 @@ int testFeedbackIsOneSample()
     check (pair.delayedCableCount() == 1, "pair has one delayed cable");
     pair.prepare (48000.0);
     pair.process();
-    check (a.portValue[1] == 1.0f, "A is the impulse on the first sample");
-    check (b.portValue[1] == 1.0f, "B hears A's output with no delay");
+    check (ronin::exactlyEqual (a.portValue[1], 1.0f), "A is the impulse on the first sample");
+    check (ronin::exactlyEqual (b.portValue[1], 1.0f), "B hears A's output with no delay");
     b.portValue[1] = 0.0f;
     pair.process();
-    check (a.portValue[1] == 1.0f, "A hears the delayed B, not the wiped jack");
+    check (ronin::exactlyEqual (a.portValue[1], 1.0f), "A hears the delayed B, not the wiped jack");
 
     PatchGraph stacked;
     ImpulseModule stackedImpulse;
@@ -160,9 +162,9 @@ int testFeedbackIsOneSample()
     check (stacked.delayedCableCount() == 2, "stacked cycle delays both cables");
     stacked.prepare (48000.0);
     stacked.process();
-    check (left.portValue[1] == 1.0f, "first sample is the impulse alone");
+    check (ronin::exactlyEqual (left.portValue[1], 1.0f), "first sample is the impulse alone");
     stacked.process();
-    check (left.portValue[1] == 2.0f, "both feedback cables arrive one sample later");
+    check (ronin::exactlyEqual (left.portValue[1], 2.0f), "both feedback cables arrive one sample later");
 
     PatchGraph factory;
     ExtIn ext;

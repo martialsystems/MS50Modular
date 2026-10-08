@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "FloatCompare.h"
 #include "Module.h"
 #include "Smoothing.h"
 
@@ -23,9 +24,9 @@ inline constexpr float outputLevelGain (float knob) noexcept
     return 1.0f + (travel - kUnity) / (1.0f - kUnity);
 }
 
-static_assert (outputLevelGain (0.0f) == 0.0f, "output level 0 is silence");
-static_assert (outputLevelGain (0.7f) == 1.0f, "output level 0.7 is unity");
-static_assert (outputLevelGain (1.0f) == 2.0f, "output level 1 is twice as loud");
+static_assert (ronin::exactlyEqual (outputLevelGain (0.0f), 0.0f), "output level 0 is silence");
+static_assert (ronin::exactlyEqual (outputLevelGain (0.7f), 1.0f), "output level 0.7 is unity");
+static_assert (ronin::exactlyEqual (outputLevelGain (1.0f), 2.0f), "output level 1 is twice as loud");
 
 class OutputModule : public Module {
 public:

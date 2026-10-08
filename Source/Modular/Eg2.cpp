@@ -36,8 +36,8 @@ float Eg2::clamp01 (float value)
 void Eg2::updateCoefficients()
 {
     const double rate = sampleRate > 1.0 ? sampleRate : 48000.0;
-    aAttack_ = EgLaw::coefficient (EgLaw::attackC(), EgLaw::secondsFor (attack01_), rate);
-    aRelease_ = EgLaw::coefficient (EgLaw::decayC(), EgLaw::secondsFor (release01_), rate);
+    aAttack_ = EgLaw::coefficient (EgLaw::attackC(), EgLaw::secondsFor (static_cast<double> (attack01_)), rate);
+    aRelease_ = EgLaw::coefficient (EgLaw::decayC(), EgLaw::secondsFor (static_cast<double> (release01_)), rate);
 }
 
 int Eg2::numPorts() const
@@ -131,8 +131,8 @@ void Eg2::processSample()
         {
             x_ = 0.0;
             elapsed_ += 1.0 / rate;
-            const double hold = EgLaw::holdDelaySeconds (hold01_);
-            const double delay = EgLaw::holdDelaySeconds (delay01_);
+            const double hold = EgLaw::holdDelaySeconds (static_cast<double> (hold01_));
+            const double delay = EgLaw::holdDelaySeconds (static_cast<double> (delay01_));
             if (! delayArmed_ && elapsed_ >= hold)
             {
                 delayArmed_ = true;

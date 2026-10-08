@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
+#include "Modular/FloatCompare.h"
+#include "Tests/TestSuite.h"
 #include "Modular/DefaultPatch.h"
 #include "Modular/EffectSwitch.h"
 #include "Modular/Eg1.h"
@@ -179,7 +181,7 @@ int testEg1ThreeJacks()
     check (eg.numKnobs() == 4, "four timing knobs");
     check (eg.numPorts() == 4, "trig plus three outputs");
     const PortDesc trig = eg.port (Eg1::kTrig);
-    check (trig.type == PortType::CV && trig.dir == PortDir::In && trig.rest == 5.0f, "trig rests at +5 V");
+    check (trig.type == PortType::CV && trig.dir == PortDir::In && ronin::exactlyEqual (trig.rest, 5.0f), "trig rests at +5 V");
     check (std::strcmp (trig.name, "Trig") == 0, "trig name");
     check (eg.port (Eg1::kOutA).dir == PortDir::Out && std::strcmp (eg.port (Eg1::kOutA).name, "OutA") == 0, "out a");
     check (eg.port (Eg1::kOutB).dir == PortDir::Out && std::strcmp (eg.port (Eg1::kOutB).name, "OutB") == 0, "out b");
@@ -207,11 +209,11 @@ int testEg1ThreeJacks()
     const FaceKnobBinding decay = faceKnobBinding ("EG 1", "DECAY");
     const FaceKnobBinding sustain = faceKnobBinding ("EG 1", "SUSTAIN");
     const FaceKnobBinding release = faceKnobBinding ("EG 1", "RELEASE");
-    check (std::strcmp (attack.parameterName, "EG 1 Attack") == 0 && attack.fallback == 0.2079f, "attack name");
-    check (std::strcmp (decay.parameterName, "EG 1 Decay") == 0 && decay.fallback == 0.39f, "decay name");
-    check (std::strcmp (sustain.parameterName, "EG 1 Sustain") == 0 && sustain.fallback == 0.60f, "sustain name");
-    check (std::strcmp (release.parameterName, "EG 1 Release") == 0 && release.fallback == 0.39f, "release name");
-    check (attack.minimum == 0.0f && attack.maximum == 1.0f, "attack range");
+    check (std::strcmp (attack.parameterName, "EG 1 Attack") == 0 && ronin::exactlyEqual (attack.fallback, 0.2079f), "attack name");
+    check (std::strcmp (decay.parameterName, "EG 1 Decay") == 0 && ronin::exactlyEqual (decay.fallback, 0.39f), "decay name");
+    check (std::strcmp (sustain.parameterName, "EG 1 Sustain") == 0 && ronin::exactlyEqual (sustain.fallback, 0.60f), "sustain name");
+    check (std::strcmp (release.parameterName, "EG 1 Release") == 0 && ronin::exactlyEqual (release.fallback, 0.39f), "release name");
+    check (ronin::exactlyEqual (attack.minimum, 0.0f) && ronin::exactlyEqual (attack.maximum, 1.0f), "attack range");
     check (faceKnobBinding ("EG 2", "ATTACK").knob == FaceKnob::Eg2Attack, "eg 2 attack is a parameter");
     return finish ("testEg1ThreeJacks");
 }

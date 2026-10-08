@@ -15,29 +15,9 @@ FetchContent_MakeAvailable(JUCE)
 set(JIDAI_COMMON_TESTS OFF CACHE BOOL "" FORCE)
 add_subdirectory(third_party/jidai-common)
 
-juce_add_plugin(Ronin
-  COMPANY_NAME "Martial Systems"
-  BUNDLE_ID com.martialsystems.ronin
-  IS_SYNTH FALSE
-  NEEDS_MIDI_INPUT FALSE
-  NEEDS_MIDI_OUTPUT FALSE
-  IS_MIDI_EFFECT FALSE
-  EDITOR_WANTS_KEYBOARD_FOCUS FALSE
-  COPY_PLUGIN_AFTER_BUILD FALSE
-  PLUGIN_MANUFACTURER_CODE Psnl
-  PLUGIN_CODE Rnin
-  FORMATS VST3
-  PRODUCT_NAME "RONIN")
-
-juce_add_binary_data(RoninPanelAssets
-  HEADER_NAME PanelAssets.h
-  NAMESPACE PanelAssets
-  SOURCES panel/assets/panel_bg.svg)
-
-target_sources(Ronin PRIVATE
-  Source/PluginProcessor.cpp
-  Source/PluginEditor.cpp
-  Source/UI/TabPages.cpp
+# RONIN's own sources. The engine list is JUCE-free (DSP modules, patch graph, state format 2, patch-bay logic):
+# it is what the JIDAI rack compiles. The plugin list adds the JUCE processor, editor and tab pages.
+set(RONIN_ENGINE_SOURCES
   Source/Modular/Module.cpp
   Source/Modular/PatchGraph.cpp
   Source/Modular/PatchState.cpp
@@ -57,8 +37,34 @@ target_sources(Ronin PRIVATE
   Source/Modular/Integrator.cpp
   Source/Modular/Mixer.cpp
   Source/Modular/SampleHold.cpp
-  Source/UI/PatchBayLogic.cpp
+  Source/UI/PatchBayLogic.cpp)
+
+set(RONIN_PLUGIN_SOURCES
+  Source/PluginProcessor.cpp
+  Source/PluginEditor.cpp
+  Source/UI/TabPages.cpp
   Source/UI/PatchBayView.cpp)
+
+juce_add_plugin(Ronin
+  COMPANY_NAME "Martial Systems"
+  BUNDLE_ID com.martialsystems.ronin
+  IS_SYNTH FALSE
+  NEEDS_MIDI_INPUT FALSE
+  NEEDS_MIDI_OUTPUT FALSE
+  IS_MIDI_EFFECT FALSE
+  EDITOR_WANTS_KEYBOARD_FOCUS FALSE
+  COPY_PLUGIN_AFTER_BUILD FALSE
+  PLUGIN_MANUFACTURER_CODE Psnl
+  PLUGIN_CODE Rnin
+  FORMATS VST3
+  PRODUCT_NAME "RONIN")
+
+juce_add_binary_data(RoninPanelAssets
+  HEADER_NAME PanelAssets.h
+  NAMESPACE PanelAssets
+  SOURCES panel/assets/panel_bg.svg)
+
+target_sources(Ronin PRIVATE ${RONIN_PLUGIN_SOURCES} ${RONIN_ENGINE_SOURCES})
 
 target_include_directories(Ronin PRIVATE Source)
 target_link_libraries(Ronin PRIVATE jidai::common)
@@ -74,7 +80,7 @@ target_link_libraries(Ronin PRIVATE
   juce::juce_recommended_config_flags
   juce::juce_recommended_warning_flags)
 
-add_executable(RoninTests
+set(RONIN_UNIT_TEST_SOURCES
   Source/Tests/GraphTests.cpp
   Source/Tests/Step3Tests.cpp
   Source/Tests/SineThroughFxTests.cpp
@@ -103,56 +109,12 @@ add_executable(RoninTests
   Source/Tests/VcoRedesignTests.cpp
   Source/Tests/DspRedesignTests.cpp
   Source/Tests/GraphRedesignTests.cpp
-  Source/Tests/JackIdTests.cpp
-  Source/Modular/Module.cpp
-  Source/Modular/PatchGraph.cpp
-  Source/Modular/PatchState.cpp
-  Source/Modular/ExtIn.cpp
-  Source/Modular/OutputModule.cpp
-  Source/Modular/Noise.cpp
-  Source/Modular/Vcf.cpp
-  Source/Modular/Vca1.cpp
-  Source/Modular/Vca2.cpp
-  Source/Modular/Eg1.cpp
-  Source/Modular/Mg.cpp
-  Source/Modular/Vco.cpp
-  Source/Modular/Eg2.cpp
-  Source/Modular/Ring.cpp
-  Source/Modular/Divider.cpp
-  Source/Modular/Inverter.cpp
-  Source/Modular/Integrator.cpp
-  Source/Modular/Mixer.cpp
-  Source/Modular/SampleHold.cpp
-  Source/UI/PatchBayLogic.cpp)
+  Source/Tests/JackIdTests.cpp)
 
+add_executable(RoninTests ${RONIN_UNIT_TEST_SOURCES} ${RONIN_ENGINE_SOURCES})
 juce_add_gui_app(RoninPanelProbe PRODUCT_NAME "RoninPanelProbe")
 
-target_sources(RoninPanelProbe PRIVATE
-  tools/PanelProbe.cpp
-  Source/PluginProcessor.cpp
-  Source/PluginEditor.cpp
-  Source/UI/TabPages.cpp
-  Source/Modular/Module.cpp
-  Source/Modular/PatchGraph.cpp
-  Source/Modular/PatchState.cpp
-  Source/Modular/ExtIn.cpp
-  Source/Modular/OutputModule.cpp
-  Source/Modular/Noise.cpp
-  Source/Modular/Vcf.cpp
-  Source/Modular/Vca1.cpp
-  Source/Modular/Vca2.cpp
-  Source/Modular/Eg1.cpp
-  Source/Modular/Mg.cpp
-  Source/Modular/Vco.cpp
-  Source/Modular/Eg2.cpp
-  Source/Modular/Ring.cpp
-  Source/Modular/Divider.cpp
-  Source/Modular/Inverter.cpp
-  Source/Modular/Integrator.cpp
-  Source/Modular/Mixer.cpp
-  Source/Modular/SampleHold.cpp
-  Source/UI/PatchBayLogic.cpp
-  Source/UI/PatchBayView.cpp)
+target_sources(RoninPanelProbe PRIVATE tools/PanelProbe.cpp ${RONIN_PLUGIN_SOURCES} ${RONIN_ENGINE_SOURCES})
 
 target_include_directories(RoninPanelProbe PRIVATE Source)
 target_link_libraries(RoninPanelProbe PRIVATE jidai::common)
@@ -182,32 +144,7 @@ target_compile_options(RoninTests PRIVATE -Wall -Wextra -Wpedantic)
 # Processor-level tests (JUCE): state v2, migration, TRI SHAPE by origin, HQ latency. Run ./build/RoninProcessorTests_artefacts/Release/RoninProcessorTests
 juce_add_console_app(RoninProcessorTests PRODUCT_NAME "RoninProcessorTests")
 
-target_sources(RoninProcessorTests PRIVATE
-  Source/Tests/ProcessorTests.cpp
-  Source/PluginProcessor.cpp
-  Source/PluginEditor.cpp
-  Source/UI/TabPages.cpp
-  Source/Modular/Module.cpp
-  Source/Modular/PatchGraph.cpp
-  Source/Modular/PatchState.cpp
-  Source/Modular/ExtIn.cpp
-  Source/Modular/OutputModule.cpp
-  Source/Modular/Noise.cpp
-  Source/Modular/Vcf.cpp
-  Source/Modular/Vca1.cpp
-  Source/Modular/Vca2.cpp
-  Source/Modular/Eg1.cpp
-  Source/Modular/Mg.cpp
-  Source/Modular/Vco.cpp
-  Source/Modular/Eg2.cpp
-  Source/Modular/Ring.cpp
-  Source/Modular/Divider.cpp
-  Source/Modular/Inverter.cpp
-  Source/Modular/Integrator.cpp
-  Source/Modular/Mixer.cpp
-  Source/Modular/SampleHold.cpp
-  Source/UI/PatchBayLogic.cpp
-  Source/UI/PatchBayView.cpp)
+target_sources(RoninProcessorTests PRIVATE Source/Tests/ProcessorTests.cpp ${RONIN_PLUGIN_SOURCES} ${RONIN_ENGINE_SOURCES})
 
 target_include_directories(RoninProcessorTests PRIVATE Source)
 target_link_libraries(RoninProcessorTests PRIVATE jidai::common)
@@ -221,3 +158,55 @@ target_link_libraries(RoninProcessorTests PRIVATE
   juce::juce_audio_utils
   juce::juce_recommended_config_flags
   juce::juce_recommended_warning_flags)
+
+# RONIN_STRICT_WARNINGS: the JIDAI rack's warning set on RONIN's own sources, as errors. JUCE's recommended warning
+# flags plus -Wfloat-equal -Wimplicit-int-float-conversion (clang only; g++ has no such flag) -Wshadow -Wconversion
+# -Wdouble-promotion -Werror. JUCE, its generated headers and vendored jidai-common are SYSTEM includes, so only
+# RONIN code is checked; JUCE's own module .cpp files keep their normal flags. Check:
+#   cmake -B build-strict -DRONIN_STRICT_WARNINGS=ON && cmake --build build-strict
+option(RONIN_STRICT_WARNINGS "Build RONIN sources with the JIDAI rack warning set as errors" OFF)
+
+if(RONIN_STRICT_WARNINGS)
+  if(CMAKE_VERSION VERSION_LESS 3.25)
+    message(FATAL_ERROR "RONIN_STRICT_WARNINGS needs CMake 3.25+ (SYSTEM target property for JUCE headers)")
+  endif()
+
+  foreach(dep jidai_common RoninPanelAssets
+      juce_core juce_events juce_data_structures juce_graphics juce_gui_basics juce_gui_extra
+      juce_audio_basics juce_audio_devices juce_audio_formats juce_audio_processors juce_audio_utils
+      juce_audio_plugin_client juce_audio_plugin_client_VST3)
+    if(TARGET ${dep})
+      get_target_property(ronin_dep_aliased ${dep} ALIASED_TARGET)
+      if(ronin_dep_aliased)
+        set_target_properties(${ronin_dep_aliased} PROPERTIES SYSTEM TRUE)
+      else()
+        set_target_properties(${dep} PROPERTIES SYSTEM TRUE)
+      endif()
+    endif()
+  endforeach()
+
+  # juce_add_plugin / gui_app / console_app put their generated JuceLibraryCode dir on the target itself.
+  foreach(target Ronin RoninPanelProbe RoninProcessorTests)
+    get_target_property(ronin_gen_dirs ${target} INCLUDE_DIRECTORIES)
+    foreach(dir ${ronin_gen_dirs})
+      if(dir MATCHES "JuceLibraryCode")
+        target_include_directories(${target} SYSTEM PRIVATE ${dir})
+      endif()
+    endforeach()
+  endforeach()
+
+  target_link_libraries(RoninTests PRIVATE juce::juce_recommended_warning_flags)
+
+  set(RONIN_RACK_WARNING_FLAGS
+    -Wfloat-equal
+    $<$<CXX_COMPILER_ID:Clang,AppleClang>:-Wimplicit-int-float-conversion>
+    -Wshadow
+    -Wconversion
+    -Wdouble-promotion
+    -Werror)
+
+  set_source_files_properties(
+      ${RONIN_ENGINE_SOURCES} ${RONIN_PLUGIN_SOURCES} ${RONIN_UNIT_TEST_SOURCES}
+      Source/Tests/ProcessorTests.cpp tools/PanelProbe.cpp
+    PROPERTIES COMPILE_OPTIONS "${RONIN_RACK_WARNING_FLAGS}")
+endif()

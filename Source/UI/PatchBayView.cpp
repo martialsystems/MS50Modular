@@ -458,7 +458,7 @@ public:
 
             const auto paint = paintFor (rows[i].color);
             g.setColour (rows[i].isNew ? paint.base.withAlpha (0.5f) : paint.base);
-            g.fillEllipse (row.getX() + 8.0f, row.getCentreY() - 6.0f, 12.0f, 12.0f);
+            g.fillEllipse (static_cast<float> (row.getX()) + 8.0f, static_cast<float> (row.getCentreY()) - 6.0f, 12.0f, 12.0f);
             g.setColour (juce::Colour (0xffd8d2bd));
             g.drawText (rows[i].text, row.getX() + 28, row.getY(), row.getWidth() - 36, row.getHeight(),
                         juce::Justification::centredLeft, true);
@@ -469,7 +469,7 @@ public:
     {
         dragRow = rowAt (event.y);
         dragMoved = false;
-        dragY = event.y;
+        dragY = static_cast<float> (event.y);
         if (dragRow >= 0 && rows[dragRow].isNew)
             dragRow = -2;
     }
@@ -478,7 +478,7 @@ public:
     {
         if (dragRow < 0)
             return;
-        if (! dragMoved && std::abs (event.y - dragY) < 4.0f)
+        if (! dragMoved && std::abs (static_cast<float> (event.y) - dragY) < 4.0f)
             return;
 
         dragMoved = true;

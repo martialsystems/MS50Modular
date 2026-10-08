@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
+#include "Modular/FloatCompare.h"
+#include "Tests/TestSuite.h"
 #include "Modular/Noise.h"
 #include "Modular/OutputModule.h"
 #include "Modular/PatchGraph.h"
@@ -96,8 +98,8 @@ int testMeterFollowsSelectedJack()
     const float selected = graph.portVolts (meter.readingModule (outputIndex), meter.readingPort (2));
     check (std::fabs (selected - (-4.0f)) < 1.0e-5f, "the needle follows the selected jack");
     check (std::fabs (Meter::needle (selected) - (-0.8f)) < 1.0e-5f, "-4 V is -0.8 of full scale");
-    check (Meter::needle (9.0f) == 1.0f, "+full scale stops at +1");
-    check (Meter::needle (-9.0f) == -1.0f, "-full scale stops at -1");
+    check (ronin::exactlyEqual (Meter::needle (9.0f), 1.0f), "+full scale stops at +1");
+    check (ronin::exactlyEqual (Meter::needle (-9.0f), -1.0f), "-full scale stops at -1");
     check (graph.cableCount() == cables, "selecting a source adds no cable");
 
     graph.prepare (48000.0);

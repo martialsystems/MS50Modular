@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
+#include "Modular/FloatCompare.h"
+#include "Tests/TestSuite.h"
 #include "Modular/DefaultPatch.h"
 #include "Modular/EffectSwitch.h"
 #include "Modular/Eg1.h"
@@ -137,8 +139,8 @@ int testOutputMixBlendsWet()
     check (mix.knob == FaceKnob::OutputMix, "output mix is a host knob");
     check (std::strcmp (mix.parameterId, "outputMix") == 0, "parameter id");
     check (std::strcmp (mix.parameterName, "Output Mix") == 0, "parameter name");
-    check (mix.minimum == 0.0f && mix.maximum == 1.0f, "travel stays 0 to 1");
-    check (mix.fallback == 1.0f, "default mix is the patch");
+    check (ronin::exactlyEqual (mix.minimum, 0.0f) && ronin::exactlyEqual (mix.maximum, 1.0f), "travel stays 0 to 1");
+    check (ronin::exactlyEqual (mix.fallback, 1.0f), "default mix is the patch");
     check (mix.index != 0 && mix.index != 1, "not an output preset knob");
     check (mix.knob != level.knob, "mix is not output level");
     check (std::strcmp (level.parameterId, "outputLevel") == 0, "level id stays");
@@ -205,11 +207,11 @@ int testOutputMixBlendsWet()
 
 int testEffectOnIsWet()
 {
-    check (outputMixAfterSwitch (false, 0.0f) == 0.0f, "off at mix 0 is dry");
-    check (outputMixAfterSwitch (false, 1.0f) == 0.0f, "off at mix 1 is dry");
-    check (outputMixAfterSwitch (true, 0.0f) == 0.0f, "on at mix 0 is dry");
-    check (outputMixAfterSwitch (true, 1.0f) == 1.0f, "on at mix 1 is the patch");
-    check (outputMixForEffect (false) == 0.0f && outputMixForEffect (true) == 1.0f,
+    check (ronin::exactlyEqual (outputMixAfterSwitch (false, 0.0f), 0.0f), "off at mix 0 is dry");
+    check (ronin::exactlyEqual (outputMixAfterSwitch (false, 1.0f), 0.0f), "off at mix 1 is dry");
+    check (ronin::exactlyEqual (outputMixAfterSwitch (true, 0.0f), 0.0f), "on at mix 0 is dry");
+    check (ronin::exactlyEqual (outputMixAfterSwitch (true, 1.0f), 1.0f), "on at mix 1 is the patch");
+    check (ronin::exactlyEqual (outputMixForEffect (false), 0.0f) && ronin::exactlyEqual (outputMixForEffect (true), 1.0f),
            "default knob is dry off and wet on");
 
     constexpr float kDryL = 0.40f;

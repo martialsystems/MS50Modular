@@ -2,6 +2,8 @@
 
 #include "Mixer.h"
 
+#include "FloatCompare.h"
+
 #include <cmath>
 
 namespace {
@@ -80,7 +82,7 @@ void Mixer::processSample()
     for (int i = 0; i < 3; ++i)
     {
         const float level = levelSmooth_[i].next();
-        if (level == 0.0f)
+        if (ronin::exactlyEqual (level, 0.0f))
             continue;
         const float sample = std::isfinite (input[i]) ? input[i] : 0.0f;
         sum += sample * level;

@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
+#include "Modular/FloatCompare.h"
+#include "Tests/TestSuite.h"
 #include "Modular/ExtIn.h"
 #include "Modular/Noise.h"
 #include "Modular/OutputModule.h"
@@ -75,13 +77,13 @@ int testNoiseBothJacksMove()
             firstWhite = white;
             firstPink = pink;
         }
-        if (white != 0.0f)
+        if (! ronin::exactlyEqual (white, 0.0f))
             whiteNonZero = true;
-        if (pink != 0.0f)
+        if (! ronin::exactlyEqual (pink, 0.0f))
             pinkNonZero = true;
-        if (white != firstWhite)
+        if (! ronin::exactlyEqual (white, firstWhite))
             whiteMoved = true;
-        if (pink != firstPink)
+        if (! ronin::exactlyEqual (pink, firstPink))
             pinkMoved = true;
         const float absWhite = std::fabs (white);
         const float absPink = std::fabs (pink);
@@ -121,8 +123,8 @@ int testNoiseBothJacksMove()
     for (int i = 0; i < 32; ++i)
     {
         graph.process();
-        if (patched.portValue[NoiseModule::kWhite] != 0.0f
-            && patched.portValue[NoiseModule::kPink] != 0.0f)
+        if (! ronin::exactlyEqual (patched.portValue[NoiseModule::kWhite], 0.0f)
+            && ! ronin::exactlyEqual (patched.portValue[NoiseModule::kPink], 0.0f))
             running = true;
     }
     check (running, "noise runs with no cable");
@@ -139,13 +141,13 @@ int testNoiseBothJacksMove()
         graph.process();
         const float left = output.hostLeft();
         const float right = output.hostRight();
-        if (! finiteSample (left) || ! finiteSample (right) || left != right)
+        if (! finiteSample (left) || ! finiteSample (right) || ! ronin::exactlyEqual (left, right))
             hostMono = false;
         if (i == 0)
             firstHost = left;
-        if (left != 0.0f)
+        if (! ronin::exactlyEqual (left, 0.0f))
             hostNonZero = true;
-        if (left != firstHost)
+        if (! ronin::exactlyEqual (left, firstHost))
             hostMoved = true;
     }
     check (hostMono, "wet white is finite and mono");
@@ -170,7 +172,7 @@ int testNoiseBothJacksMove()
         graph.process();
         if (i == 0)
             firstPinkHost = output.hostLeft();
-        if (output.hostLeft() != firstPinkHost)
+        if (! ronin::exactlyEqual (output.hostLeft(), firstPinkHost))
             pinkHostMoved = true;
     }
     check (pinkHostMoved, "wet pink moves the host");
@@ -194,8 +196,8 @@ int testNoiseSeedRepeats()
     {
         first.processSample();
         second.processSample();
-        check (first.portValue[NoiseModule::kWhite] == second.portValue[NoiseModule::kWhite], "white matches");
-        check (first.portValue[NoiseModule::kPink] == second.portValue[NoiseModule::kPink], "pink matches");
+        check (ronin::exactlyEqual (first.portValue[NoiseModule::kWhite], second.portValue[NoiseModule::kWhite]), "white matches");
+        check (ronin::exactlyEqual (first.portValue[NoiseModule::kPink], second.portValue[NoiseModule::kPink]), "pink matches");
     }
 
     NoiseModule restarted;
@@ -205,8 +207,8 @@ int testNoiseSeedRepeats()
     {
         first.processSample();
         restarted.processSample();
-        check (first.portValue[NoiseModule::kWhite] == restarted.portValue[NoiseModule::kWhite], "prepare reseeds white");
-        check (first.portValue[NoiseModule::kPink] == restarted.portValue[NoiseModule::kPink], "prepare clears pink");
+        check (ronin::exactlyEqual (first.portValue[NoiseModule::kWhite], restarted.portValue[NoiseModule::kWhite]), "prepare reseeds white");
+        check (ronin::exactlyEqual (first.portValue[NoiseModule::kPink], restarted.portValue[NoiseModule::kPink]), "prepare clears pink");
     }
 
     return finish ("testNoiseSeedRepeats");
@@ -269,8 +271,8 @@ int testNoiseHasNoKnobs()
     {
         noise.processSample();
         untouched.processSample();
-        check (noise.portValue[NoiseModule::kWhite] == untouched.portValue[NoiseModule::kWhite], "setKnob leaves white");
-        check (noise.portValue[NoiseModule::kPink] == untouched.portValue[NoiseModule::kPink], "setKnob leaves pink");
+        check (ronin::exactlyEqual (noise.portValue[NoiseModule::kWhite], untouched.portValue[NoiseModule::kWhite]), "setKnob leaves white");
+        check (ronin::exactlyEqual (noise.portValue[NoiseModule::kPink], untouched.portValue[NoiseModule::kPink]), "setKnob leaves pink");
     }
 
     return finish ("testNoiseHasNoKnobs");

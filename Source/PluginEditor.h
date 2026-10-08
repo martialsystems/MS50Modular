@@ -20,7 +20,7 @@ public:
     void resized() override;
 
     static constexpr int kDefaultWidth = 1280;
-    static int heightForWidth (int width) noexcept { return juce::roundToInt (width * (564.0 + ronin_ui::kStripH) / 1600.0); }
+    static int heightForWidth (int width) noexcept { return juce::roundToInt (width * (564.0 + static_cast<double> (ronin_ui::kStripH)) / 1600.0); }
 
     void showTab (ronin_ui::Tab tab);
     ronin_ui::Tab currentTab() const noexcept { return strip.current(); }

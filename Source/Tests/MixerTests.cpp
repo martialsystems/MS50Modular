@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Martial Systems LLC. All rights reserved.
 
+#include "Modular/FloatCompare.h"
+#include "Tests/TestSuite.h"
 #include "Modular/Mixer.h"
 #include "Modular/Noise.h"
 #include "Modular/OutputModule.h"
@@ -65,9 +67,9 @@ int testMixerSumsThree()
     const FaceKnobBinding level1 = faceKnobBinding ("MIX", "LEVEL 1");
     const FaceKnobBinding level2 = faceKnobBinding ("MIX", "LEVEL 2");
     const FaceKnobBinding level3 = faceKnobBinding ("MIX", "LEVEL 3");
-    check (level1.knob == FaceKnob::MixerLevel1 && level1.index == 0 && level1.fallback == 0.8f, "level 1 host");
-    check (level2.knob == FaceKnob::MixerLevel2 && level2.index == 1 && level2.fallback == 0.8f, "level 2 host");
-    check (level3.knob == FaceKnob::MixerLevel3 && level3.index == 2 && level3.fallback == 0.8f, "level 3 host");
+    check (level1.knob == FaceKnob::MixerLevel1 && level1.index == 0 && ronin::exactlyEqual (level1.fallback, 0.8f), "level 1 host");
+    check (level2.knob == FaceKnob::MixerLevel2 && level2.index == 1 && ronin::exactlyEqual (level2.fallback, 0.8f), "level 2 host");
+    check (level3.knob == FaceKnob::MixerLevel3 && level3.index == 2 && ronin::exactlyEqual (level3.fallback, 0.8f), "level 3 host");
     check (std::strcmp (level1.parameterId, "mixerLevel1") == 0, "level 1 id");
     check (std::strcmp (level1.parameterName, "Mixer Level 1") == 0, "level 1 name");
     check (std::strcmp (level2.parameterName, "Mixer Level 2") == 0, "level 2 name");
@@ -84,9 +86,9 @@ int testMixerSumsThree()
     check (kPanelJacks[in2].module == 15 && kPanelJacks[in2].port == 1 && kPanelJacks[in2].dir == 0, "in 2");
     check (kPanelJacks[in3].module == 15 && kPanelJacks[in3].port == 2 && kPanelJacks[in3].dir == 0, "in 3");
     check (kPanelJacks[out].module == 15 && kPanelJacks[out].port == 3 && kPanelJacks[out].dir == 1, "out");
-    check (kPanelKnobs[panelKnobIndex ("MIX", "LEVEL 1")].valueDefault == 0.8f, "level 1 faceplate");
-    check (kPanelKnobs[panelKnobIndex ("MIX", "LEVEL 2")].valueDefault == 0.8f, "level 2 faceplate");
-    check (kPanelKnobs[panelKnobIndex ("MIX", "LEVEL 3")].valueDefault == 0.8f, "level 3 faceplate");
+    check (ronin::exactlyEqual (kPanelKnobs[panelKnobIndex ("MIX", "LEVEL 1")].valueDefault, 0.8f), "level 1 faceplate");
+    check (ronin::exactlyEqual (kPanelKnobs[panelKnobIndex ("MIX", "LEVEL 2")].valueDefault, 0.8f), "level 2 faceplate");
+    check (ronin::exactlyEqual (kPanelKnobs[panelKnobIndex ("MIX", "LEVEL 3")].valueDefault, 0.8f), "level 3 faceplate");
 
     PanelLink refused;
     check (orientPanelJacks (white, in1, 0, 1, 2, refused) == PanelLinkResult::Unmapped,
@@ -131,7 +133,7 @@ int testMixerIsInverted()
     drive (mixer, -0.5f, 4.0f, 4.0f);
     check (std::fabs (mixer.portValue[Mixer::kOut] - 0.5f) < 1.0e-5f, "negative input leaves positive");
     drive (mixer, 0.0f, 3.0f, -3.0f);
-    check (mixer.portValue[Mixer::kOut] == 0.0f, "zero input stays zero");
+    check (ronin::exactlyEqual (mixer.portValue[Mixer::kOut], 0.0f), "zero input stays zero");
     return finish ("testMixerIsInverted");
 }
 

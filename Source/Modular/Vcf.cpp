@@ -15,9 +15,8 @@ constexpr double kIs = 2.52e-9;
 constexpr double kN = 1.752;
 constexpr double kVt = 0.02585;
 constexpr double kBridgeC = 22.0e-9;
-// RONIN_Redesign §5.13b (N13, DECIDED by the user): 0.012 -> 0.004. A 1 kHz knob with a 2.5 V mean input now
+// RONIN_Redesign §5.13b (N13, DECIDED by the user): Vcf::kInputPull 0.012 -> 0.004. A 1 kHz knob with a 2.5 V mean input now
 // droops to 801.8 Hz (was 515.4 Hz). User-saved format-1 patches get cutoff compensation on load (M-R5).
-constexpr double kInputPull = Vcf::kInputPull;
 constexpr double kDiodeVolts = 5.0;
 
 void flushState (double& state)

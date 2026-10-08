@@ -2,6 +2,7 @@
 // RONIN_Redesign §3.2, §5 items 4-5. Numbers from jidai-audit/verify/verify_ronin.py
 // (proposed_tri_polyblamp, vco_tri_shape, vco_saw_alias_dB_below_signal_in_0_20kHz).
 
+#include "Tests/TestSuite.h"
 #include "Modular/Jcs.h"
 #include "Modular/Vco.h"
 #include "Spectrum.h"
@@ -46,7 +47,7 @@ std::vector<double> render (Vco& vco, double hz, int samples, int port)
         vco.portValue[Vco::kFreqB] = 0.0f;
         vco.portValue[Vco::kPwm] = 0.0f;
         vco.processSample();
-        out[static_cast<size_t> (i)] = vco.portValue[port];
+        out[static_cast<size_t> (i)] = static_cast<double> (vco.portValue[port]);
     }
     return out;
 }
@@ -199,7 +200,7 @@ int testHzvJackRoleLin()
     Vco ref;
     ref.prepare (48000.0);
     ref.processSample();
-    const double footage = Vco::footageHzFor (ref.activeScaleIndex());
+    const double footage = static_cast<double> (Vco::footageHzFor (ref.activeScaleIndex()));
     const double one = hzAt (1.0f);
     std::printf ("  footage %.4f Hz, 1 V -> %.4f Hz\n", footage, one);
     check (std::fabs (one / footage - 1.0) < 1.0e-4, "1 V plays the footage reference (f = footage * V)");

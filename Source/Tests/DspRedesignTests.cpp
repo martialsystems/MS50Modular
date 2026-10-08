@@ -2,6 +2,8 @@
 // RONIN_Redesign §5 items 6-10, 13-14: HQ decimator, MG polyBLEP, smoothing, integrator, Schmitt inputs,
 // VCF caching and drive pull, EXT IN gate hysteresis.
 
+#include "Modular/FloatCompare.h"
+#include "Tests/TestSuite.h"
 #include <jidai/dsp/Halfband.h>
 
 #include <cmath>
@@ -82,7 +84,7 @@ int testHalfbandSpec()
     bool exact = true;
     for (int k = 0; k < kHbTaps; ++k)
     {
-        if (k != kHbCentre && (k % 2) == 0 && hbTap (k) != 0.0)
+        if (k != kHbCentre && (k % 2) == 0 && ! ronin::exactlyEqual (hbTap (k), 0.0))
             exact = false;
         if (std::not_equal_to<double>() (hbTap (k), hbTap (kHbTaps - 1 - k)))
             exact = false;
@@ -138,8 +140,8 @@ int testMgPolyBlep()
         mg.portValue[MgModule::kFreqMod] = 0.0f;
         mg.portValue[MgModule::kPwm] = 0.0f;
         mg.processSample();
-        pulse[i] = mg.portValue[MgModule::kPulse] - 2.5;
-        saw[i] = mg.portValue[MgModule::kSawUp];
+        pulse[i] = static_cast<double> (mg.portValue[MgModule::kPulse]) - 2.5;
+        saw[i] = static_cast<double> (mg.portValue[MgModule::kSawUp]);
         lo = std::fmin (lo, mg.portValue[MgModule::kPulse]);
         hi = std::fmax (hi, mg.portValue[MgModule::kPulse]);
     }
@@ -221,8 +223,8 @@ int testKnobSmoothing()
     check (std::fabs (mixAtTau - 0.8f * std::exp (-1.0f)) < 0.002f, "mixer level is a 10 ms one-pole");
     for (int i = 0; i < 9600; ++i)
         mixer.processSample();
-    check (mixer.portValue[Mixer::kOut] == 0.0f, "mixer level lands exactly on 0");
-    check (mixer.presetKnob (Mixer::kKnobLevel1) == 0.0f, "the stored knob is the target");
+    check (ronin::exactlyEqual (mixer.portValue[Mixer::kOut], 0.0f), "mixer level lands exactly on 0");
+    check (ronin::exactlyEqual (mixer.presetKnob (Mixer::kKnobLevel1), 0.0f), "the stored knob is the target");
 
     // Output level: a level jump does not step the host output.
     OutputModule out;
@@ -252,8 +254,8 @@ int testKnobSmoothing()
     for (int i = 0; i < static_cast<int> (0.005 * rate); ++i)
         vcf.processSample();
     const double expected = 20.0 * std::pow (900.0, 1.0 - std::exp (-1.0));
-    std::printf ("  vcf at tau %.1f Hz (log-domain expects %.1f)\n", vcf.effectiveHz(), expected);
-    check (std::fabs (std::log2 (vcf.effectiveHz() / expected)) < 0.02, "cutoff ramp is log-domain, 5 ms");
+    std::printf ("  vcf at tau %.1f Hz (log-domain expects %.1f)\n", static_cast<double> (vcf.effectiveHz()), expected);
+    check (std::fabs (std::log2 (static_cast<double> (vcf.effectiveHz()) / expected)) < 0.02, "cutoff ramp is log-domain, 5 ms");
     for (int i = 0; i < 9600; ++i)
         vcf.processSample();
     check (std::fabs (vcf.effectiveHz() - 18000.0f) < 1.0f, "cutoff lands on 18 kHz");
@@ -289,11 +291,11 @@ int testIntegratorDoubleFlushCached()
     {
         in.processSample();
         const double s = in.state();
-        if (s != 0.0 && std::fabs (s) < 1.0e-15)
+        if (! ronin::exactlyEqual (s, 0.0) && std::fabs (s) < 1.0e-15)
             subnormal = true;
     }
     check (! subnormal, "no state below 1e-15 V");
-    check (in.state() == 0.0 && in.portValue[Integrator::kOut] == 0.0f, "decay lands exactly on 0");
+    check (ronin::exactlyEqual (in.state(), 0.0) && ronin::exactlyEqual (in.portValue[Integrator::kOut], 0.0f), "decay lands exactly on 0");
     return finish ("testIntegratorDoubleFlushCached");
 }
 
@@ -341,7 +343,7 @@ int testSchmittInputs()
         sh.portValue[SampleHold::kExtClock] = sig[i];
         const float before = sh.portValue[SampleHold::kOut];
         sh.processSample();
-        if (sh.portValue[SampleHold::kOut] != before)
+        if (! ronin::exactlyEqual (sh.portValue[SampleHold::kOut], before))
             ++takes;
         const bool clock = sh.portValue[SampleHold::kClockOut] > 2.5f;
         if (clock && ! lastClock)
@@ -361,7 +363,7 @@ int testSchmittInputs()
     {
         div.portValue[Divider::kIn] = v;
         div.processSample();
-        if (div.portValue[Divider::kDiv2] != last)
+        if (! ronin::exactlyEqual (div.portValue[Divider::kDiv2], last))
             ++toggles;
         last = div.portValue[Divider::kDiv2];
     }
@@ -371,10 +373,10 @@ int testSchmittInputs()
     Divider d;
     d.prepare (48000.0);
     auto feed = [&d] (float v) { d.portValue[Divider::kIn] = v; d.processSample(); return d.portValue[Divider::kDiv2]; };
-    check (feed (1.0f) == 0.0f, "1.0 V does not trigger");
-    check (feed (1.01f) == 5.0f, "> 1.0 V triggers, Div2 goes to 5 V");
-    check (feed (0.6f) == 5.0f && feed (1.5f) == 5.0f, "no retrigger above 0.5 V");
-    check (feed (0.49f) == 5.0f && feed (1.5f) == 0.0f, "below 0.5 V re-arms");
+    check (ronin::exactlyEqual (feed (1.0f), 0.0f), "1.0 V does not trigger");
+    check (ronin::exactlyEqual (feed (1.01f), 5.0f), "> 1.0 V triggers, Div2 goes to 5 V");
+    check (ronin::exactlyEqual (feed (0.6f), 5.0f) && ronin::exactlyEqual (feed (1.5f), 5.0f), "no retrigger above 0.5 V");
+    check (ronin::exactlyEqual (feed (0.49f), 5.0f) && ronin::exactlyEqual (feed (1.5f), 0.0f), "below 0.5 V re-arms");
     return finish ("testSchmittInputs");
 }
 
@@ -382,7 +384,7 @@ int testSchmittInputs()
 
 int testDrivePull()
 {
-    check (Vcf::kInputPull == 0.004, "kInputPull == 0.004");
+    check (ronin::exactlyEqual (Vcf::kInputPull, 0.004), "kInputPull == 0.004");
     const double hz = Vcf::effectiveHzFor (1000.0, 2.5, Vcf::kInputPull);
     std::printf ("  1 kHz knob, 2.5 V mean: %.2f Hz (legacy %.2f Hz)\n", hz,
                  Vcf::effectiveHzFor (1000.0, 2.5, Vcf::kLegacyInputPull));
@@ -399,7 +401,7 @@ int testDrivePull()
         vcf.portValue[Vcf::kSigIn] = (i / 24) % 2 == 0 ? 2.5f : -2.5f;   // 1 kHz square, mean |x| = 2.5 V
         vcf.processSample();
     }
-    std::printf ("  running VCF effective cutoff %.2f Hz\n", vcf.effectiveHz());
+    std::printf ("  running VCF effective cutoff %.2f Hz\n", static_cast<double> (vcf.effectiveHz()));
     check (std::fabs (vcf.effectiveHz() - 801.8f) < 1.0f, "the running VCF droops to 801.8 Hz");
 
     // Rate-independent law (coefficients cached in prepare): same effective cutoff at 96 kHz.
@@ -456,10 +458,10 @@ int testExtInGateHysteresis()
         }
         return quiet.portValue[3];
     };
-    check (run (1.1f * th, 4800) == 0.0f, "opens above the threshold (0 V held)");
-    check (run (0.8f * th, 4800) == 0.0f, "stays open at 0.8 x threshold");
-    check (run (0.6f * th, 4800) == 5.0f, "closes below 0.7 x threshold (+5 V released)");
-    check (run (0.9f * th, 4800) == 5.0f, "does not reopen below the threshold");
+    check (ronin::exactlyEqual (run (1.1f * th, 4800), 0.0f), "opens above the threshold (0 V held)");
+    check (ronin::exactlyEqual (run (0.8f * th, 4800), 0.0f), "stays open at 0.8 x threshold");
+    check (ronin::exactlyEqual (run (0.6f * th, 4800), 5.0f), "closes below 0.7 x threshold (+5 V released)");
+    check (ronin::exactlyEqual (run (0.9f * th, 4800), 5.0f), "does not reopen below the threshold");
     return finish ("testExtInGateHysteresis");
 }
 

@@ -55,7 +55,7 @@ juce::MemoryBlock saveState (RoninAudioProcessor& p)
 
 }
 
-void testHqDefaultOff()
+static void testHqDefaultOff()
 {
     RoninAudioProcessor p;
     check (p.hqParameter() != nullptr && ! p.hqParameter()->get(), "HQ parameter defaults OFF");
@@ -81,7 +81,7 @@ void testHqDefaultOff()
     finish ("testHqDefaultOff");
 }
 
-void testHqLatencyIsTwentyThree()
+static void testHqLatencyIsTwentyThree()
 {
     // EXT IN L -> OUTPUT L dry path: an impulse comes out 23 samples later with HQ on, 0 with HQ off.
     for (bool hq : { false, true })
@@ -118,7 +118,7 @@ void testHqLatencyIsTwentyThree()
     finish ("testHqLatencyIsTwentyThree");
 }
 
-void testTriDefaultFreshAndInit()
+static void testTriDefaultFreshAndInit()
 {
     RoninAudioProcessor p;
     check (p.triShape() == Vco::TriShape::Triangle, "a fresh instance is on TRIANGLE");
@@ -176,7 +176,7 @@ double cents (double a, double b) { return 1200.0 * std::log2 (a / b); }
 
 }
 
-void testTriDefaultByOrigin()
+static void testTriDefaultByOrigin()
 {
     RoninAudioProcessor fresh;
     check (fresh.triShape() == Vco::TriShape::Triangle, "fresh instance -> TRIANGLE");
@@ -208,7 +208,7 @@ void testTriDefaultByOrigin()
     finish ("testTriDefaultByOrigin");
 }
 
-void testParabolaSelectable()
+static void testParabolaSelectable()
 {
     RoninAudioProcessor p;
     p.triShapeParameter()->setValueNotifyingHost (1.0f);
@@ -221,7 +221,7 @@ void testParabolaSelectable()
     finish ("testParabolaSelectable");
 }
 
-void testUserPatchCutoffCompensation()
+static void testUserPatchCutoffCompensation()
 {
     RoninAudioProcessor layout;
     const int vco = layout.vcoGraphIndex();
@@ -231,7 +231,7 @@ void testUserPatchCutoffCompensation()
         RoninAudioProcessor p;
         const auto v1 = makeV1State (p, { Cable { vco, Vco::kSaw, vcf, Vcf::kSigIn } }, { { "vcfCutoff", 0.45 } });
         p.setStateInformation (v1.getData(), static_cast<int> (v1.getSize()));
-        const double now = param01 (p, "VCF", "CUTOFF");
+        const double now = static_cast<double> (param01 (p, "VCF", "CUTOFF"));
         const double oldHz = Vcf::effectiveHzFor (Vcf::knobHzFor (0.45), 2.5, Vcf::kLegacyInputPull);
         const double newHz = Vcf::effectiveHzFor (Vcf::knobHzFor (now), 2.5, Vcf::kInputPull);
         std::printf ("  saw: cutoff 0.45 -> %.4f, %.1f Hz vs %.1f Hz (%.3f c)\n", now, newHz, oldHz, cents (newHz, oldHz));
@@ -243,7 +243,7 @@ void testUserPatchCutoffCompensation()
         RoninAudioProcessor p;
         const auto v1 = makeV1State (p, { Cable { vco, Vco::kPulse, vcf, Vcf::kSigIn } }, { { "vcfCutoff", 0.45 } });
         p.setStateInformation (v1.getData(), static_cast<int> (v1.getSize()));
-        const double now = param01 (p, "VCF", "CUTOFF");
+        const double now = static_cast<double> (param01 (p, "VCF", "CUTOFF"));
         check (std::fabs ((now - 0.45) + 0.130) < 0.002, "VCO PULSE -> VCF IN: delta c ~ -0.130");
     }
     {
@@ -266,7 +266,7 @@ void testUserPatchCutoffCompensation()
     finish ("testUserPatchCutoffCompensation");
 }
 
-void testFormat1MigrationEgAndLegacyInvert()
+static void testFormat1MigrationEgAndLegacyInvert()
 {
     RoninAudioProcessor p;
     const int eg2 = p.eg2GraphIndex();
@@ -304,7 +304,7 @@ void testFormat1MigrationEgAndLegacyInvert()
     finish ("testFormat1MigrationEgAndLegacyInvert");
 }
 
-void testFormat2Xml()
+static void testFormat2Xml()
 {
     RoninAudioProcessor p;
     const auto state = saveState (p);
@@ -398,7 +398,7 @@ juce::MemoryBlock withPrefix (const juce::MemoryBlock& state, const juce::String
 
 }
 
-void testSlashJackIdsStateRoundTrip()
+static void testSlashJackIdsStateRoundTrip()
 {
     // JCS R6 ids whose LABEL contains '/' (VCO:HZ/V, VCO:V/OCT, DIV:/2, DIV:/4) save and load through the shared
     // jidai-common parser in the bare, RONIN/ and RONIN#N/ forms.

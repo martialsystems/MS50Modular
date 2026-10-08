@@ -2,6 +2,7 @@
 // JCS R6 jack ids through the shared jidai-common parser: every RONIN id whose SECTION or LABEL contains '/'
 // (VCO:HZ/V, VCO:V/OCT, DIV:/2, DIV:/4) round-trips in the bare, RONIN/ and RONIN#N/ forms.
 
+#include "Tests/TestSuite.h"
 #include "Modular/Divider.h"
 #include "Modular/Eg1.h"
 #include "Modular/Eg2.h"

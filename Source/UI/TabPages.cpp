@@ -306,7 +306,7 @@ void VoicePage::paintPage (juce::Graphics& g)
 
     // VCO: tuner, TRI SHAPE, footage reference.
     const auto& osc = processor.vcoModule();
-    const double hz = osc.lastHz();
+    const double hz = static_cast<double> (osc.lastHz());
     lcd (g, { 140, 90, 280, 40 }, str (knobunits::noteName (hz)), 20.0f);
     lcd (g, { 180, 140, 200, 26 }, juce::String (hz, 2) + " Hz", 13.0f);
     text (g, { 60, 170, 440, 18 }, "TUNER (HZ/V LIN or V/OCT path)", 10.0f, kDim);
@@ -348,7 +348,7 @@ void VoicePage::paintPage (juce::Graphics& g)
     text (g, { 1100, 150, 440, 30 },
           "a 2.5 V input pulls the cutoff " + juce::String (newOct, 2) + " oct (was " + juce::String (oldOct, 2)
               + " at 0.012)", 9.5f, kDim);
-    lcd (g, { 1200, 220, 240, 30 }, "CUTOFF " + str (knobunits::hz (filter.effectiveHz())), 14.0f);
+    lcd (g, { 1200, 220, 240, 30 }, "CUTOFF " + str (knobunits::hz (static_cast<double> (filter.effectiveHz()))), 14.0f);
     text (g, { 1100, 256, 440, 30 }, "knob + CV + drive pull, live; sample-rate independent", 9.5f, kDim);
 }
 
@@ -364,7 +364,7 @@ float attackShape (float t)   // t in 0..1 of the attack time
 
 float fallShape (float t)
 {
-    return static_cast<float> (std::exp (-std::log (100.0) * t));
+    return static_cast<float> (std::exp (-std::log (100.0) * static_cast<double> (t)));
 }
 
 }
@@ -395,9 +395,9 @@ void EnvPage::paintEg1 (juce::Graphics& g, juce::Rectangle<float> a)
     }
 
     // Live curve: segment widths follow the real times (log-compressed so short segments stay visible).
-    const double at = EgLaw::secondsFor (knob01 (processor, "EG 1", "ATTACK"));
-    const double dt = EgLaw::secondsFor (knob01 (processor, "EG 1", "DECAY"));
-    const double rt = EgLaw::secondsFor (knob01 (processor, "EG 1", "RELEASE"));
+    const double at = EgLaw::secondsFor (static_cast<double> (knob01 (processor, "EG 1", "ATTACK")));
+    const double dt = EgLaw::secondsFor (static_cast<double> (knob01 (processor, "EG 1", "DECAY")));
+    const double rt = EgLaw::secondsFor (static_cast<double> (knob01 (processor, "EG 1", "RELEASE")));
     const float sus = knob01 (processor, "EG 1", "SUSTAIN");
     auto width = [] (double s) { return static_cast<float> (1.0 + std::log10 (1.0 + s * 1000.0)); };
     const float wa = width (at), wd = width (dt), ws = 3.0f, wr = width (rt);
@@ -457,10 +457,10 @@ void EnvPage::paintEg2 (juce::Graphics& g, juce::Rectangle<float> a)
              str (knobunits::realUnits ("EG 2", labels[i], knob01 (processor, "EG 2", labels[i]), ms)), 13.0f);
     }
 
-    const double ht = EgLaw::holdDelaySeconds (knob01 (processor, "EG 2", "HOLD"));
-    const double dl = EgLaw::holdDelaySeconds (knob01 (processor, "EG 2", "DELAY"));
-    const double at = EgLaw::secondsFor (knob01 (processor, "EG 2", "ATTACK"));
-    const double rt = EgLaw::secondsFor (knob01 (processor, "EG 2", "RELEASE"));
+    const double ht = EgLaw::holdDelaySeconds (static_cast<double> (knob01 (processor, "EG 2", "HOLD")));
+    const double dl = EgLaw::holdDelaySeconds (static_cast<double> (knob01 (processor, "EG 2", "DELAY")));
+    const double at = EgLaw::secondsFor (static_cast<double> (knob01 (processor, "EG 2", "ATTACK")));
+    const double rt = EgLaw::secondsFor (static_cast<double> (knob01 (processor, "EG 2", "RELEASE")));
     auto width = [] (double s) { return static_cast<float> (1.0 + std::log10 (1.0 + s * 1000.0)); };
     const float ww = width (ht + dl), wa = width (at), wh = 3.0f, wr = width (rt);
     const float total = ww + wa + wh + wr;
@@ -614,7 +614,7 @@ void PatchPage::paintPage (juce::Graphics& g)
         text (g, { 1160, 120, 380, 30 }, "select a cable", 11.0f, kDim);
     }
     const float outL = processor.jackVolts (processor.outputGraphIndex(), 0) * OutputModule::kVoltsToHost;
-    const juce::String db = std::fabs (outL) > 1.0e-6f ? juce::String (20.0 * std::log10 (std::fabs (outL)), 1) + " dBFS"
+    const juce::String db = std::fabs (outL) > 1.0e-6f ? juce::String (20.0 * static_cast<double> (std::log10 (std::fabs (outL))), 1) + " dBFS"
                                                        : juce::String ("-inf dBFS");
     row (230, "OUTPUT:L (dry in)", jcs::Role::Audio, db, std::fabs (outL) > 1.0f);
     text (g, { 1160, 486, 380, 30 }, "red lamp: |V| > 5.5 V for over 10 ms (JCS R15)", 9.5f, kDim);

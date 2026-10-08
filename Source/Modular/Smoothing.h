@@ -16,13 +16,13 @@ public:
     static constexpr double kCutoffSeconds = 0.005;   // VCF cutoff knob in the log domain, 5 ms
 
     explicit KnobSmoother (float initial = 0.0f, double seconds = kGainSeconds) noexcept
-        : value_ (initial), target_ (initial), seconds_ (seconds) {}
+        : value_ (static_cast<double> (initial)), target_ (initial), seconds_ (seconds) {}
 
     void prepare (double sampleRate) noexcept
     {
         const double rate = sampleRate > 1.0 ? sampleRate : 48000.0;
         coeff_ = -std::expm1 (-1.0 / (seconds_ * rate));
-        value_ = target_;
+        value_ = static_cast<double> (target_);
         fresh_ = true;
     }
 
@@ -30,13 +30,13 @@ public:
     {
         target_ = target;
         if (fresh_)
-            value_ = target;
+            value_ = static_cast<double> (target);
     }
 
     void snap (float value) noexcept
     {
         target_ = value;
-        value_ = value;
+        value_ = static_cast<double> (value);
     }
 
     float next() noexcept
