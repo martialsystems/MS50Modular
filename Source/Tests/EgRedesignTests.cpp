@@ -324,7 +324,7 @@ int testEg2LabelsAndDelayTrig()
         const long width = std::lround (0.001 * rate) > 1 ? std::lround (0.001 * rate) : 1;
         check (pulseLen == width, "DelayTrig lasts max(1, round(0.001 sr)) samples");
         check (std::fabs (pulseStart / rate - 0.010) <= 1.5 / rate, "DelayTrig fires at the end of hold");
-        check (pulseLevel == 1.0f || pulseLevel == 5.0f, "DelayTrig level");
+        check (pulseLevel == 5.0f, "DelayTrig is a 5 V pulse (JCS R2)");
         const double T = EgLaw::secondsFor (0.5);
         check (attackStart > 0 && std::fabs ((peakAt - attackStart + 1) / rate - T) <= 2.0 / rate,
                "EG 2 attack takes its label time");

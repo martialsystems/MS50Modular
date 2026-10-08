@@ -172,7 +172,7 @@ void Eg2::processSample()
     portValue[kOutNeg] = -out;
     if (delayLeft_ > 0)
     {
-        portValue[kDelayTrig] = 1.0f;
+        portValue[kDelayTrig] = jcs::kGateHigh;   // §5.11 (N11): a JCS R2 5 V pulse (was 1.0 V)
         --delayLeft_;
     }
     else
