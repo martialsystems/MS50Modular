@@ -13,8 +13,10 @@ One table, `Source/Modular/PanelDefaults.h`, feeds the host parameters, `panel/a
 *   VCA 1: Initial 0, Mod 0.85, Low Cut 0. Initial 0 means EG 1 (or whatever is on Env) still controls the VCA. Initial above 0 passes audio with no gate.
 *   VCA 2: Initial 0, Mod 1. Gain is `clamp01(CV / 5 V + Initial) * Mod`, so these defaults are the plain CV law.
 *   MG: Rate 0.5, PW 0.5.
-*   EG 1: Attack 0.05, Decay 0.3, Sustain 0.6, Release 0.3.
-*   EG 2: Hold 0.3, Delay 0, Attack 0.05, Release 0.3.
+*   EG 1: Attack 0.2079 (9.85 ms), Decay 0.39 (73 ms), Sustain 0.6, Release 0.39 (73 ms).
+*   EG 2: Hold 0.3, Delay 0, Attack 0.2079 (9.85 ms), Release 0.39 (73 ms).
+
+EG time knobs read in real time, 1 ms to 60 s (RONIN_Redesign §3.1). The EG values are the earlier 0.05 / 0.3 defaults passed through migration M-R1, so INIT keeps its envelope timing.
 *   S&H Rate 0.5. Integrator Time 0.5. Mixer Level 1, 2 and 3 at 0.8. Output Mix 1. Output Level 0.7 (unity).
 *   Divider switch /2. It has two positions, /2 and /4, and is saved with the session. The /2 and /4 jacks both always run. There is no /16.
 

@@ -136,11 +136,12 @@ int testEg1ReleasesWhenTriggerLifts()
     eg.portValue[Eg1::kTrig] = 5.0f;
     eg.processSample();
     const float first = eg.portValue[Eg1::kOutA];
-    hold (eg, 5.0f, static_cast<int> (0.4 * kRate));
+    // The 0.30 s release label is now the real 5 V -> 1 % time (RONIN_Redesign §3.1), so 0.1 s is mid-release.
+    hold (eg, 5.0f, static_cast<int> (0.1 * kRate));
     const float mid = eg.portValue[Eg1::kOutA];
     check (held > 2.5f, "release starts from the sustain level");
     check (first > 2.5f, "lifting the trigger does not click to zero");
-    check (mid < held - 0.5f && mid > 0.2f, "release falls over hundreds of milliseconds");
+    check (mid < held - 0.5f && mid > 0.2f, "release falls over its labelled time");
 
     eg.portValue[Eg1::kTrig] = 0.0f;
     eg.processSample();
@@ -206,10 +207,10 @@ int testEg1ThreeJacks()
     const FaceKnobBinding decay = faceKnobBinding ("EG 1", "DECAY");
     const FaceKnobBinding sustain = faceKnobBinding ("EG 1", "SUSTAIN");
     const FaceKnobBinding release = faceKnobBinding ("EG 1", "RELEASE");
-    check (std::strcmp (attack.parameterName, "EG 1 Attack") == 0 && attack.fallback == 0.05f, "attack name");
-    check (std::strcmp (decay.parameterName, "EG 1 Decay") == 0 && decay.fallback == 0.30f, "decay name");
+    check (std::strcmp (attack.parameterName, "EG 1 Attack") == 0 && attack.fallback == 0.2079f, "attack name");
+    check (std::strcmp (decay.parameterName, "EG 1 Decay") == 0 && decay.fallback == 0.39f, "decay name");
     check (std::strcmp (sustain.parameterName, "EG 1 Sustain") == 0 && sustain.fallback == 0.60f, "sustain name");
-    check (std::strcmp (release.parameterName, "EG 1 Release") == 0 && release.fallback == 0.30f, "release name");
+    check (std::strcmp (release.parameterName, "EG 1 Release") == 0 && release.fallback == 0.39f, "release name");
     check (attack.minimum == 0.0f && attack.maximum == 1.0f, "attack range");
     check (faceKnobBinding ("EG 2", "ATTACK").knob == FaceKnob::Eg2Attack, "eg 2 attack is a parameter");
     return finish ("testEg1ThreeJacks");

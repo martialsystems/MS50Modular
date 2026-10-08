@@ -581,6 +581,12 @@ int testOneDefaultTable();
 int testPresetRoundTrip();
 int testPresetRejectsBadVersion();
 int testFeedbackIsOneSample();
+int testEgNoStallInFloat();
+int testEgLabelsAreRealTime();
+int testEgKnobLawAndMigration();
+int testEgSnapAndSustainSlew();
+int testEgTrigHysteresis();
+int testEg2LabelsAndDelayTrig();
 
 int main()
 {
@@ -692,5 +698,11 @@ int main()
     failed += testPresetRoundTrip();
     failed += testPresetRejectsBadVersion();
     failed += testFeedbackIsOneSample();
+    failed += testEgNoStallInFloat();
+    failed += testEgLabelsAreRealTime();
+    failed += testEgKnobLawAndMigration();
+    failed += testEgSnapAndSustainSlew();
+    failed += testEgTrigHysteresis();
+    failed += testEg2LabelsAndDelayTrig();
     return failed == 0 ? 0 : 1;
 }

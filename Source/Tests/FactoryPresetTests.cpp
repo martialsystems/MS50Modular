@@ -430,9 +430,10 @@ int testOneDefaultTable()
     check (factoryVca1Initial (init) == fallback ("VCA 1", "INITIAL"), "INIT VCA 1 Initial is the table");
     check (factoryPresetEffect (init), "INIT is effect on");
 
-    check (fallback ("EG 1", "ATTACK") == 0.05f && fallback ("EG 1", "DECAY") == 0.30f
-               && fallback ("EG 1", "SUSTAIN") == 0.60f && fallback ("EG 1", "RELEASE") == 0.30f,
-           "fresh EG 1 is 0.05 / 0.3 / 0.6 / 0.3");
+    // The old 0.05 / 0.3 / 0.6 / 0.3 defaults through M-R1 (real-time law, RONIN_Redesign §6).
+    check (fallback ("EG 1", "ATTACK") == 0.2079f && fallback ("EG 1", "DECAY") == 0.39f
+               && fallback ("EG 1", "SUSTAIN") == 0.60f && fallback ("EG 1", "RELEASE") == 0.39f,
+           "fresh EG 1 is 0.2079 / 0.39 / 0.6 / 0.39");
     check (fallback ("VCF", "CUTOFF") == 0.45f && fallback ("VCF", "PEAK") == 0.20f && fallback ("VCF", "MOD") == 0.40f,
            "fresh VCF is 0.45 / 0.2 / 0.4");
     check (fallback ("MIX", "LEVEL 1") == 0.80f && fallback ("MIX", "LEVEL 2") == 0.80f && fallback ("MIX", "LEVEL 3") == 0.80f,
