@@ -202,12 +202,46 @@ void paintLcdDots (juce::Graphics& g, juce::Rectangle<float> area, const juce::S
     }
 }
 
+// The PRESET list drops below the screen in rows of 21 design px. A bank longer than the bay can show splits
+// into balanced columns side by side, so every program stays on screen and clickable.
+constexpr int kPresetMenuMaxRows = 18;
+constexpr float kPresetRowPitch = 21.0f;
+
+int presetMenuColumns (int count)
+{
+    return count > kPresetMenuMaxRows ? (count + kPresetMenuMaxRows - 1) / kPresetMenuMaxRows : 1;
+}
+
+int presetMenuRows (int count)
+{
+    const int columns = presetMenuColumns (count);
+    return (count + columns - 1) / columns;
+}
+
+float presetMenuColumnWidth()
+{
+    return (kPresetKeyX + kPresetKeyW) - kPresetBezelX;
+}
+
 juce::Rectangle<float> presetMenuDesign (int count)
 {
     return { kPresetBezelX,
              kPresetBezelY + kPresetBezelH + 3.0f,
-             (kPresetKeyX + kPresetKeyW) - kPresetBezelX,
-             10.0f + static_cast<float> (count) * 21.0f - 3.0f };
+             presetMenuColumnWidth() * static_cast<float> (presetMenuColumns (count)),
+             10.0f + static_cast<float> (presetMenuRows (count)) * kPresetRowPitch - 3.0f };
+}
+
+// Design-space rectangle of one program's row: column-major, top to bottom then left to right.
+juce::Rectangle<float> presetRowDesign (int count, int index)
+{
+    const auto box = presetMenuDesign (count);
+    const int rows = presetMenuRows (count);
+    const int column = index / rows;
+    const int row = index % rows;
+    return { box.getX() + 5.0f + static_cast<float> (column) * presetMenuColumnWidth(),
+             box.getY() + 5.0f + static_cast<float> (row) * kPresetRowPitch,
+             presetMenuColumnWidth() - 10.0f,
+             18.0f };
 }
 
 void paintKnobCap (juce::Graphics& g, juce::Point<float> centre, float radius, float scale, bool isSwitch, float value)
@@ -976,10 +1010,13 @@ int PatchBayView::presetRowAt (float x, float y) const
     const auto box = presetMenuDesign (count);
     if (x < box.getX() || x > box.getRight() || y < box.getY() || y > box.getBottom())
         return -1;
-    const int row = static_cast<int> (std::floor ((y - box.getY() - 5.0f) / 21.0f));
-    if (row < 0 || row >= count)
+    const int rows = presetMenuRows (count);
+    const int row = static_cast<int> (std::floor ((y - box.getY() - 5.0f) / kPresetRowPitch));
+    const int column = static_cast<int> (std::floor ((x - box.getX()) / presetMenuColumnWidth()));
+    if (row < 0 || row >= rows || column < 0 || column >= presetMenuColumns (count))
         return -1;
-    return row;
+    const int index = column * rows + row;
+    return index < count ? index : -1;
 }
 
 void PatchBayView::reloadPublishedCables()
@@ -1555,10 +1592,11 @@ void PatchBayView::paint (juce::Graphics& g)
         for (int row = 0; row < programs; ++row)
         {
             const bool hi = row == presetHi_;
-            const auto rowRect = juce::Rectangle<float> (origin.x + (box.getX() + 5.0f) * scale,
-                                                         origin.y + (box.getY() + 5.0f + static_cast<float> (row) * 21.0f) * scale,
-                                                         (box.getWidth() - 10.0f) * scale,
-                                                         18.0f * scale);
+            const auto rowDesign = presetRowDesign (programs, row);
+            const auto rowRect = juce::Rectangle<float> (origin.x + rowDesign.getX() * scale,
+                                                         origin.y + rowDesign.getY() * scale,
+                                                         rowDesign.getWidth() * scale,
+                                                         rowDesign.getHeight() * scale);
             if (hi)
             {
                 g.setColour (juce::Colour (0xff1e2419));
@@ -2087,6 +2125,14 @@ bool PatchBayView::keyPressed (const juce::KeyPress& key)
         {
             if (presetHi_ + 1 < count)
                 ++presetHi_;
+            repaint();
+            return true;
+        }
+        if (key == juce::KeyPress::leftKey || key == juce::KeyPress::rightKey)
+        {
+            const int step = presetMenuRows (count) * (key == juce::KeyPress::leftKey ? -1 : 1);
+            if (presetHi_ + step >= 0 && presetHi_ + step < count)
+                presetHi_ += step;
             repaint();
             return true;
         }

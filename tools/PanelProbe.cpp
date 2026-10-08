@@ -806,8 +806,39 @@ private:
         expect (bay->presetMenuOpen(), "preset screen opens the list");
         expect (bay->keyPressed (juce::KeyPress (juce::KeyPress::escapeKey)), "escape closes the preset list");
         expect (! bay->presetMenuOpen(), "preset list is closed");
-        clickAt (*bay, kPresetBezelX + 12.0f, kPresetBezelY + kPresetBezelH * 0.5f);
         const float row0Y = kPresetBezelY + kPresetBezelH + 3.0f + 5.0f + 10.5f;
+        {
+            // Every factory program is on screen in the PRESET list and loads by a click on its row. A bank
+            // longer than 18 rows splits into balanced columns (PatchBayView presetMenuDesign).
+            const int programs = processor->getNumPrograms();
+            const int columns = programs > 18 ? (programs + 17) / 18 : 1;
+            const int rows = (programs + columns - 1) / columns;
+            const float columnW = (kPresetKeyX + kPresetKeyW) - kPresetBezelX;
+            bool allOnScreen = true;
+            bool allLoad = true;
+            for (int program = 0; program < programs; ++program)
+            {
+                const float x = kPresetBezelX + 20.0f + static_cast<float> (program / rows) * columnW;
+                const float y = row0Y + static_cast<float> (program % rows) * 21.0f;
+                allOnScreen = allOnScreen && x + 40.0f < 1280.0f && y + 10.0f < 451.0f;
+                clickAt (*bay, kPresetBezelX + 12.0f, kPresetBezelY + kPresetBezelH * 0.5f);
+                if (program == programs - 1)
+                    if (const char* dir = std::getenv ("RONIN_PROBE_PAGES"))
+                    {
+                        const auto shot = bay->createComponentSnapshot (bay->getLocalBounds(), true, 1.0f);
+                        juce::File file (juce::File (juce::String (dir)).getChildFile ("PRESET_LIST.png"));
+                        file.deleteFile();
+                        juce::FileOutputStream out (file);
+                        juce::PNGImageFormat().writeImageToStream (shot, out);
+                    }
+                clickAt (*bay, x, y);
+                allLoad = allLoad && ! bay->presetMenuOpen() && processor->getCurrentProgram() == program;
+            }
+            expect (programs >= 16 && programs <= 24, "the PRESET list holds the whole factory bank");
+            expect (allOnScreen, "every PRESET row is on screen");
+            expect (allLoad, "a click on each PRESET row loads that program");
+        }
+        clickAt (*bay, kPresetBezelX + 12.0f, kPresetBezelY + kPresetBezelH * 0.5f);
         clickAt (*bay, kPresetBezelX + 20.0f, row0Y);
         expect (! bay->presetMenuOpen(), "choosing a preset closes the list");
         expect (processor->getCurrentProgram() == kInitPreset, "the first preset is INIT");
