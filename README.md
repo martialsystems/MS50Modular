@@ -51,7 +51,7 @@ The front panel keeps its open, symmetric layout. Everything else lives on tabs 
 
 - VST3 effect for macOS (universal: Apple silicon and Intel) and Linux. Version 0.1 is a beta.
 - Patches save with your DAW project. Older RONIN projects are updated when they load: envelope times keep their length, the oscillator keeps the parabola shape, and filter settings are adjusted for the new input pull. SETUP shows what changed. Once re-saved, a project needs this version of RONIN or later.
-- The factory bank holds only INIT for now. New factory programs will come in a later update.
+- 22 factory programs on the PRESET screen, voiced for classic EDM: effects for your input (filters, a trance gate, a side-chain pump, a random filter and a ring modulator), six self-playing acid basses ready for a BUSHIDO sequence, basses, a lead, drums and sound effects. Each one says what input it expects; see `docs/presets.md`.
 
 ## Quick start
 
@@ -78,6 +78,7 @@ The Jidai Collection is Martial Systems' line of patchable instruments. They sha
 - **BUSHIDO:** a 3 × 12 analog-style step sequencer.
 - **RONIN:** the semi-modular synthesizer and effect.
 - **SHOGUN:** a 16-voice analog-style drum machine with a full patch bay.
+- **[ORIGAMI](https://github.com/martialsystems/origami):** the triple wave folder, available as a standalone effect and as a rack device.
 - **JIDAI:** the rack that hosts the collection side by side.
 
 ## Legal

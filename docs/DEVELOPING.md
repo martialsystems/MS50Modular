@@ -2,7 +2,7 @@ Copyright (c) 2026 Martial Systems LLC. All rights reserved. RONIN is part of th
 
 # Developing RONIN
 
-Read this before changing code. The DSP behaviour is specified in `docs/SCHEMATICS.md`, the stand-in rules in `docs/METHODOLOGY.md`, the build order in `docs/BUILD_GUIDE.md` and the tests in `docs/TESTPLAN.md`. The factory program (INIT only for now) and the default knob table are in `docs/presets.md`.
+Read this before changing code. The DSP behaviour is specified in `docs/SCHEMATICS.md`, the stand-in rules in `docs/METHODOLOGY.md`, the build order in `docs/BUILD_GUIDE.md` and the tests in `docs/TESTPLAN.md`. The factory bank (22 programs) and the default knob table are in `docs/presets.md`.
 
 ## Repo map
 
@@ -18,8 +18,10 @@ Source/
     PatchState.h/.cpp     format-2 jack ids (SECTION:LABEL, shared parser) and the format-1 migration (M-R1..M-R5)
     Smoothing.h, EgLaw.h  knob smoothing, EG real-time law
     HqPair.h              HQ 2x: one 2fs sub-sample per statement, earlier first, into the shared halfband
+    FactoryPresets.h      the factory bank: knobs by host parameter id, cables by jack id, compiled in
+    FloatCompare.h        ronin::exactlyEqual, the one place an exact float compare is allowed (-Wfloat-equal)
   UI/                     panel patch bay (MAIN), tab strip and VOICE / ENV / PATCH / SETUP pages, real-unit read-outs
-  Tests/                  RoninTests (JUCE-free) and ProcessorTests.cpp (RoninProcessorTests, needs JUCE)
+  Tests/                  RoninTests (JUCE-free) and ProcessorTests.cpp (RoninProcessorTests, needs JUCE); TestSuite.h declares the RoninTests entry points
 third_party/jidai-common/ vendored shared JCS + DSP headers (commit in VENDOR.md; no local edits)
 panel/                    layout, SVG, geometry emitter
 tools/PanelProbe.cpp      standalone window check
@@ -40,6 +42,17 @@ cmake --build build --target RoninTests RoninProcessorTests Ronin_VST3 RoninPane
 xvfb-run -a ./build/RoninProcessorTests_artefacts/Release/RoninProcessorTests   # processor-level tests (HQ, TRI, state)
 xvfb-run -a build/RoninPanelProbe_artefacts/Release/RoninPanelProbe   # Linux; prints PROBE PASS
 ```
+
+### Strict warnings (the JIDAI rack build)
+
+The JIDAI rack compiles RONIN's sources with JUCE's recommended warning flags plus `-Wfloat-equal -Wimplicit-int-float-conversion -Wshadow -Wconversion -Wdouble-promotion -Werror`. Check it with:
+
+```bash
+cmake -S . -B build-strict -DCMAKE_BUILD_TYPE=Release -DRONIN_STRICT_WARNINGS=ON      # needs CMake 3.25+
+cmake --build build-strict --target Ronin_VST3 RoninTests RoninProcessorTests RoninPanelProbe
+```
+
+Run it with g++ and with clang (`-DCMAKE_CXX_COMPILER=clang++`; `-Wimplicit-int-float-conversion` is clang-only). JUCE modules and the vendored jidai-common are SYSTEM includes in this mode, so only RONIN code is held to the flags. The engine files the rack compiles are `RONIN_ENGINE_SOURCES` in `CMakeLists.txt` (JUCE-free); the plugin adds `RONIN_PLUGIN_SOURCES`. Exact float compares go through `ronin::exactlyEqual` (`Source/Modular/FloatCompare.h`). Narrowing is written as an explicit `static_cast` that keeps the old arithmetic, so the sound stays bit-identical.
 
 Requirements: CMake 3.22 or newer, a C++20 compiler and git. JUCE 8.0.4 is fetched by CMake, not vendored. Format: VST3. `IS_SYNTH` false. MIDI input off.
 
