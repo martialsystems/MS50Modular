@@ -34,8 +34,8 @@ inline constexpr int SampleHold = 15;
 // The factory bank is cleared for now and will be rewritten. It holds one program, INIT: the fresh-instance patch.
 // INIT is EXT IN Mono through the VCF and VCA 1 to Output Wet, the dry L and R cables, and EG 1 on the Ext In gate
 // opening VCA 1 and moving the cutoff. Effect on, every knob on the PanelDefaults.h table, VCA 1 Initial 0.
-// TODO(init-triangle): new patches should start the VCO on a true triangle. The VCO has one Tri output today
-// (the integrated saw, a parabola; Vco.cpp) and no shape setting, so INIT cannot choose it yet.
+// INIT starts the VCO on the true TRIANGLE (Vco::applyFactoryPreset; RONIN_Redesign M-R2, decided by the user).
+// PARABOLA (legacy) stays selectable on the VOICE tab and is what user-saved format-1 states load on.
 inline constexpr int kFactoryPresetCount = 1;
 inline constexpr int kDefaultFactoryPreset = 0;
 inline constexpr int kInitPreset = 0;

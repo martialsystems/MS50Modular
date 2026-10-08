@@ -33,4 +33,4 @@ Every program load returns both to these defaults.
 
 1. INIT: Effect on. Ext In Mono to VCF SigIn, VCF SigOut to VCA 1 SigIn, VCA 1 Out to Output Wet, Ext In L to Output L, Ext In R to Output R, Ext In Gate to EG 1 Trig, EG 1 OutA to VCA 1 Env, EG 1 OutA to VCF Cutoff. The Ext In button or a gate opens EG 1, which opens VCA 1 and moves the filter. VCA 1 Initial is 0.
 
-TODO(init-triangle): INIT should start the VCO on a true triangle. The VCO has no shape setting yet (its Tri jack is the integrated saw), so INIT does not set one.
+INIT starts the VCO on the true TRIANGLE (PolyBLAMP, odd harmonics only). PARABOLA (legacy), the integrated saw, stays selectable on the VOICE tab (TRI SHAPE) and is what user-saved format-1 states load on (RONIN_Redesign M-R2).

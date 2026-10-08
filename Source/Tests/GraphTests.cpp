@@ -587,6 +587,10 @@ int testEgKnobLawAndMigration();
 int testEgSnapAndSustainSlew();
 int testEgTrigHysteresis();
 int testEg2LabelsAndDelayTrig();
+int testTriDefaultIsTriangle();
+int testParabolaSelectableModule();
+int testSawPulsePolyBlepKept();
+int testFootageSwitchesAtWrap();
 
 int main()
 {
@@ -704,5 +708,9 @@ int main()
     failed += testEgSnapAndSustainSlew();
     failed += testEgTrigHysteresis();
     failed += testEg2LabelsAndDelayTrig();
+    failed += testTriDefaultIsTriangle();
+    failed += testParabolaSelectableModule();
+    failed += testSawPulsePolyBlepKept();
+    failed += testFootageSwitchesAtWrap();
     return failed == 0 ? 0 : 1;
 }

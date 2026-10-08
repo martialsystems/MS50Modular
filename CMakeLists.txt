@@ -93,6 +93,7 @@ add_executable(RoninTests
   Source/Tests/PresetTests.cpp
   Source/Tests/FeedbackTests.cpp
   Source/Tests/EgRedesignTests.cpp
+  Source/Tests/VcoRedesignTests.cpp
   Source/Modular/Module.cpp
   Source/Modular/PatchGraph.cpp
   Source/Modular/ExtIn.cpp
