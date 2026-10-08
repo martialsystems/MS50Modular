@@ -2,8 +2,8 @@
 
 - Source: `jidai-collection` repository, folder `jidai-common/`
 - Branch: `redesign/jidai`
-- Commit: `9d6e382` ("Phase 2: shared TripleShaper + halfband, ORIGAMI core, plugin and rack device")
-- Copied verbatim with `git archive 9d6e382 jidai-common`; no local edits. Only this VENDOR.md was added.
+- Commit: `24ee621` ("jidai-common 1.1.1: SHOGUN + RONIN fix batch (re-vendor this commit)"), version 1.1.1
+- Copied verbatim with `git archive 24ee621 jidai-common`; no local edits. Only this VENDOR.md was added.
 
 RONIN uses:
 - `jidai/CableStandard.h` through `Source/Modular/Jcs.h`, a two-line adapter (`#include <jidai/CableStandard.h>`

@@ -110,7 +110,7 @@ inline std::string noteName (double hzValue)
 {
     if (! (hzValue > 0.0))
         return "--";
-    // Shared JCS R4 law and names (jidai-common Pitch.h): MIDI 48 = C3 = 130.8128 Hz.
+    // Shared JCS R4 law and names (jidai-common Pitch.h): MIDI 48 = C3 = jcs kC3Hz (130.8127826502993 Hz, exact).
     using jidai::jcs::pitch::Law;
     const double midi = jidai::jcs::pitch::note (Law::VOct, jidai::jcs::pitch::hzToVolts (Law::VOct, hzValue));
     const long nearest = std::lround (midi);

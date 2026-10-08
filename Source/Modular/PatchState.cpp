@@ -44,7 +44,11 @@ bool jackAddress (const RackIndices& rack, const std::string& rawId, int& module
     // JCS R6 (shared parser): SECTION:LABEL, RONIN/SECTION:LABEL and RONIN#N/SECTION:LABEL bind to this device.
     // Another device's prefix is not ours. The per-device alias table is applied first (RONIN renames no jacks,
     // so it is empty). No legacy model-name prefix aliases, as in jidai-common.
-    const auto parsed = jcs::parseJackId (roninAliases().apply (rawId));
+    // resolve() also returns the alias's input law; RONIN declares no aliases, so it is always the identity.
+    const jcs::AliasTable::Resolved resolved = roninAliases().resolve (rawId);
+    if (! resolved.conversion.identity())
+        return false;   // a voltage-converting alias would need the cable to carry the law; none exists in RONIN
+    const auto parsed = jcs::parseJackId (resolved.id);
     if (! parsed || (! parsed->prefix.empty() && parsed->prefix != "RONIN"))
         return false;
     const std::string& section = parsed->section;
