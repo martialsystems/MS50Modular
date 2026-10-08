@@ -445,6 +445,19 @@ float PatchGraph::cableVolts (float raw, const PortDesc& sourceDesc, const PortD
     return raw;
 }
 
+bool PatchGraph::convertsToStrig (const PortDesc& sourceDesc, const PortDesc& destDesc) noexcept
+{
+    return sourceDesc.type == PortType::Gate && ! sourceDesc.strigVolts && destDesc.strigInput;
+}
+
+jcs::Badge PatchGraph::cableBadge (const PortDesc& sourceDesc, const PortDesc& destDesc) noexcept
+{
+    if (convertsToStrig (sourceDesc, destDesc))
+        return jcs::Badge::GateToStrig;
+    const jcs::Badge badge = jcs::cableBadge (portRole (sourceDesc), portRole (destDesc));
+    return badge == jcs::Badge::GateToStrig ? jcs::Badge::None : badge;
+}
+
 void PatchGraph::contributeCables (int moduleIndex, const Snapshot& snapshot) const
 {
     Module* module = modules_[moduleIndex];

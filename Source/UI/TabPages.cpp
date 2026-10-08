@@ -506,9 +506,8 @@ juce::String flagFor (const RoninAudioProcessor& p, const Cable& c)
     juce::StringArray flags;
     if (c.legacyInvert)
         flags.add ("old inversion kept");
-    else if (from.type == PortType::Gate && ! from.strigVolts && to.strigInput)
-        flags.add (utf8 ("converted \xe2\x8a\x93\xe2\x86\x92\xe2\x8a\x94"));
-    const auto badge = jcs::cableBadge (portRole (from), portRole (to));
+    // "gate converted to S-trig" appears exactly where the graph converts (PatchGraph::convertsToStrig).
+    const auto badge = PatchGraph::cableBadge (from, to);
     if (badge != jcs::Badge::None)
         flags.add (utf8 (jcs::badgeText (badge)));
     if (c.colour != 0)

@@ -281,7 +281,7 @@ All 57 jacks on the panel. "In" is an input and "Out" an output.
 | RING | A | In | CV | Any signal, DC passes |
 | RING | B | In | CV | Any signal, DC passes |
 | RING | OUT | Out | CV | A × B ÷ 5 V |
-| DIV | IN | In | CV | Rising edges counted (on above 1.0 V, off below 0.5 V) |
+| DIV | IN | In | Gate / clock | Rising edges counted (on above 1.0 V, off below 0.5 V) |
 | DIV | /2 | Out | Gate / clock | 0/5 V at half the input rate |
 | DIV | /4 | Out | Gate / clock | 0/5 V at a quarter of the input rate |
 | INV | IN | In | CV | Any signal |

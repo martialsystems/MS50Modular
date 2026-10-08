@@ -4,10 +4,23 @@
 
 #include "Modular/FloatCompare.h"
 #include "Tests/TestSuite.h"
+#include "Modular/Divider.h"
 #include "Modular/Eg1.h"
 #include "Modular/Eg2.h"
+#include "Modular/ExtIn.h"
+#include "Modular/Integrator.h"
+#include "Modular/Inverter.h"
+#include "Modular/Mg.h"
+#include "Modular/Mixer.h"
+#include "Modular/Noise.h"
+#include "Modular/OutputModule.h"
 #include "Modular/PatchGraph.h"
+#include "Modular/Ring.h"
+#include "Modular/SampleHold.h"
 #include "Modular/Vca1.h"
+#include "Modular/Vca2.h"
+#include "Modular/Vcf.h"
+#include "Modular/Vco.h"
 
 #include <cmath>
 #include <cstdio>
@@ -230,4 +243,110 @@ int testGraphOverRangeR15()
         graph.process();
     check (graph.portOverRange (is, 1), "960 samples at 96 kHz is 10 ms");
     return finish ("testGraphOverRangeR15");
+}
+
+// The patch bay's "gate converted to S-trig" badge (PatchGraph::cableBadge) appears exactly where the graph converts
+// a cable (cableVolts): for every output -> input pair of RONIN's modules, and for every source/destination type,
+// S-trig flag and role combination. DIV /2 and /4 (GATE/CLK role, CV type) into EG TRIG pass as written: no badge.
+int testBadgeMatchesGraphConversion()
+{
+    ExtIn ext;
+    OutputModule out;
+    NoiseModule noise;
+    Vcf vcf;
+    Vca1 vca1;
+    Vca2 vca2;
+    Eg1 eg1;
+    MgModule mg;
+    Vco vco;
+    Eg2 eg2;
+    Ring ring;
+    Divider div;
+    Inverter inv;
+    Integrator integ;
+    Mixer mix;
+    SampleHold sh;
+    const Module* mods[] = { &ext, &out, &noise, &vcf, &vca1, &vca2, &eg1, &mg, &vco, &eg2, &ring, &div, &inv, &integ, &mix, &sh };
+
+    auto graphConverts = [] (const PortDesc& from, const PortDesc& to)
+    {
+        const bool high = ! ronin::exactlyEqual (PatchGraph::cableVolts (5.0f, from, to, false), 5.0f);
+        const bool low = ! ronin::exactlyEqual (PatchGraph::cableVolts (0.0f, from, to, false), 0.0f);
+        return high && low;
+    };
+
+    int pairs = 0, converting = 0, disagree = 0;
+    for (const Module* s : mods)
+        for (int sp = 0; sp < s->numPorts(); ++sp)
+        {
+            const PortDesc from = s->port (sp);
+            if (from.dir != PortDir::Out)
+                continue;
+            for (const Module* d : mods)
+                for (int dp = 0; dp < d->numPorts(); ++dp)
+                {
+                    const PortDesc to = d->port (dp);
+                    if (to.dir != PortDir::In)
+                        continue;
+                    ++pairs;
+                    const bool converts = graphConverts (from, to);
+                    const bool badge = PatchGraph::cableBadge (from, to) == jcs::Badge::GateToStrig;
+                    if (converts != badge || converts != PatchGraph::convertsToStrig (from, to))
+                    {
+                        std::printf ("  %s -> %s: graph %d badge %d\n", from.name, to.name, converts ? 1 : 0, badge ? 1 : 0);
+                        ++disagree;
+                    }
+                    converting += converts ? 1 : 0;
+                }
+        }
+    check (pairs > 300 && disagree == 0, "every module output -> input: badge exactly where the graph converts");
+    check (converting == 2, "only EG 2 DELAY into EG 1 TRIG and EG 2 TRIG converts");
+
+    // Every type x S-trig flag x role combination, source and destination.
+    const PortType types[] = { PortType::Audio, PortType::CV, PortType::Gate };
+    const PortRole roles[] = { PortRole::Default, PortRole::Audio, PortRole::Cv, PortRole::VOct, PortRole::HzvLin,
+                               PortRole::GateClk, PortRole::STrig };
+    int combos = 0, combosDisagree = 0;
+    for (PortType st : types)
+        for (int sv = 0; sv < 2; ++sv)
+            for (PortRole sr : roles)
+                for (PortType dt : types)
+                    for (int di = 0; di < 2; ++di)
+                        for (PortRole dr : roles)
+                        {
+                            const PortDesc from { "src", st, PortDir::Out, 0.0f, sv == 1, false, sr };
+                            const PortDesc to { "dst", dt, PortDir::In, 0.0f, false, di == 1, dr };
+                            ++combos;
+                            const bool badge = PatchGraph::cableBadge (from, to) == jcs::Badge::GateToStrig;
+                            if (badge != graphConverts (from, to))
+                                ++combosDisagree;
+                        }
+    check (combos == 1764 && combosDisagree == 0, "every role pair: badge exactly where the graph converts");
+
+    // The named cases.
+    const PortDesc egTrig = eg1.port (Eg1::kTrig);
+    check (PatchGraph::cableBadge (div.port (Divider::kDiv2), egTrig) == jcs::Badge::None
+               && ronin::exactlyEqual (PatchGraph::cableVolts (5.0f, div.port (Divider::kDiv2), egTrig, false), 5.0f),
+           "DIV /2 -> EG 1 TRIG: no badge, volts as written");
+    check (PatchGraph::cableBadge (div.port (Divider::kDiv4), eg2.port (Eg2::kTrig)) == jcs::Badge::None,
+           "DIV /4 -> EG 2 TRIG: no badge");
+    check (PatchGraph::cableBadge (sh.port (SampleHold::kClockOut), egTrig) == jcs::Badge::None,
+           "S&H clock -> EG TRIG: no badge");
+    check (PatchGraph::cableBadge (eg2.port (Eg2::kDelayTrig), egTrig) == jcs::Badge::GateToStrig
+               && ronin::exactlyEqual (PatchGraph::cableVolts (5.0f, eg2.port (Eg2::kDelayTrig), egTrig, false), 0.0f),
+           "EG 2 DELAY -> EG 1 TRIG: converted, with the badge");
+    const PortDesc extGate = ext.port (3);
+    check (portRole (extGate) == jcs::Role::STrig && extGate.strigVolts && extGate.type == PortType::Gate,
+           "EXT IN GATE is an S-TRIG output (S-trig volts, Gate type)");
+    check (PatchGraph::cableBadge (extGate, egTrig) == jcs::Badge::None
+               && ronin::exactlyEqual (PatchGraph::cableVolts (0.0f, extGate, egTrig, false), 0.0f),
+           "EXT IN GATE -> EG 1 TRIG: no badge, volts as written");
+    check (portRole (div.port (Divider::kIn)) == jcs::Role::GateClk && portRole (div.port (Divider::kDiv2)) == jcs::Role::GateClk
+               && portRole (div.port (Divider::kDiv4)) == jcs::Role::GateClk
+               && portRole (sh.port (SampleHold::kExtClock)) == jcs::Role::GateClk,
+           "DIV IN, /2, /4 and S&H CLOCK are GATE/CLK");
+    check (portRole (mg.port (MgModule::kTri)) == jcs::Role::CV && portRole (mg.port (MgModule::kSawUp)) == jcs::Role::CV
+               && portRole (mg.port (MgModule::kSawDown)) == jcs::Role::CV && portRole (mg.port (MgModule::kPulse)) == jcs::Role::CV,
+           "MG TRI, SAW, INV SAW and PULSE are CV");
+    return finish ("testBadgeMatchesGraphConversion");
 }

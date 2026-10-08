@@ -2,8 +2,9 @@
 
 - Source: `jidai-collection` repository, folder `jidai-common/`
 - Branch: `redesign/jidai`
-- Commit: `24ee621` ("jidai-common 1.1.1: SHOGUN + RONIN fix batch (re-vendor this commit)"), version 1.1.1
-- Copied verbatim with `git archive 24ee621 jidai-common`; no local edits. Only this VENDOR.md was added.
+- Commit: `8a4b5aecf3d6c2ac8900cc2e88db8feecf8440a8` ("jidai-common 1.1.2: AMT 0 transparent, group delay API, lin55 floor
+  (re-vendor this commit)"), version 1.1.2
+- Copied verbatim with `git archive 8a4b5ae jidai-common`; no local edits. Only this VENDOR.md was added.
 
 RONIN uses:
 - `jidai/CableStandard.h` through `Source/Modular/Jcs.h`, a two-line adapter (`#include <jidai/CableStandard.h>`

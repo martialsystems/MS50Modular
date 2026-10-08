@@ -128,3 +128,4 @@ int testExtInGateHysteresis();
 int testKnobUnits();
 int testKnobTypeValue();
 int testGraphOverRangeR15();
+int testBadgeMatchesGraphConversion();

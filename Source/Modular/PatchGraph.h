@@ -52,6 +52,13 @@ public:
 
     // The volts one cable adds to its destination (JCS R3s, M3). Shared with the UI's jack monitor.
     static float cableVolts (float raw, const PortDesc& sourceDesc, const PortDesc& destDesc, bool legacyInvert) noexcept;
+    // True exactly where cableVolts converts a gate to S-trig on a non-migrated cable: a Gate-type output that is not
+    // already S-trig, landing on an S-trig input (EG 1/EG 2 TRIG). A GATE/CLK-role output of CV type (DIV /2 and /4)
+    // passes its volts as written.
+    static bool convertsToStrig (const PortDesc& sourceDesc, const PortDesc& destDesc) noexcept;
+    // The patch bay's cable badge: jcs::cableBadge on the two roles, except that "gate converted to S-trig" shows
+    // exactly where convertsToStrig is true (the same rule as the rack's badge).
+    static jcs::Badge cableBadge (const PortDesc& sourceDesc, const PortDesc& destDesc) noexcept;
     bool cableIsDelayed (int index) const;
 
     static constexpr int kStateVersion = 1;

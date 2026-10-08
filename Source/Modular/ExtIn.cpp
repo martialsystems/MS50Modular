@@ -55,7 +55,9 @@ PortDesc ExtIn::port (int index) const
         return { "R", PortType::Audio, PortDir::Out };
     if (index == 2)
         return { "Mono", PortType::Audio, PortDir::Out };
-    return { "Gate", PortType::Gate, PortDir::Out, 5.0f, true };
+    // S-trig volts (0 V held, +5 V released) with the follower's hysteresis (opens above THRESHOLD, closes below
+    // 0.7 x THRESHOLD), so its role is S-TRIG. A cable from it into EG TRIG passes as written: no conversion.
+    return { "Gate", PortType::Gate, PortDir::Out, jcs::kStrigRest, true, false, PortRole::STrig };
 }
 
 void ExtIn::setKnob (int knob, float zeroToOne)

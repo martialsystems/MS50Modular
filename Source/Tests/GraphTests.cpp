@@ -625,5 +625,6 @@ int main()
     failed += testKnobUnits();
     failed += testKnobTypeValue();
     failed += testGraphOverRangeR15();
+    failed += testBadgeMatchesGraphConversion();
     return failed == 0 ? 0 : 1;
 }
