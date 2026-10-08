@@ -11,6 +11,10 @@ FetchContent_Declare(
   GIT_SHALLOW TRUE)
 FetchContent_MakeAvailable(JUCE)
 
+# Jidai Cable Standard v1.1 (vendored jidai-common, see third_party/jidai-common/VENDOR.md). Header-only.
+set(JIDAI_COMMON_TESTS OFF CACHE BOOL "" FORCE)
+add_subdirectory(third_party/jidai-common)
+
 juce_add_plugin(Ronin
   COMPANY_NAME "Martial Systems"
   BUNDLE_ID com.martialsystems.ronin
@@ -57,6 +61,7 @@ target_sources(Ronin PRIVATE
   Source/UI/PatchBayView.cpp)
 
 target_include_directories(Ronin PRIVATE Source)
+target_link_libraries(Ronin PRIVATE jidai::common)
 
 target_compile_definitions(Ronin PUBLIC
   JUCE_WEB_BROWSER=0
@@ -149,6 +154,7 @@ target_sources(RoninPanelProbe PRIVATE
   Source/UI/PatchBayView.cpp)
 
 target_include_directories(RoninPanelProbe PRIVATE Source)
+target_link_libraries(RoninPanelProbe PRIVATE jidai::common)
 
 target_compile_definitions(RoninPanelProbe PRIVATE
   JUCE_WEB_BROWSER=0
@@ -161,6 +167,7 @@ target_link_libraries(RoninPanelProbe PRIVATE
   juce::juce_recommended_warning_flags)
 
 target_include_directories(RoninTests PRIVATE Source)
+target_link_libraries(RoninTests PRIVATE jidai::common)
 
 target_compile_features(RoninTests PRIVATE cxx_std_20)
 
@@ -202,6 +209,7 @@ target_sources(RoninProcessorTests PRIVATE
   Source/UI/PatchBayView.cpp)
 
 target_include_directories(RoninProcessorTests PRIVATE Source)
+target_link_libraries(RoninProcessorTests PRIVATE jidai::common)
 
 target_compile_definitions(RoninProcessorTests PRIVATE
   JUCE_WEB_BROWSER=0
