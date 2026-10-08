@@ -5,8 +5,13 @@
 #include "Modular/PatchState.h"
 #include "UI/PatchBayLogic.h"
 
+#include <juce_audio_formats/juce_audio_formats.h>
+
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
+#include <memory>
 #include <functional>
 #include <vector>
 
@@ -460,6 +465,251 @@ static void testSlashJackIdsStateRoundTrip()
     finish ("testSlashJackIdsStateRoundTrip");
 }
 
+// ---- Factory bank (docs/presets.md) ----
+
+namespace {
+
+bool usesExtIn (int index)
+{
+    // An effect program takes EXT IN MONO or GATE into the patch; the dry L and R cables alone do not count.
+    const FactoryPreset& preset = kFactoryPresets[index];
+    for (int i = 0; i < preset.cableCount; ++i)
+    {
+        const juce::String from (preset.cables[i].from);
+        if (from == "EXT IN:MONO" || from == "EXT IN:GATE")
+            return true;
+    }
+    return false;
+}
+
+// A representative effect input, 125 BPM: a decaying chord stab and a kick-like thump on every beat, a noise
+// tick on the off-beats. Peaks near 0.6 (-4.4 dBFS); quiet between hits, so EXT IN GATE opens and closes.
+void testInput (std::vector<float>& left, std::vector<float>& right, double rate)
+{
+    const double beat = 60.0 / 125.0;
+    juce::Random random (12345);
+    for (size_t n = 0; n < left.size(); ++n)
+    {
+        const double t = static_cast<double> (n) / rate;
+        const double inBeat = std::fmod (t, beat);
+        const double offBeat = std::fmod (t + beat * 0.5, beat);
+        const double stab = std::exp (-inBeat / 0.15)
+                          * (std::sin (2.0 * juce::MathConstants<double>::pi * 220.0 * t)
+                             + std::sin (2.0 * juce::MathConstants<double>::pi * 277.18 * t)
+                             + std::sin (2.0 * juce::MathConstants<double>::pi * 329.63 * t)) * 0.10;
+        const double kick = std::exp (-inBeat / 0.08) * std::sin (2.0 * juce::MathConstants<double>::pi * 55.0 * t) * 0.25;
+        const double tick = std::exp (-offBeat / 0.02) * (static_cast<double> (random.nextFloat()) * 2.0 - 1.0) * 0.12;
+        left[n] = static_cast<float> (stab + kick + tick);
+        right[n] = static_cast<float> (stab * 0.9 + kick + tick);
+    }
+}
+
+struct RenderStats {
+    float peak = 0.0f;
+    double rms = 0.0;
+    bool finite = true;
+};
+
+RenderStats renderProgram (int index, bool hq, double seconds, juce::AudioBuffer<float>* keep)
+{
+    constexpr double rate = 48000.0;
+    constexpr int block = 512;
+    RoninAudioProcessor p;
+    p.hqParameter()->setValueNotifyingHost (hq ? 1.0f : 0.0f);
+    p.setCurrentProgram (index);
+    p.prepareToPlay (rate, block);
+    const int total = static_cast<int> (seconds * rate);
+    std::vector<float> inL (static_cast<size_t> (total), 0.0f);
+    std::vector<float> inR (static_cast<size_t> (total), 0.0f);
+    if (usesExtIn (index))
+        testInput (inL, inR, rate);   // effect programs get the test input; the rest play with silence at EXT IN
+
+    if (keep != nullptr)
+        keep->setSize (2, total);
+    RenderStats stats;
+    double sum = 0.0;
+    juce::AudioBuffer<float> buffer (2, block);
+    juce::MidiBuffer midi;
+    for (int start = 0; start < total; start += block)
+    {
+        const int n = std::min (block, total - start);
+        buffer.setSize (2, n, false, false, true);
+        for (int i = 0; i < n; ++i)
+        {
+            buffer.setSample (0, i, inL[static_cast<size_t> (start + i)]);
+            buffer.setSample (1, i, inR[static_cast<size_t> (start + i)]);
+        }
+        p.processBlock (buffer, midi);
+        for (int ch = 0; ch < 2; ++ch)
+        {
+            for (int i = 0; i < n; ++i)
+            {
+                const float y = buffer.getSample (ch, i);
+                if (! std::isfinite (y))
+                {
+                    stats.finite = false;
+                    continue;
+                }
+                stats.peak = std::max (stats.peak, std::fabs (y));
+                sum += static_cast<double> (y) * static_cast<double> (y);
+                if (keep != nullptr)
+                    keep->setSample (ch, start + i, y);
+            }
+        }
+    }
+    stats.rms = std::sqrt (sum / (2.0 * static_cast<double> (total)));
+    return stats;
+}
+
+juce::String knobDefaultsFromInit (const juce::XmlElement& init, const juce::String& id)
+{
+    return init.getStringAttribute (id);
+}
+
+}
+
+// Every program loads, is on the true TRIANGLE with the effect on, saves its own knobs (by id) and cables
+// (by jack id) in format 2, and the saved state round-trips byte for byte.
+static void testFactoryBankStateRoundTrip()
+{
+    std::unique_ptr<juce::XmlElement> initXml;
+    {
+        RoninAudioProcessor init;
+        init.setCurrentProgram (kInitPreset);
+        const juce::MemoryBlock initState = saveState (init);
+        initXml = juce::AudioProcessor::getXmlFromBinary (initState.getData(), static_cast<int> (initState.getSize()));
+    }
+    check (initXml != nullptr, "INIT state parses");
+    if (initXml == nullptr)
+    {
+        finish ("testFactoryBankStateRoundTrip");
+        return;
+    }
+
+    for (int index = 0; index < kFactoryPresetCount; ++index)
+    {
+        const FactoryPreset& preset = kFactoryPresets[index];
+        const juce::String name (preset.name);
+        auto fail = [&] (bool ok, const char* what)
+        {
+            if (! ok)
+                std::printf ("  [%02d %s] %s\n", index + 1, preset.name, what);
+            check (ok, what);
+        };
+
+        RoninAudioProcessor p;
+        p.prepareToPlay (48000.0, 256);
+        p.triShapeParameter()->setValueNotifyingHost (1.0f);   // start from PARABOLA: the program must switch it
+        p.setCurrentProgram (index);
+        fail (p.getCurrentProgram() == index, "the program is selected");
+        fail (p.getProgramName (index) == name, "the host sees the program name");
+        fail (p.triShape() == Vco::TriShape::Triangle, "the program is on the true TRIANGLE");
+        fail (p.effectIsOn(), "the program is effect on");
+        fail (p.presetError().isEmpty(), "no load error");
+
+        const juce::MemoryBlock saved = saveState (p);
+        const auto xml = juce::AudioProcessor::getXmlFromBinary (saved.getData(), static_cast<int> (saved.getSize()));
+        fail (xml != nullptr && xml->getIntAttribute ("format") == 2, "saved as state format 2");
+        if (xml == nullptr)
+            continue;
+        fail (xml->getIntAttribute ("vcoTriShape", -1) == 0, "saved TRI SHAPE is TRIANGLE");
+
+        // Knobs: the program's own values by id; every other knob is the INIT (default table) value.
+        for (int k = 0; k < preset.knobCount; ++k)
+        {
+            const juce::String id (preset.knobs[k].id);
+            fail (xml->hasAttribute (id), "every program knob id is a saved host parameter");
+            fail (std::fabs (xml->getDoubleAttribute (id) - static_cast<double> (preset.knobs[k].value)) < 1.0e-6,
+                  "the saved knob is the program value");
+        }
+        for (int a = 0; a < initXml->getNumAttributes(); ++a)
+        {
+            const juce::String id = initXml->getAttributeName (a);
+            if (id == "effectOn" || id == "hqMode" || id == "vcoTriShape" || id.startsWith ("ui") || id == "format"
+                || id == "unit")
+                continue;
+            if (factoryKnob (index, id.toRawUTF8(), -1.0f) >= 0.0f)
+                continue;
+            fail (xml->getStringAttribute (id) == knobDefaultsFromInit (*initXml, id),
+                  "a knob the program does not set is the default table value");
+        }
+
+        // Cables: the program's jack ids, in order (oldest first).
+        const auto* list = xml->getChildByName ("CABLES");
+        fail (list != nullptr && list->getNumChildElements() == preset.cableCount, "every program cable is saved");
+        if (list != nullptr)
+        {
+            int c = 0;
+            for (auto* cable : list->getChildWithTagNameIterator ("CABLE"))
+            {
+                if (c < preset.cableCount)
+                {
+                    fail (cable->getStringAttribute ("from") == juce::String::fromUTF8 (preset.cables[c].from)
+                              && cable->getStringAttribute ("to") == juce::String::fromUTF8 (preset.cables[c].to),
+                          "saved cable matches the program, in order");
+                }
+                ++c;
+            }
+        }
+
+        // Round trip: load the saved state into a fresh instance and save again, byte for byte.
+        RoninAudioProcessor q;
+        q.prepareToPlay (48000.0, 256);
+        q.setStateInformation (saved.getData(), static_cast<int> (saved.getSize()));
+        const juce::MemoryBlock again = saveState (q);
+        fail (again == saved, "the saved state round-trips byte for byte");
+        fail (q.triShape() == Vco::TriShape::Triangle, "the reloaded program stays on TRIANGLE");
+        fail (saveState (p) == saved, "saving twice gives the same bytes");
+    }
+    finish ("testFactoryBankStateRoundTrip");
+}
+
+// Every program sounds and stays in range: 4 s rendered at 48 kHz (HQ off and on). Effect programs get a
+// representative drum-and-chord test input at EXT IN; the self-playing programs get silence, so they must play
+// on their own. Peak above -60 dBFS, at or below 0 dBFS (1.0), no NaN or inf. Level checks only (no exact
+// sample compare), so the result does not depend on FMA contraction or the compiler.
+static void testFactoryBankRenders()
+{
+    const char* wavDir = std::getenv ("RONIN_PRESET_WAV_DIR");
+    for (int index = 0; index < kFactoryPresetCount; ++index)
+    {
+        for (bool hq : { false, true })
+        {
+            juce::AudioBuffer<float> keep;
+            const bool dump = wavDir != nullptr && ! hq;
+            const RenderStats stats = renderProgram (index, hq, hq ? 2.0 : 4.0, dump ? &keep : nullptr);
+            const double peakDb = 20.0 * std::log10 (std::max (1.0e-12, static_cast<double> (stats.peak)));
+            const double rmsDb = 20.0 * std::log10 (std::max (1.0e-12, stats.rms));
+            std::printf ("  %02d %-12s %s input %-5s peak %6.2f dBFS  rms %6.2f dBFS\n", index + 1,
+                         kFactoryPresets[index].name, hq ? "HQ" : "1x", usesExtIn (index) ? "test" : "none", peakDb,
+                         rmsDb);
+            if (! stats.finite)
+                std::printf ("  [%02d] NaN or inf in the output\n", index + 1);
+            check (stats.finite, "no NaN or inf");
+            check (stats.peak > 0.001f, "not silent: peak above -60 dBFS");
+            check (stats.peak <= 1.0f, "no clipping: peak at or below 0 dBFS");
+            if (dump)
+            {
+                const juce::File file = juce::File (wavDir).getChildFile (juce::String (index + 1).paddedLeft ('0', 2) + "_"
+                                                                          + juce::String (kFactoryPresets[index].name).replaceCharacter (' ', '_')
+                                                                          + ".wav");
+                file.deleteFile();
+                juce::WavAudioFormat format;
+                if (auto stream = file.createOutputStream())
+                {
+                    std::unique_ptr<juce::AudioFormatWriter> writer (format.createWriterFor (stream.get(), 48000.0, 2, 24, {}, 0));
+                    if (writer != nullptr)
+                    {
+                        stream.release();
+                        writer->writeFromAudioSampleBuffer (keep, 0, keep.getNumSamples());
+                    }
+                }
+            }
+        }
+    }
+    finish ("testFactoryBankRenders");
+}
+
 int main()
 {
     juce::ScopedJuceInitialiser_GUI juce;
@@ -472,6 +722,8 @@ int main()
     testFormat1MigrationEgAndLegacyInvert();
     testFormat2Xml();
     testSlashJackIdsStateRoundTrip();
+    testFactoryBankStateRoundTrip();
+    testFactoryBankRenders();
     std::printf ("ProcessorTests: %d passed, %d failed\n", gPassed, gFailed);
     return gFailed == 0 ? 0 : 1;
 }

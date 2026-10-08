@@ -93,6 +93,7 @@ int testSampleHoldExtClockWins();
 int testSampleHoldRateChangesInternalClock();
 int testMeterFollowsSelectedJack();
 int testFactoryPresetCount();
+int testFactoryBankData();
 int testInitPresetRoundTrip();
 int testPresetBadVersionStillRejected();
 int testInitPlaysTheInput();

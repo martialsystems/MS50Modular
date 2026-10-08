@@ -590,6 +590,7 @@ int main()
     failed += testSampleHoldRateChangesInternalClock();
     failed += testMeterFollowsSelectedJack();
     failed += testFactoryPresetCount();
+    failed += testFactoryBankData();
     failed += testInitPresetRoundTrip();
     failed += testPresetBadVersionStillRejected();
     failed += testInitPlaysTheInput();
