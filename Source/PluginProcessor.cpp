@@ -80,7 +80,7 @@ RoninAudioProcessor::RoninAudioProcessor()
     integratorModuleIndex_ = graph.addModule (integrator);
     mixerModuleIndex_ = graph.addModule (mixer);
     sampleHoldModuleIndex_ = graph.addModule (sampleHold);
-    // A fresh instance is the Voice program: its cables, the default table, and Effect on.
+    // A fresh instance is the INIT program: its cables, the default table, and Effect on.
     setCurrentProgram (kDefaultFactoryPreset);
 }
 
@@ -492,7 +492,7 @@ void RoninAudioProcessor::applyProgramParameters (int index)
     if (effectOn_ != nullptr)
         effectOn_->setValueNotifyingHost (factoryPresetEffect (index) ? 1.0f : 0.0f);
 
-    // One default table. Hold and the self-mod presets override their knobs. Feedback and the self-mod presets set VCA 1 Initial.
+    // One default table. A factory program may override its knobs and VCA 1 Initial; INIT uses the table as is.
     const FactoryProgramKnobs knobs = factoryProgramKnobs (index);
     restore (vcfCutoff_, knobs.vcfCutoff);
     restore (vcfPeak_, knobs.vcfPeak);

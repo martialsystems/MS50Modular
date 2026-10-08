@@ -114,7 +114,7 @@ Unpatch: drag a drawn cable onto empty space, or right-click it. A jack on the 1
 
 `testPanelKnobs`: 33 knobs, EXT IN is the column beside OUTPUT, a 40px upward drag adds 0.2, Shift is five times finer, the wheel matches that scale, and the divider switch steps between 2 and 4.
 
-`testOneDefaultTable`: every face knob is bound, FaceKnobs and layout.json agree, every host knob is restored by a program load, Voice is the table, and the layout meter law is linear.
+`testOneDefaultTable`: every face knob is bound, FaceKnobs and layout.json agree, every host knob is restored by a program load, INIT is the table, and the layout meter law is linear.
 
 `testTwoLoopsDoNotAllocate`: two feedback loops through one module delay only the newest cable and process with no allocation.
 

@@ -10,7 +10,7 @@ RONIN is a full rack of analog-style modules inside one plugin. Run your track t
 - **Real patching.** Drag cables between jacks. Inputs sum, outputs fan out, and plugs stack on a jack. Cables hang and swing, and you can reorder a stack with a click.
 - **Feedback is allowed.** Close a loop and RONIN delays only the newest cable by one sample, the way a hardware rack behaves, so self-modulation stays stable and repeatable.
 - **An effect first.** Stereo in, stereo out. EXT IN turns your track into a signal, a mono sum and a gate with its own Threshold and Release. The EFFECT switch and MIX knob blend RONIN's patch with your dry signal, and LEVEL sets the output.
-- **13 factory programs.** They range from a dry pass-through and a filtered voice to seven patches that run on their own: Feedback, Filter loop, MG into filter, Stepped cutoff, Ring drone, Delayed bounce and Self ring.
+- **INIT program.** The factory bank is cleared for now and holds only INIT, a filtered voice on your input. New factory programs will be written later.
 - **Every knob is automatable.** Each panel control is a host parameter, and double-click returns it to its default.
 - **A VU meter on any jack.** Click a jack and the meter reads it (±5 V full scale).
 - **Built to be sequenced.** Patch BUSHIDO, RONIN's Jidai Collection partner, into the Hz/V and trigger inputs and RONIN plays sequences.
@@ -21,8 +21,8 @@ VST3 effect, macOS (universal: Apple silicon and Intel) and Linux. Version 0.1 i
 
 ## Quick start
 
-1. Put RONIN on an audio track or bus. It opens on **03 VOICE**: your track runs through the filter and VCA, and EG 1 opens them when the input crosses the EXT IN threshold.
-2. Click the **PRESET** screen to pick a program. Programs 06 and 08 to 12 make sound with no input at all. 13 SELF RING stays silent until something seeds its loop, such as BUSHIDO's CV into RING B.
+1. Put RONIN on an audio track or bus. It opens on **01 INIT**: your track runs through the filter and VCA, and EG 1 opens them when the input crosses the EXT IN threshold.
+2. Click the **PRESET** screen to pick a program. For now the list holds only INIT, and your own patches are saved with the DAW project.
 3. Drag from any jack to another to patch. Drop a plug on empty space to unplug, right-click a cable to remove it, or click a jack to pick from its stack.
 4. Hold the **HOLD** key to open the EXT IN gate by hand.
 5. Use **MIX** to blend wet with dry, and the **EFFECT** switch for a quick bypass to dry.

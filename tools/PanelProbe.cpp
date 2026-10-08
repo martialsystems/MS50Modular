@@ -253,7 +253,7 @@ private:
         const int factoryCount = publishedCount (*processor);
         expect (factoryCount == 8, "default patch has eight cables");
         expect (bay->visualCount() == factoryCount, "default cables are drawn");
-        // Startup is the Voice program: every face knob starts on the default table, cap and parameter alike.
+        // Startup is the INIT program: every face knob starts on the default table, cap and parameter alike.
         for (int i = 0; i < kPanelKnobCount; ++i)
         {
             auto* parameter = processor->parameterForPanelKnob (kPanelKnobs[i].section, kPanelKnobs[i].label);
@@ -274,9 +274,9 @@ private:
             expect (levelParam->getName (64) == "Output Level", "output level parameter name");
             expect (near (levelParam->getValue(), 0.7f), "output level starts at 0.7");
             expect (near (bay->knobValue (levelKnob), 0.7f), "output level cap starts at 0.7");
-            // A fresh instance is the Voice program, so Effect starts on. The dry checks below turn it off.
+            // A fresh instance is the INIT program, so Effect starts on. The dry checks below turn it off.
             expect (processor->effectIsOn(), "a fresh instance starts with Effect on");
-            expect (processor->getCurrentProgram() == kDefaultFactoryPreset, "a fresh instance is Voice");
+            expect (processor->getCurrentProgram() == kDefaultFactoryPreset, "a fresh instance is INIT");
             effect->setValueNotifyingHost (0.0f);
             const float dryUnity = hostLeftAfter (*processor, 0.5f, 0.0f);
             expect (near (dryUnity, 0.5f), "default output level is unity on the dry path");
@@ -767,13 +767,13 @@ private:
         const float row0Y = kPresetBezelY + kPresetBezelH + 3.0f + 5.0f + 10.5f;
         clickAt (*bay, kPresetBezelX + 20.0f, row0Y);
         expect (! bay->presetMenuOpen(), "choosing a preset closes the list");
-        expect (processor->getCurrentProgram() == 0, "the first preset is Dry");
+        expect (processor->getCurrentProgram() == kInitPreset, "the first preset is INIT");
         checkVcaKnobs (*bay, row0Y);
         clickAt (*bay, kPresetBezelX + 12.0f, kPresetBezelY + kPresetBezelH * 0.5f);
         clickAt (*bay, kPresetBezelX + 20.0f, row0Y);
-        expect (processor->getCurrentProgram() == 0, "the first preset is Dry again");
-        expect (bay->outputMix() == 0.0f, "dry preset turns the effect off");
-        expect (publishedCount (*processor) == 2, "dry replaces the cables");
+        expect (processor->getCurrentProgram() == kInitPreset, "the first preset is INIT again");
+        expect (bay->outputMix() != 0.0f, "INIT leaves the effect on");
+        expect (publishedCount (*processor) == 8, "INIT replaces the cables with its eight");
         if (auto* restoredLevel = processor->parameterForPanelKnob ("OUTPUT", "LEVEL"))
             expect (near (restoredLevel->getValue(), 0.7f), "preset restore puts output level back at 0.7");
         if (auto* restoredMix = processor->parameterForPanelKnob ("OUTPUT", "MIX"))
@@ -783,7 +783,7 @@ private:
     }
 
     // VCA 1 and VCA 2 Initial and Mod: bound to the module, double-click returns the module default,
-    // and a preset that opens VCA 1 shows that value on the knob.
+    // and loading INIT puts a raised VCA 1 Initial back at 0 on the knob.
     void checkVcaKnobs (PatchBayView& bay, float row0Y)
     {
         struct VcaKnob { const char* section; const char* label; float moduleDefault; };
@@ -800,7 +800,7 @@ private:
                 continue;
             }
             expect (near (kPanelKnobs[knob].valueDefault, v.moduleDefault), "panel default is the module default");
-            expect (near (bay.knobValue (knob), v.moduleDefault), "Dry shows the module default");
+            expect (near (bay.knobValue (knob), v.moduleDefault), "INIT shows the module default");
             dragKnobLocal (bay, kPanelKnobs[knob].cx, kPanelKnobs[knob].cy, v.moduleDefault > 0.5f ? 60.0f : -60.0f, false);
             expect (! near (parameter->getValue(), v.moduleDefault), "dragging the knob moves its parameter");
             doubleClickKnob (bay, knob);
@@ -810,17 +810,16 @@ private:
 
         const int initial = panelKnobIndex ("VCA 1", "INITIAL");
         auto* initialParam = processor->parameterForPanelKnob ("VCA 1", "INITIAL");
-        clickAt (bay, kPresetBezelX + 12.0f, kPresetBezelY + kPresetBezelH * 0.5f);
-        clickAt (bay, kPresetBezelX + 20.0f, row0Y + 21.0f * static_cast<float> (kFilterLoopPreset));
-        expect (processor->getCurrentProgram() == kFilterLoopPreset, "Filter loop preset loads");
-        expect (near (factoryVca1Initial (kFilterLoopPreset), 0.7f), "Filter loop sets VCA 1 Initial to 0.7");
+        expect (near (factoryVca1Initial (kInitPreset), 0.0f), "INIT leaves VCA 1 Initial at 0");
         if (initial >= 0 && initialParam != nullptr)
         {
-            expect (near (initialParam->getValue(), 0.7f), "preset puts 0.7 on the VCA 1 Initial parameter");
-            expect (near (bay.knobValue (initial), 0.7f), "preset shows 0.7 on the VCA 1 Initial knob");
-            doubleClickKnob (bay, initial);
-            expect (near (bay.knobValue (initial), 0.0f), "double-click returns VCA 1 Initial to 0");
-            expect (near (initialParam->getValue(), 0.0f), "double-click resets the VCA 1 Initial parameter");
+            dragKnobLocal (bay, kPanelKnobs[initial].cx, kPanelKnobs[initial].cy, -60.0f, false);
+            expect (initialParam->getValue() > 0.05f, "dragging raises VCA 1 Initial");
+            clickAt (bay, kPresetBezelX + 12.0f, kPresetBezelY + kPresetBezelH * 0.5f);
+            clickAt (bay, kPresetBezelX + 20.0f, row0Y);
+            expect (processor->getCurrentProgram() == kInitPreset, "INIT loads from the list");
+            expect (near (initialParam->getValue(), 0.0f), "INIT puts the VCA 1 Initial parameter back at 0");
+            expect (near (bay.knobValue (initial), 0.0f), "INIT shows 0 on the VCA 1 Initial knob");
         }
     }
 

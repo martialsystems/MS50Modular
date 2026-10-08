@@ -2,7 +2,7 @@ Copyright (c) 2026 Martial Systems LLC. All rights reserved. RONIN is part of th
 
 # Developing RONIN
 
-Read this before changing code. The DSP behaviour is specified in `docs/SCHEMATICS.md`, the stand-in rules in `docs/METHODOLOGY.md`, the build order in `docs/BUILD_GUIDE.md` and the tests in `docs/TESTPLAN.md`. Factory programs and the default knob table are in `docs/presets.md`.
+Read this before changing code. The DSP behaviour is specified in `docs/SCHEMATICS.md`, the stand-in rules in `docs/METHODOLOGY.md`, the build order in `docs/BUILD_GUIDE.md` and the tests in `docs/TESTPLAN.md`. The factory program (INIT only for now) and the default knob table are in `docs/presets.md`.
 
 ## Repo map
 
@@ -47,7 +47,7 @@ FL Studio on macOS does not open the Debug bundle. After a VST3 change, quit FL 
 * DSP modules do not include JUCE headers. The processor copies buffers in and out.
 * `process()` and `processSample()` do not allocate, lock, or log.
 * Inputs sum. A second cable into an input stays in the graph. Stack order, cable color, and cable shape do not change the sound. The cable rule is in `docs/METHODOLOGY.md`.
-* Knob defaults live in one table, `Source/Modular/PanelDefaults.h`. A test checks that FaceKnobs, `panel/assets/layout.json` and the Voice program agree.
+* Knob defaults live in one table, `Source/Modular/PanelDefaults.h`. A test checks that FaceKnobs, `panel/assets/layout.json` and the INIT program agree.
 * Do not commit DAW projects, samples, `.env` files, or schematic scans.
 * UI work that changes a control or a cable must be clicked through in a real plugin host or a standalone window (the panel probe counts) before it is called done. Say which host.
 * After a VST3 change that should load in FL Studio, run `scripts/install_fl_plugin.sh`. Do not copy a second bundle into `/Library/Audio/Plug-Ins/VST3`.
