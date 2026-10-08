@@ -344,10 +344,8 @@ void VoicePage::paintPage (juce::Graphics& g)
     text (g, { 1100, 90, 440, 18 }, "DRIVE PULL", 11.0f, kLabel);
     lcd (g, { 1200, 114, 240, 30 }, juce::String (Vcf::kInputPull, 3) + " (fixed)", 14.0f);
     const double newOct = std::log2 (Vcf::effectiveHzFor (1000.0, 2.5, Vcf::kInputPull) / 1000.0);
-    const double oldOct = std::log2 (Vcf::effectiveHzFor (1000.0, 2.5, Vcf::kLegacyInputPull) / 1000.0);
-    text (g, { 1100, 150, 440, 30 },
-          "a 2.5 V input pulls the cutoff " + juce::String (newOct, 2) + " oct (was " + juce::String (oldOct, 2)
-              + " at 0.012)", 9.5f, kDim);
+    text (g, { 1100, 150, 440, 30 }, "a 2.5 V input pulls the cutoff down " + juce::String (-newOct, 2) + " octave",
+          9.5f, kDim);
     lcd (g, { 1200, 220, 240, 30 }, "CUTOFF " + str (knobunits::hz (static_cast<double> (filter.effectiveHz()))), 14.0f);
     text (g, { 1100, 256, 440, 30 }, "knob + CV + drive pull, live; sample-rate independent", 9.5f, kDim);
 }
