@@ -193,7 +193,7 @@ static void testTriDefaultByOrigin()
     const auto v1 = makeV1State (user, {}, { { "vcfCutoff", 0.45 } });
     user.setStateInformation (v1.getData(), static_cast<int> (v1.getSize()));
     check (user.triShape() == Vco::TriShape::Parabola, "user format-1 state -> PARABOLA (legacy)");
-    check (reportHas (user, "M-R2"), "the load report records M-R2");
+    check (reportHas (user, "TRI SHAPE set to PARABOLA"), "the load report records M-R2");
     auto* attack = dynamic_cast<juce::RangedAudioParameter*> (user.parameterForPanelKnob ("EG 1", "ATTACK"));
     check (attack != nullptr && std::fabs (attack->getValue() - PanelDefault::kEg1Attack) < 1.0e-6f,
            "an EG knob the session did not store is not migrated twice");
@@ -208,7 +208,7 @@ static void testTriDefaultByOrigin()
         loader.setStateInformation (v2.getData(), static_cast<int> (v2.getSize()));
         check (loader.triShape() == (stored == 1 ? Vco::TriShape::Parabola : Vco::TriShape::Triangle),
                "format-2 state -> the stored value");
-        check (loader.loadedFormat() == 2 && ! reportHas (loader, "M-R2"), "format 2 is not migrated");
+        check (loader.loadedFormat() == 2 && ! reportHas (loader, "TRI SHAPE set to PARABOLA"), "format 2 is not migrated");
     }
     finish ("testTriDefaultByOrigin");
 }
@@ -242,7 +242,7 @@ static void testUserPatchCutoffCompensation()
         std::printf ("  saw: cutoff 0.45 -> %.4f, %.1f Hz vs %.1f Hz (%.3f c)\n", now, newHz, oldHz, cents (newHz, oldHz));
         check (std::fabs (now - 0.385) < 0.001, "VCO SAW -> VCF IN at 0.45 loads at 0.385");
         check (std::fabs (cents (newHz, oldHz)) < 1.0, "same effective cutoff within 1 cent");
-        check (reportHas (p, "M-R5"), "compensation is reported");
+        check (reportHas (p, "same cutoff for the VCO"), "compensation is reported");
     }
     {
         RoninAudioProcessor p;
@@ -296,7 +296,7 @@ static void testFormat1MigrationEgAndLegacyInvert()
     check (n == 3, "three cables load");
     check (n == 3 && cables[0].legacyInvert && ! cables[1].legacyInvert && ! cables[2].legacyInvert,
            "M-R3: only the Gate -> non-S-trig cable gets legacyInvert");
-    check (reportHas (p, "M-R3: 1 cable"), "M-R3 is reported");
+    check (reportHas (p, "1 cable kept its old S-trig inversion"), "M-R3 is reported");
 
     // The flag survives a format-2 save and load.
     const auto v2 = saveState (p);

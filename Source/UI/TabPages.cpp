@@ -315,7 +315,7 @@ void VoicePage::paintPage (juce::Graphics& g)
     auto* shape = processor.triShapeParameter();
     toggle (g, { 160, 244, 240, 26 }, { "TRIANGLE", "PARABOLA (legacy)" }, shape != nullptr ? shape->getIndex() : 0,
             [shape] (int i) { if (shape != nullptr) shape->setValueNotifyingHost (static_cast<float> (i)); });
-    text (g, { 60, 274, 440, 30 }, "new / INIT: TRIANGLE (true PolyBLAMP)  ·  PARABOLA: legacy, used by user v1 patches",
+    text (g, { 60, 274, 440, 30 }, utf8 ("new patches: TRIANGLE (anti-aliased)  \xc2\xb7  PARABOLA: legacy, for older saved patches"),
           9.5f, kDim);
 
     text (g, { 60, 330, 440, 18 }, "FOOTAGE REFERENCE", 11.0f, kLabel);
@@ -336,7 +336,7 @@ void VoicePage::paintPage (juce::Graphics& g)
     toggle (g, { 720, 114, 160, 26 }, { "OFF", "ON" }, hq != nullptr && hq->get() ? 1 : 0,
             [hq] (int i) { if (hq != nullptr) hq->setValueNotifyingHost (static_cast<float> (i)); });
     lcd (g, { 680, 170, 240, 30 }, "latency " + juce::String (processor.getLatencySamples()) + " smp", 14.0f);
-    text (g, { 580, 206, 440, 30 }, "ON runs the engine at 2x and reports 23 samples to the host (JCS R11)", 9.5f, kDim);
+    text (g, { 580, 206, 440, 30 }, "ON runs the engine at 2x and reports 23 samples of latency to the host", 9.5f, kDim);
     lcd (g, { 680, 260, 240, 30 }, "CPU " + juce::String (processor.cpuPercent(), 1) + " %", 14.0f);
 
     // VCF: drive pull (fixed) and live effective cutoff.
@@ -507,7 +507,7 @@ juce::String flagFor (const RoninAudioProcessor& p, const Cable& c)
     const PortDesc to = p.portDesc (c.destModule, c.destPort);
     juce::StringArray flags;
     if (c.legacyInvert)
-        flags.add ("legacyInvert (old S-15 inversion kept)");
+        flags.add ("old inversion kept");
     else if (from.type == PortType::Gate && ! from.strigVolts && to.strigInput)
         flags.add (utf8 ("converted \xe2\x8a\x93\xe2\x86\x92\xe2\x8a\x94"));
     const auto badge = jcs::cableBadge (portRole (from), portRole (to));
@@ -583,7 +583,7 @@ void PatchPage::paintPage (juce::Graphics& g)
         text (g, { 60, 200, 1020, 30 }, "No cables. Patch on the MAIN tab.", 12.0f, kDim);
     text (g, { 60, 486, 1020, 30 },
           utf8 ("click a row to monitor it \xc2\xb7 Del unplugs \xc2\xb7 right-click: colour override, convert, unplug "
-                "\xc2\xb7 colour = source role (JCS R14)"),
+                "\xc2\xb7 colour = source role"),
           9.5f, kDim);
 
     // Jack monitor: the selected cable's two jacks (the input shows its summed volts), and the host output.
@@ -617,7 +617,7 @@ void PatchPage::paintPage (juce::Graphics& g)
     const juce::String db = std::fabs (outL) > 1.0e-6f ? juce::String (20.0 * static_cast<double> (std::log10 (std::fabs (outL))), 1) + " dBFS"
                                                        : juce::String ("-inf dBFS");
     row (230, "OUTPUT:L (dry in)", jcs::Role::Audio, db, std::fabs (outL) > 1.0f);
-    text (g, { 1160, 486, 380, 30 }, "red lamp: |V| > 5.5 V for over 10 ms (JCS R15)", 9.5f, kDim);
+    text (g, { 1160, 486, 380, 30 }, "red lamp: over range, |V| > 5.5 V for over 10 ms", 9.5f, kDim);
 }
 
 void PatchPage::showMenu (int index)
@@ -714,7 +714,7 @@ void SetupPage::paintPage (juce::Graphics& g)
             onCableColourMode();
     });
     text (g, { 60, 240, 700, 30 },
-          "BY ROLE: S-TRIG / AUDIO / V/OCT / GATE-CLK / HZ/V LIN / CV colours (JCS R14). MANUAL: the palette swatches.",
+          "BY ROLE: S-TRIG / AUDIO / V/OCT / GATE-CLK / HZ/V LIN / CV colours. MANUAL: the palette swatches.",
           9.5f, kDim, juce::Justification::centredLeft);
     text (g, { 60, 290, 300, 26 }, "EG TIME DISPLAY", 11.0f, kLabel, juce::Justification::centredLeft);
     toggle (g, { 420, 290, 260, 26 }, { "s", "ms" }, processor.egTimeInMs() ? 1 : 0,
@@ -728,7 +728,7 @@ void SetupPage::paintPage (juce::Graphics& g)
                                                  : "New patch: nothing migrated.");
     for (int i = 0; i < shown.size() && i < 8; ++i)
         lcd (g, { 850, 80.0f + static_cast<float> (i) * 52.0f, 680, 42 }, shown[i], 10.5f);
-    text (g, { 840, 500, 700, 18 }, "format " + juce::String (patchstate::kFormat) + " (JCS R7): knobs by id, cables by jack id",
+    text (g, { 840, 500, 700, 18 }, "patch format " + juce::String (patchstate::kFormat) + ": knobs by id, cables by jack id",
           9.5f, kDim);
 }
 

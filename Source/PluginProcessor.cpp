@@ -786,14 +786,14 @@ void RoninAudioProcessor::loadFormat1 (const juce::XmlElement& xml)
     migrate (eg1Release_, false, stalled);
     migrate (eg2Attack_, true, stalled);
     migrate (eg2Release_, false, stalled);
-    loadReport_.add ("M-R1: EG knobs moved to the real-time law (same segment times).");
+    loadReport_.add ("EG times: knobs moved to the real-time scale; every segment keeps its length.");
     if (stalled)
-        loadReport_.add ("M-R1: an EG attack that used to stall now reaches decay and sustain (a fix).");
+        loadReport_.add ("EG attack: an attack that used to stall now reaches decay and sustain (a fix).");
 
     // M-R2: user-saved format-1 patches keep the parabola triangle.
     if (vcoTriShape_ != nullptr)
         *vcoTriShape_ = 1;
-    loadReport_.add ("M-R2: VCO TRI SHAPE set to PARABOLA (legacy), the shape this patch was saved with.");
+    loadReport_.add ("VCO TRI SHAPE set to PARABOLA (legacy), the shape this patch was saved with.");
 
     // M-R3: Gate -> non-S-trig cables keep their old inversion.
     Cable cables[PatchGraph::kMaxCables];
@@ -802,8 +802,8 @@ void RoninAudioProcessor::loadFormat1 (const juce::XmlElement& xml)
     if (marked > 0)
     {
         graph.setCables (cables, count);
-        loadReport_.add ("M-R3: " + juce::String (marked) + (marked == 1 ? " cable kept its" : " cables kept their")
-                         + " old S-trig inversion (legacyInvert).");
+        loadReport_.add (juce::String (marked) + (marked == 1 ? " cable kept its" : " cables kept their")
+                         + " old S-trig inversion.");
     }
 
     // M-R5: drive-pull cutoff compensation, only for a direct VCO SAW or PULSE cable into VCF IN.
@@ -814,13 +814,13 @@ void RoninAudioProcessor::loadFormat1 (const juce::XmlElement& xml)
         const double old = static_cast<double> (vcfCutoff_->convertTo0to1 (vcfCutoff_->get()));
         const double now = patchstate::compensateCutoff (old, level);
         *vcfCutoff_ = vcfCutoff_->convertFrom0to1 (static_cast<float> (now));
-        loadReport_.add ("M-R5: VCF CUTOFF " + juce::String (old, 3) + " -> " + juce::String (now, 3)
+        loadReport_.add ("VCF CUTOFF " + juce::String (old, 3) + " -> " + juce::String (now, 3)
                          + " (same cutoff for the VCO " + (feed == patchstate::VcfFeed::VcoSaw ? "SAW" : "PULSE")
                          + " under the new drive pull).");
     }
     else if (feed != patchstate::VcfFeed::None)
     {
-        loadReport_.add ("M-R5: VCF CUTOFF left as saved: the VCF input is not a single direct VCO SAW or PULSE "
+        loadReport_.add ("VCF CUTOFF left as saved: the VCF input is not a single direct VCO SAW or PULSE "
                          "cable, so its level is unknown. The filter may sound brighter under the new drive pull.");
     }
 }
