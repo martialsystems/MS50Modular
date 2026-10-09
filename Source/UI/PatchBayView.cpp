@@ -676,7 +676,7 @@ juce::String PatchBayView::frameSignature() const
     return s;
 }
 
-void PatchBayView::paintBackdrop (juce::Graphics& g)
+void PatchBayView::drawStaticLayer (juce::Graphics& g)
 {
     // The plate fill and the panel art never change: draw them once into an image at the physical pixel size and
     // copy it. At a 1:1 pixel scale the copy is bit-identical to drawing them directly.
@@ -1534,7 +1534,7 @@ void PatchBayView::timerCallback()
 
 void PatchBayView::paint (juce::Graphics& g)
 {
-    paintBackdrop (g);
+    drawStaticLayer (g);
     const auto origin = panelOrigin();
     const float scale = panelScale();
 

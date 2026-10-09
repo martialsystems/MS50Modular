@@ -84,7 +84,7 @@ private:
 
     void timerCallback() override;
     void updateTimer();
-    void paintBackdrop (juce::Graphics&);
+    void drawStaticLayer (juce::Graphics&);
     juce::Rectangle<int> designRectToLocal (float x, float y, float w, float h) const;
     juce::String frameSignature() const;
     void showStatus (const char* text);
