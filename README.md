@@ -1,3 +1,5 @@
+> **Found a bug?** Please [open a GitHub issue](https://github.com/martialsystems/Ronin/issues/new/choose) and fill in the bug report form.
+
 # RONIN
 
 **A semi-modular synthesizer you patch as an effect. Part of the Jidai Collection by Martial Systems.**
