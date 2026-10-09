@@ -44,7 +44,8 @@ set(RONIN_PLUGIN_SOURCES
   Source/PluginProcessor.cpp
   Source/PluginEditor.cpp
   Source/UI/TabPages.cpp
-  Source/UI/PatchBayView.cpp)
+  Source/UI/PatchBayView.cpp
+  Source/UI/ListControl.cpp)
 
 # Compiler command-line family. clang-cl reports CXX_COMPILER_ID Clang but takes MSVC-style options.
 if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")

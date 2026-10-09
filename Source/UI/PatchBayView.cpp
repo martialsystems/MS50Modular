@@ -3,6 +3,7 @@
 #include "UI/PatchBayView.h"
 
 #include "Modular/EffectSwitch.h"
+#include "Modular/FloatCompare.h"
 #include "Modular/PatchState.h"
 #include "Modular/Port.h"
 #include "PanelAssets.h"
@@ -613,6 +614,7 @@ PatchBayView::PatchBayView (RoninAudioProcessor& processor)
     : audioProcessor (processor)
 {
     setWantsKeyboardFocus (true);
+    setOpaque (true);   // paint covers every pixel (the cached plate), so partial repaints skip the parent
     stroke_.preallocateSpace (768);
     menu_ = std::make_unique<StackMenu> (*this);
     addChildComponent (*menu_);
@@ -621,7 +623,91 @@ PatchBayView::PatchBayView (RoninAudioProcessor& processor)
 
     panel_ = loadPanelBackground();
     reloadPublishedCables();
-    startTimerHz (60);
+    for (int i = 0; i < kPanelKnobCount; ++i)
+        paintedKnob_[i] = -1.0f;
+    updateTimer();
+}
+
+void PatchBayView::visibilityChanged()
+{
+    updateTimer();
+}
+
+void PatchBayView::parentHierarchyChanged()
+{
+    updateTimer();
+}
+
+void PatchBayView::updateTimer()
+{
+    // 60 Hz while the MAIN face is visible (or not yet on a desktop, as in the probe); stopped on other tabs.
+    const bool wanted = isVisible() && (getPeer() == nullptr ? true : isShowing());
+    if (wanted && ! isTimerRunning())
+    {
+        paintedSignature_.clear();   // first frame after showing repaints everything
+        startTimerHz (60);
+    }
+    else if (! wanted && isTimerRunning())
+        stopTimer();
+}
+
+juce::Rectangle<int> PatchBayView::designRectToLocal (float x, float y, float w, float h) const
+{
+    const auto origin = panelOrigin();
+    const float scale = panelScale();
+    return juce::Rectangle<float> (origin.x + x * scale, origin.y + y * scale, w * scale, h * scale)
+        .getSmallestIntegerContainer()
+        .expanded (2);
+}
+
+juce::String PatchBayView::frameSignature() const
+{
+    // Everything the timer can change besides ropes, knobs and the needle. A change repaints the whole face.
+    juce::String s;
+    s << audioProcessor.getCurrentProgram() << '|' << (audioProcessor.effectIsOn() ? 1 : 0) << '|'
+      << (audioProcessor.extInButtonHeld() ? 1 : 0) << '|' << audioProcessor.presetError() << '|' << status_ << '|'
+      << hoverJack_ << '|' << count_ << '|' << (grabActive_ ? 1 : 0) << '|' << (presetMenu_ ? 1 : 0) << '|'
+      << currentColor_ << '|' << getWidth() << 'x' << getHeight() << '|' << knobReadout_;
+    Cable published[kPatchBayMaxCables] {};
+    const int n = audioProcessor.copyPublishedCables (published, kPatchBayMaxCables);
+    s << '|' << n << '|' << (audioProcessor.cableColourByRole() ? 1 : 0);
+    for (int i = 0; i < n; ++i)
+        s << ',' << static_cast<juce::int64> (published[i].colour) << (published[i].legacyInvert ? 'L' : 'n');
+    return s;
+}
+
+void PatchBayView::paintBackdrop (juce::Graphics& g)
+{
+    // The plate fill and the panel art never change: draw them once into an image at the physical pixel size and
+    // copy it. At a 1:1 pixel scale the copy is bit-identical to drawing them directly.
+    const float physical = juce::jmax (0.25f, g.getInternalContext().getPhysicalPixelScaleFactor());
+    const int w = juce::jmax (1, juce::roundToInt (static_cast<float> (getWidth()) * physical));
+    const int h = juce::jmax (1, juce::roundToInt (static_cast<float> (getHeight()) * physical));
+    if (! backdrop_.isValid() || backdrop_.getWidth() != w || backdrop_.getHeight() != h
+        || ! ronin::exactlyEqual (backdropScale_, physical))
+    {
+        backdrop_ = juce::Image (juce::Image::ARGB, w, h, false, juce::SoftwareImageType());
+        backdropScale_ = physical;
+        juce::Graphics ig (backdrop_);
+        ig.addTransform (juce::AffineTransform::scale (physical));
+        ig.fillAll (juce::Colour (0xff101012));
+        const auto origin = panelOrigin();
+        const float scale = panelScale();
+        const auto area = juce::Rectangle<float> (origin.x, origin.y, kPanelW * scale, kPanelH * scale);
+        if (panel_ != nullptr)
+        {
+            // Wear sticks outside the viewBox. Fit the viewBox, not the drawable bounds, so the knobs land on the ticks.
+            juce::Graphics::ScopedSaveState clip (ig);
+            ig.reduceClipRegion (area.toNearestInt());
+            panel_->draw (ig, 1.0f, juce::AffineTransform::scale (scale, scale).translated (origin.x, origin.y));
+        }
+        else
+            ig.fillAll (juce::Colour (0xff1a1a1c));
+    }
+    if (ronin::exactlyEqual (physical, 1.0f))
+        g.drawImageAt (backdrop_, 0, 0);
+    else
+        g.drawImageTransformed (backdrop_, juce::AffineTransform::scale (1.0f / physical));
 }
 
 PatchBayView::~PatchBayView()
@@ -1384,24 +1470,73 @@ void PatchBayView::timerCallback()
     syncHostKnobs();
     prepareRopes (true);
     stepRopes();
-    repaint();
+
+    // Repaint only what changed: moving ropes (old and new extent), turned knobs, the meter needle.
+    const juce::String signature = frameSignature();
+    if (signature != paintedSignature_)
+    {
+        paintedSignature_ = signature;
+        for (int i = 0; i < kPanelKnobCount; ++i)
+            paintedKnob_[i] = knobValue_[i];
+        paintedNeedle_ = Meter::needle (audioProcessor.meterVolts());
+        for (int c = 0; c < count_; ++c)
+            std::memcpy (prevNodes_[c], ropes_[c].p, sizeof (ropes_[c].p));
+        lastDirty_ = getLocalBounds();
+        repaint();
+        return;
+    }
+    juce::RectangleList<int> dirty;
+    constexpr float kRopeMargin = 30.0f;   // plug radius, stack offset, shadow
+    for (int c = 0; c < count_; ++c)
+    {
+        if (! ropes_[c].ready)
+            continue;
+        bool moved = false;
+        float x0 = 1.0e9f, y0 = 1.0e9f, x1 = -1.0e9f, y1 = -1.0e9f;
+        for (int n = 0; n < kNodes; ++n)
+        {
+            const float ax = prevNodes_[c][n][0], ay = prevNodes_[c][n][1];
+            const float bx = ropes_[c].p[n][0], by = ropes_[c].p[n][1];
+            // prevNodes_ holds where the rope was last painted: a settling rope that creeps by less than a
+            // twentieth of a design pixel is not repainted every frame.
+            moved = moved || std::fabs (ax - bx) > 0.05f || std::fabs (ay - by) > 0.05f;
+            x0 = std::min ({ x0, ax, bx });
+            y0 = std::min ({ y0, ay, by });
+            x1 = std::max ({ x1, ax, bx });
+            y1 = std::max ({ y1, ay, by });
+        }
+        if (moved)
+        {
+            dirty.add (designRectToLocal (x0 - kRopeMargin, y0 - kRopeMargin, x1 - x0 + 2.0f * kRopeMargin,
+                                          y1 - y0 + 2.0f * kRopeMargin));
+            std::memcpy (prevNodes_[c], ropes_[c].p, sizeof (ropes_[c].p));
+        }
+    }
+    for (int i = 0; i < kPanelKnobCount; ++i)
+    {
+        if (ronin::exactlyEqual (paintedKnob_[i], knobValue_[i]))
+            continue;
+        paintedKnob_[i] = knobValue_[i];
+        const PanelKnobRec& k = kPanelKnobs[i];
+        const float r = k.radius + 10.0f;
+        dirty.add (designRectToLocal (k.cx - r, k.cy - r, 2.0f * r, 2.0f * r));
+    }
+    const float needle = Meter::needle (audioProcessor.meterVolts());
+    if (! ronin::exactlyEqual (needle, paintedNeedle_))
+    {
+        paintedNeedle_ = needle;
+        dirty.add (designRectToLocal (kMeterFaceX, kMeterFaceY, kMeterFaceW, kMeterFaceH));
+    }
+    lastDirty_ = dirty.getBounds();
+    for (const auto& r : dirty)
+        repaint (r);
 }
 
 void PatchBayView::paint (juce::Graphics& g)
 {
-    g.fillAll (juce::Colour (0xff101012));
+    paintBackdrop (g);
     const auto origin = panelOrigin();
     const float scale = panelScale();
-    const auto area = juce::Rectangle<float> (origin.x, origin.y, kPanelW * scale, kPanelH * scale);
-    if (panel_ != nullptr)
-    {
-        // Wear sticks outside the viewBox. Fit the viewBox, not the drawable bounds, so the knobs land on the ticks.
-        juce::Graphics::ScopedSaveState clip (g);
-        g.reduceClipRegion (area.toNearestInt());
-        panel_->draw (g, 1.0f, juce::AffineTransform::scale (scale, scale).translated (origin.x, origin.y));
-    }
-    else
-        g.fillAll (juce::Colour (0xff1a1a1c));
 
     int levelA[kPatchBayMaxCables] {};
     int levelB[kPatchBayMaxCables] {};
@@ -1613,15 +1748,19 @@ void PatchBayView::paint (juce::Graphics& g)
             const juce::String shown = (juce::String (row == current ? ">" : " ")
                                         + presetScreenLine (row, audioProcessor.getProgramName (row)))
                                            .substring (0, kPresetChars);
-            const auto dots = rowRect.reduced (3.0f * scale, 1.0f * scale);
-            paintLcdDots (g, dots, shown, hi ? juce::Colour (0xffa6b192) : juce::Colour (0xff1e2419),
-                          hi ? 0.08f : 0.09f);
+            // Lists use a plain font (the screen itself keeps its dot matrix).
+            const auto rowText = rowRect.reduced (6.0f * scale, 0.0f);
+            g.setColour (hi ? juce::Colour (0xffa6b192) : juce::Colour (0xff1e2419));
+            g.setFont (juce::Font (juce::FontOptions (juce::jmax (12.0f, rowRect.getHeight() * 0.72f))).boldened());
+            g.drawFittedText (shown, rowText.toNearestInt(), juce::Justification::centredLeft, 1, 0.75f);
         }
     }
 }
 
 void PatchBayView::resized()
 {
+    backdrop_ = juce::Image();   // the static layer is re-drawn at the new size
+    paintedSignature_.clear();
 }
 
 void PatchBayView::mouseMove (const juce::MouseEvent& event)
@@ -1694,7 +1833,18 @@ void PatchBayView::mouseDown (const juce::MouseEvent& event)
     {
         if (extInButtonAt (design.x, design.y))
             return;
+        // A list control opens its whole list (current ticked).
+        if (presetAt (design.x, design.y))
+        {
+            listRightClick (1);
+            return;
+        }
         const int typedKnob = knobAt (design.x, design.y);
+        if (typedKnob >= 0 && kPanelKnobs[typedKnob].kind == 1)
+        {
+            listRightClick (0);
+            return;
+        }
         if (typedKnob >= 0 && kPanelKnobs[typedKnob].kind != 1 && parameterForKnob (typedKnob) != nullptr)
         {
             openValueEditor (typedKnob);
@@ -1758,6 +1908,7 @@ void PatchBayView::mouseDown (const juce::MouseEvent& event)
         knobDragIndex_ = knob;
         knobDragStartY_ = event.position.y;
         knobDragStartValue_ = knobValue_[knob];
+        knobShift_ = event.mods.isShiftDown();
         gestureParam_ = parameterForKnob (knob);
         if (gestureParam_ != nullptr)
             gestureParam_->beginChangeGesture();
@@ -1841,10 +1992,9 @@ void PatchBayView::mouseUp (const juce::MouseEvent& event)
         knobSuppressSwitchStep_ = false;
         if (! suppress && ! moved && index >= 0 && index < kPanelKnobCount && kPanelKnobs[index].kind == 1)
         {
-            const float next = panelKnobSwitchClick (knobValue_[index]);
-            setKnobValue (index, next);
-            if (gestureParam_ != nullptr)
-                gestureParam_->setValueNotifyingHost (clampf (next, 0.0f, 1.0f));
+            endGesture();
+            switchClick (index, knobShift_);
+            return;
         }
         endGesture();
         return;
@@ -2073,6 +2223,78 @@ bool PatchBayView::typeKnobValue (int knob, const juce::String& text)
     parameter->endChangeGesture();
     setKnobValue (knob, v);
     return true;
+}
+
+namespace {
+
+int ratioSwitchKnob() noexcept
+{
+    for (int i = 0; i < kPanelKnobCount; ++i)
+        if (kPanelKnobs[i].kind == 1)
+            return i;
+    return -1;
+}
+
+juce::StringArray ratioItems()
+{
+    return { juce::String::fromUTF8 ("\xc3\xb7 2"), juce::String::fromUTF8 ("\xc3\xb7 4") };
+}
+
+}
+
+std::vector<ronin_ui::ListControl> PatchBayView::listControls() const
+{
+    std::vector<ronin_ui::ListControl> lists;
+    const int knob = ratioSwitchKnob();
+    if (knob >= 0)
+    {
+        const PanelKnobRec& rec = kPanelKnobs[knob];
+        juce::Component::SafePointer<PatchBayView> safe (const_cast<PatchBayView*> (this));
+        lists.push_back ({ "DIV RATIO SWITCH", ratioItems(), knobValue_[knob] < 0.5f ? 0 : 1, true,
+                           { rec.hitX, rec.hitY, rec.hitW, rec.hitH },
+                           [safe, knob] (int i) {
+                               if (safe == nullptr)
+                                   return;
+                               auto* parameter = safe->parameterForKnob (knob);
+                               const float value = i == 0 ? 0.0f : 1.0f;
+                               safe->setKnobValue (knob, value);
+                               if (parameter != nullptr)
+                               {
+                                   parameter->beginChangeGesture();
+                                   parameter->setValueNotifyingHost (value);
+                                   parameter->endChangeGesture();
+                               }
+                               safe->repaint();
+                           } });
+    }
+    juce::StringArray programs;
+    for (int i = 0; i < audioProcessor.getNumPrograms(); ++i)
+        programs.add (presetScreenLine (i, audioProcessor.getProgramName (i)));
+    juce::Component::SafePointer<PatchBayView> safe (const_cast<PatchBayView*> (this));
+    lists.push_back ({ "PRESET", programs, audioProcessor.getCurrentProgram(), false,
+                       { kPresetBezelX, kPresetBezelY, kPresetBezelW, kPresetBezelH },
+                       [safe] (int i) { if (safe != nullptr) safe->choosePreset (i); } });
+    return lists;
+}
+
+void PatchBayView::switchClick (int knob, bool back)
+{
+    if (knob < 0 || knob >= kPanelKnobCount || kPanelKnobs[knob].kind != 1)
+        return;
+    const auto lists = listControls();
+    const auto& list = lists[0];
+    list.choose (ronin_ui::stepIndex (list.current, list.items.size(), back));
+}
+
+void PatchBayView::listRightClick (int control)
+{
+    const auto lists = listControls();
+    if (control < 0 || control >= static_cast<int> (lists.size()))
+        return;
+    endGesture();
+    presetMenu_ = false;
+    ronin_ui::showListMenu (lists[static_cast<size_t> (control)], this);
+    repaint();
 }
 
 void PatchBayView::setKnobValue (int index, float value)

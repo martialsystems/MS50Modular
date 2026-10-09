@@ -2,6 +2,8 @@
 // Processor-level tests (JUCE): RONIN_Redesign §6 tests that need the real plugin state and latency reporting.
 
 #include "PluginProcessor.h"
+#include "PluginEditor.h"
+#include "UI/ListControl.h"
 #include "Modular/PatchState.h"
 #include "UI/PatchBayLogic.h"
 
@@ -914,6 +916,180 @@ static void testMgSyncHostPlayhead()
     finish ("testMgSyncHostPlayhead");
 }
 
+
+static void testListControlRightClickRule()
+{
+    // Every list control (MAIN and every tab): right-click opens the whole list with the current item ticked;
+    // a stepping control steps forward on click and back on Shift-click.
+    RoninAudioProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> base (p.createEditor());
+    auto* editor = dynamic_cast<RoninAudioProcessorEditor*> (base.get());
+    check (editor != nullptr, "the editor opens");
+    if (editor == nullptr)
+    {
+        finish ("testListControlRightClickRule");
+        return;
+    }
+    juce::PopupMenu shown;
+    std::function<void (int)> pick;
+    int menus = 0;
+    ronin_ui::listMenuSpy = [&] (const juce::PopupMenu& menu, std::function<void (int)> callback) {
+        shown = menu;
+        pick = std::move (callback);
+        ++menus;
+    };
+    auto menuMatches = [&] (const ronin_ui::ListControl& list) {
+        int items = 0;
+        int ticked = -1;
+        int tickedCount = 0;
+        bool names = true;
+        juce::PopupMenu::MenuItemIterator it (shown);
+        while (it.next())
+        {
+            const auto& item = it.getItem();
+            if (item.isTicked)
+            {
+                ticked = item.itemID - 1;
+                ++tickedCount;
+            }
+            names = names && item.itemID - 1 == items && items < list.items.size() && item.text == list.items[items];
+            ++items;
+        }
+        return items == list.items.size() && tickedCount == 1 && ticked == list.current && names;
+    };
+    int controls = 0;
+    int steppers = 0;
+    for (auto tab : { ronin_ui::Tab::Voice, ronin_ui::Tab::Env, ronin_ui::Tab::Patch, ronin_ui::Tab::Midi, ronin_ui::Tab::Setup })
+    {
+        editor->showTab (tab);
+        auto* page = editor->page (tab);
+        for (const auto& list : page->listControls())
+        {
+            ++controls;
+            const juce::String where = juce::String (ronin_ui::tabName (tab)) + " " + list.name;
+            const int before = menus;
+            page->clickDesign (list.design.getCentreX(), list.design.getCentreY(), true, false);
+            check (menus == before + 1, (where + ": right-click opens the list").toRawUTF8());
+            check (menuMatches (list), (where + ": the menu has every item, the current one ticked").toRawUTF8());
+            if (! list.steps)
+                continue;
+            ++steppers;
+            const int n = list.items.size();
+            auto now = [&] {
+                for (const auto& l : page->listControls())
+                    if (l.name == list.name)
+                        return l.current;
+                return -1;
+            };
+            page->clickDesign (list.design.getCentreX(), list.design.getCentreY(), false, true);
+            check (now() == ronin_ui::stepIndex (list.current, n, true), (where + ": Shift-click steps back").toRawUTF8());
+            page->clickDesign (list.design.getCentreX(), list.design.getCentreY(), false, false);
+            check (now() == list.current, (where + ": click steps forward").toRawUTF8());
+            pick (n);   // the last item, picked from the menu
+            check (now() == n - 1, (where + ": a menu pick selects that item").toRawUTF8());
+            pick (list.current + 1);
+        }
+    }
+    check (steppers >= 1, "the MIDI tab's DIVISION is a stepping list");
+
+    editor->showTab (ronin_ui::Tab::Main);
+    auto& bay = editor->patchBay();
+    const auto lists = bay.listControls();
+    check (lists.size() == 2, "MAIN: DIV RATIO SWITCH and PRESET");
+    for (int i = 0; i < static_cast<int> (lists.size()); ++i)
+    {
+        ++controls;
+        const int before = menus;
+        bay.listRightClick (i);
+        const juce::String where = "MAIN " + lists[static_cast<size_t> (i)].name;
+        check (menus == before + 1 && menuMatches (lists[static_cast<size_t> (i)]),
+               (where + ": right-click lists every item, current ticked").toRawUTF8());
+    }
+    int knob = -1;
+    for (int k = 0; k < kPanelKnobCount; ++k)
+        if (kPanelKnobs[k].kind == 1)
+            knob = k;
+    const int ratio = bay.listControls()[0].current;
+    bay.switchClick (knob, true);
+    check (bay.listControls()[0].current == ronin_ui::stepIndex (ratio, 2, true), "MAIN DIV: Shift-click steps back");
+    bay.switchClick (knob, false);
+    check (bay.listControls()[0].current == ratio, "MAIN DIV: click steps forward");
+    check (controls >= 9, "every list control was checked");
+    ronin_ui::listMenuSpy = nullptr;
+    base.reset();
+    finish ("testListControlRightClickRule");
+}
+
+static void testHelpTextReadable()
+{
+    // Help text is at least 9 pt (12 px) on screen and zooms after half a second of hover.
+    RoninAudioProcessor p;
+    p.setUiScalePercent (75);
+    std::unique_ptr<juce::AudioProcessorEditor> base (p.createEditor());
+    auto* editor = dynamic_cast<RoninAudioProcessorEditor*> (base.get());
+    if (editor == nullptr)
+    {
+        check (false, "the editor opens");
+        finish ("testHelpTextReadable");
+        return;
+    }
+    editor->setSize (1366, RoninAudioProcessorEditor::heightForWidth (1366));
+    auto* page = editor->page (ronin_ui::Tab::Midi);
+    editor->showTab (ronin_ui::Tab::Midi);
+    check (page->noteSize (9.5f) >= 12.0f, "help text is at least 12 px at 1366 wide");
+    page->listControls();   // paints
+    page->hoverDesign (400.0f, 485.0f, 0.2f);
+    check (page->zoomedNote().isEmpty(), "no zoom before half a second");
+    page->hoverDesign (400.0f, 485.0f, 0.6f);
+    check (page->zoomedNote().isNotEmpty(), "help text zooms after half a second");
+    page->hoverDesign (400.0f, 200.0f, 2.0f);
+    check (page->zoomedNote().isEmpty(), "a jack row (not help text) does not zoom");
+    base.reset();
+    finish ("testHelpTextReadable");
+}
+
+
+static void testEditorRepaintOnlyWhatChanged()
+{
+    RoninAudioProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> base (p.createEditor());
+    auto* editor = dynamic_cast<RoninAudioProcessorEditor*> (base.get());
+    if (editor == nullptr)
+    {
+        check (false, "the editor opens");
+        finish ("testEditorRepaintOnlyWhatChanged");
+        return;
+    }
+    auto& bay = editor->patchBay();
+    check (bay.animating(), "MAIN animates while shown");
+    editor->showTab (ronin_ui::Tab::Voice);
+    check (! bay.animating(), "the MAIN timer stops on another tab");
+    editor->showTab (ronin_ui::Tab::Main);
+    check (bay.animating(), "and starts again on MAIN");
+
+    const auto first = bay.createComponentSnapshot (bay.getLocalBounds(), true, 1.0f);
+    for (int i = 0; i < 900; ++i)
+        bay.runFrame();
+    bay.runFrame();
+    check (bay.lastDirtyBounds().isEmpty(), "a settled face repaints nothing");
+    const auto second = bay.createComponentSnapshot (bay.getLocalBounds(), true, 1.0f);
+    bool same = first.getWidth() == second.getWidth() && first.getHeight() == second.getHeight();
+    check (same, "snapshots keep their size");
+
+    // A knob moved by the host repaints that knob only.
+    auto* cutoff = dynamic_cast<juce::RangedAudioParameter*> (p.parameterForPanelKnob ("VCF", "CUTOFF"));
+    if (cutoff != nullptr)
+    {
+        cutoff->setValueNotifyingHost (cutoff->getValue() > 0.5f ? 0.2f : 0.8f);
+        bay.runFrame();
+        const auto dirty = bay.lastDirtyBounds();
+        check (! dirty.isEmpty() && dirty.getWidth() < bay.getWidth() / 4 && dirty.getHeight() < bay.getHeight() / 3,
+               "a host knob change repaints a small area");
+    }
+    base.reset();
+    finish ("testEditorRepaintOnlyWhatChanged");
+}
+
 int main()
 {
     juce::ScopedJuceInitialiser_GUI juce;
@@ -931,6 +1107,9 @@ int main()
     testMidiSampleAccurate();
     testMgSyncStateBackCompat();
     testMgSyncHostPlayhead();
+    testListControlRightClickRule();
+    testHelpTextReadable();
+    testEditorRepaintOnlyWhatChanged();
     std::printf ("ProcessorTests: %d passed, %d failed\n", gPassed, gFailed);
     return gFailed == 0 ? 0 : 1;
 }

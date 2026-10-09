@@ -9,6 +9,7 @@ RoninAudioProcessorEditor::RoninAudioProcessorEditor (RoninAudioProcessor& audio
       voice (audioProcessor),
       env (audioProcessor),
       patch (audioProcessor),
+      midi (audioProcessor),
       setup (audioProcessor)
 {
     addAndMakeVisible (bay);
@@ -16,11 +17,13 @@ RoninAudioProcessorEditor::RoninAudioProcessorEditor (RoninAudioProcessor& audio
     addChildComponent (voice);
     addChildComponent (env);
     addChildComponent (patch);
+    addChildComponent (midi);
     addChildComponent (setup);
     strip.onChange = [this] (ronin_ui::Tab tab) { showTab (tab); };
     setup.onScale = [this] (int percent) { applyScale (percent); };
     setup.onCableColourMode = [this] { bay.repaint(); };
     patch.onCablesChanged = [this] { bay.reloadCablesFromGraph(); };
+    midi.onCablesChanged = [this] { bay.reloadCablesFromGraph(); };
 
     // Art 1600 x 564 plus the 36 px strip: 1600 x 600 design. Scale steps 75 .. 200 % of 1280.
     constrainer.setFixedAspectRatio (1600.0 / (564.0 + static_cast<double> (ronin_ui::kStripH)));
@@ -40,6 +43,7 @@ ronin_ui::Page* RoninAudioProcessorEditor::page (ronin_ui::Tab tab) noexcept
         case ronin_ui::Tab::Voice: return &voice;
         case ronin_ui::Tab::Env: return &env;
         case ronin_ui::Tab::Patch: return &patch;
+        case ronin_ui::Tab::Midi: return &midi;
         case ronin_ui::Tab::Setup: return &setup;
         case ronin_ui::Tab::Main: break;
     }
@@ -54,7 +58,7 @@ void RoninAudioProcessorEditor::showTab (ronin_ui::Tab tab)
         return;
     }
     bay.setVisible (tab == ronin_ui::Tab::Main);
-    for (auto t : { ronin_ui::Tab::Voice, ronin_ui::Tab::Env, ronin_ui::Tab::Patch, ronin_ui::Tab::Setup })
+    for (auto t : { ronin_ui::Tab::Voice, ronin_ui::Tab::Env, ronin_ui::Tab::Patch, ronin_ui::Tab::Midi, ronin_ui::Tab::Setup })
         page (t)->setVisible (t == tab);
     if (tab == ronin_ui::Tab::Main)
         bay.repaint();
@@ -81,5 +85,6 @@ void RoninAudioProcessorEditor::resized()
     voice.setBounds (area);
     env.setBounds (area);
     patch.setBounds (area);
+    midi.setBounds (area);
     setup.setBounds (area);
 }
