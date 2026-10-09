@@ -626,5 +626,11 @@ int main()
     failed += testKnobTypeValue();
     failed += testGraphOverRangeR15();
     failed += testBadgeMatchesGraphConversion();
+    failed += testMidiNoteMapping();
+    failed += testMidiGateVelocity();
+    failed += testMidiLegatoLastNote();
+    failed += testMidiJackIdsAndFormat1();
+    failed += testMgSyncPhaseLock();
+    failed += testMgSyncFallbacks();
     return failed == 0 ? 0 : 1;
 }

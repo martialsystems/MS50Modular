@@ -3,6 +3,7 @@
 #include "PatchState.h"
 
 #include "EgLaw.h"
+#include "MidiJacks.h"
 #include "UI/PatchBayLogic.h"
 #include "Vcf.h"
 #include "Vco.h"
@@ -23,6 +24,9 @@ bool address (const RackIndices& r, int jack, int& module, int& port)
 
 std::string jackId (const RackIndices& rack, int module, int port)
 {
+    if (module >= 0 && module == rack.midi)
+        return port >= 0 && port < midijacks::kCount ? std::string (midijacks::kSection) + ":" + midijacks::label (port)
+                                                     : std::string();
     for (int jack = 0; jack < kPanelJackCount; ++jack)
     {
         int m = -1;
@@ -53,6 +57,19 @@ bool jackAddress (const RackIndices& rack, const std::string& rawId, int& module
         return false;
     const std::string& section = parsed->section;
     const std::string& label = parsed->label;
+    if (section == midijacks::kSection)
+    {
+        for (int p = 0; p < midijacks::kCount; ++p)
+        {
+            if (rack.midi >= 0 && label == midijacks::label (p))
+            {
+                module = rack.midi;
+                port = p;
+                return true;
+            }
+        }
+        return false;
+    }
     for (int jack = 0; jack < kPanelJackCount; ++jack)
     {
         if (section == kPanelJacks[jack].section && label == kPanelJacks[jack].label)

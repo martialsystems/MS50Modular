@@ -10,7 +10,7 @@
 // Fixed rack. The caller owns each Module. The graph only stores the address.
 class PatchGraph {
 public:
-    static constexpr int kMaxModules = 16;
+    static constexpr int kMaxModules = 20;   // RONIN's 16 panel modules plus MIDI IN, with headroom
     static constexpr int kMaxCables = 64;
     static constexpr int kMaxPorts = 8;
 
