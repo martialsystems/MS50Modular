@@ -1038,11 +1038,11 @@ static void testHelpTextReadable()
     editor->showTab (ronin_ui::Tab::Midi);
     check (page->noteSize (9.5f) >= 12.0f, "help text is at least 12 px at 1366 wide");
     page->listControls();   // paints
-    page->hoverDesign (400.0f, 485.0f, 0.2f);
+    page->hoverDesign (400.0f, 485.0f, 0.2);
     check (page->zoomedNote().isEmpty(), "no zoom before half a second");
-    page->hoverDesign (400.0f, 485.0f, 0.6f);
+    page->hoverDesign (400.0f, 485.0f, 0.6);
     check (page->zoomedNote().isNotEmpty(), "help text zooms after half a second");
-    page->hoverDesign (400.0f, 200.0f, 2.0f);
+    page->hoverDesign (400.0f, 200.0f, 2.0);
     check (page->zoomedNote().isEmpty(), "a jack row (not help text) does not zoom");
     base.reset();
     finish ("testHelpTextReadable");

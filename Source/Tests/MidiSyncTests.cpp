@@ -49,7 +49,11 @@ int finish (const char* name)
     return failed == 0 ? 0 : 1;
 }
 
-bool near (double a, double b, double tol = 1.0e-6) { return std::fabs (a - b) <= tol; }
+template <typename A, typename B>
+bool near (A a, B b, double tol = 1.0e-6)
+{
+    return std::fabs (static_cast<double> (a) - static_cast<double> (b)) <= tol;
+}
 
 void tick (MidiIn& m) { m.processSample(); }
 
