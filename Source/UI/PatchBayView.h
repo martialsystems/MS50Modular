@@ -3,6 +3,7 @@
 #pragma once
 
 #include "PluginProcessor.h"
+#include "UI/ListControl.h"
 #include "UI/PatchBayLogic.h"
 
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -21,6 +22,13 @@ public:
 
     void paint (juce::Graphics&) override;
     void resized() override;
+    void visibilityChanged() override;
+    void parentHierarchyChanged() override;
+    // Editor performance: the animation timer runs only while the bay is on screen.
+    bool animating() const { return isTimerRunning(); }
+    // The area the last timer frame asked to repaint (tests); empty when nothing moved.
+    juce::Rectangle<int> lastDirtyBounds() const noexcept { return lastDirty_; }
+    void runFrame() { timerCallback(); }
     void mouseMove (const juce::MouseEvent&) override;
     void mouseExit (const juce::MouseEvent&) override;
     void mouseDown (const juce::MouseEvent&) override;
@@ -56,6 +64,11 @@ public:
     bool reorderStack (int jack, const int* bottomToTop, int n);
     void advanceCableFrame();
 
+    // MAIN list controls (DIV RATIO SWITCH steps; PRESET opens its list), the same paths the mouse takes.
+    std::vector<ronin_ui::ListControl> listControls() const;
+    void switchClick (int knob, bool back);      // left-click (Shift = back) on a stepping switch
+    void listRightClick (int control);           // right-click: the full list, current ticked
+
     void menuReorder (int jack, const int* topFirst, int n);
     void menuPickup (int cableIndex, bool endIsA);
     void menuAdd (int jack);
@@ -70,6 +83,10 @@ private:
     };
 
     void timerCallback() override;
+    void updateTimer();
+    void drawStaticLayer (juce::Graphics&);
+    juce::Rectangle<int> designRectToLocal (float x, float y, float w, float h) const;
+    juce::String frameSignature() const;
     void showStatus (const char* text);
     void prepareRopes (bool settleFresh);
     void stepRopes();
@@ -141,6 +158,7 @@ private:
     bool knobDrag_ = false;
     bool knobDragMoved_ = false;
     bool knobSuppressSwitchStep_ = false;
+    bool knobShift_ = false;   // Shift held on a switch click: step back
     int knobDragIndex_ = -1;
     float knobDragStartY_ = 0.0f;
     float knobDragStartValue_ = 0.0f;
@@ -153,6 +171,16 @@ private:
     int hoverJack_ = -1;
     int hoverLabel_ = -1;
     int shownProgram_ = kDefaultFactoryPreset;
+
+    // Static layer (plate fill + panel art) cached at the physical pixel size; redrawn only on resize.
+    juce::Image backdrop_;
+    float backdropScale_ = 0.0f;
+    // What the last frame showed, so the timer repaints only what changed.
+    float prevNodes_[kPatchBayMaxCables][kNodes][2] {};   // rope nodes as last painted
+    float paintedKnob_[kPanelKnobCount] {};
+    float paintedNeedle_ = -9.0f;
+    juce::String paintedSignature_;
+    juce::Rectangle<int> lastDirty_;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PatchBayView)
 };

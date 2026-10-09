@@ -37,6 +37,7 @@ private:
     ronin_ui::VoicePage voice;
     ronin_ui::EnvPage env;
     ronin_ui::PatchPage patch;
+    ronin_ui::MidiPage midi;
     ronin_ui::SetupPage setup;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (RoninAudioProcessorEditor)

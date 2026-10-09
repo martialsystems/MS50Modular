@@ -2,6 +2,8 @@
 // Processor-level tests (JUCE): RONIN_Redesign §6 tests that need the real plugin state and latency reporting.
 
 #include "PluginProcessor.h"
+#include "PluginEditor.h"
+#include "UI/ListControl.h"
 #include "Modular/PatchState.h"
 #include "UI/PatchBayLogic.h"
 
@@ -710,6 +712,384 @@ static void testFactoryBankRenders()
     finish ("testFactoryBankRenders");
 }
 
+
+// ---- MIDI IN and MG host sync -----------------------------------------------------------------
+
+namespace {
+
+juce::MemoryBlock midiPatch (const char* from, const char* to)
+{
+    juce::XmlElement xml ("RONIN");
+    xml.setAttribute ("format", 2);
+    xml.setAttribute ("unit", "RONIN");
+    auto* cable = xml.createNewChildElement ("CABLES")->createNewChildElement ("CABLE");
+    cable->setAttribute ("from", from);
+    cable->setAttribute ("to", to);
+    juce::MemoryBlock block;
+    juce::AudioProcessor::copyXmlToBinary (xml, block);
+    return block;
+}
+
+}
+
+static void testMidiSampleAccurate()
+{
+    RoninAudioProcessor p;
+    check (p.acceptsMidi(), "the plugin accepts MIDI");
+    const auto patch = midiPatch ("MIDI:VEL", "OUTPUT:WET");
+    p.setStateInformation (patch.getData(), static_cast<int> (patch.getSize()));
+    Cable cables[4];
+    check (p.copyPublishedCables (cables, 4) == 1, "MIDI:VEL -> OUTPUT:WET loads by jack id");
+
+    // Each position on a fresh instance (VEL holds after a key, so each case starts at 0 V).
+    for (int at : { 1, 37, 63 })
+    {
+        RoninAudioProcessor q;
+        q.setStateInformation (patch.getData(), static_cast<int> (patch.getSize()));
+        q.effectParameter()->setValueNotifyingHost (1.0f);
+        q.prepareToPlay (48000.0, 64);
+        runBlocks (q, 4, 64);
+        juce::AudioBuffer<float> buffer (2, 64);
+        buffer.clear();
+        juce::MidiBuffer midi;
+        midi.addEvent (juce::MidiMessage::noteOn (1, 60, static_cast<juce::uint8> (100)), at);
+        q.processBlock (buffer, midi);
+        int first = -1;
+        for (int i = 0; i < 64 && first < 0; ++i)
+            if (std::fabs (buffer.getSample (0, i)) > 1.0e-6f)
+                first = i;
+        check (first == at, "a key at sample N first sounds at sample N");
+        check (q.midiModule().lastNote() == 60 && q.midiModule().heldCount() == 1, "the MIDI read-out sees the key");
+    }
+
+    // Gate: MIDI:GATE -> OUTPUT:WET goes high at the note-on sample and low at the note-off sample.
+    {
+        RoninAudioProcessor q;
+        const auto gatePatch = midiPatch ("MIDI:GATE", "OUTPUT:WET");
+        q.setStateInformation (gatePatch.getData(), static_cast<int> (gatePatch.getSize()));
+        q.effectParameter()->setValueNotifyingHost (1.0f);
+        q.prepareToPlay (48000.0, 64);
+        runBlocks (q, 4, 64);
+        juce::AudioBuffer<float> buffer (2, 64);
+        buffer.clear();
+        juce::MidiBuffer midi;
+        midi.addEvent (juce::MidiMessage::noteOn (1, 48, static_cast<juce::uint8> (100)), 10);
+        midi.addEvent (juce::MidiMessage::noteOn (1, 52, static_cast<juce::uint8> (100)), 20);
+        midi.addEvent (juce::MidiMessage::noteOff (1, 48), 30);
+        midi.addEvent (juce::MidiMessage::noteOff (1, 52), 40);
+        q.processBlock (buffer, midi);
+        const float high = buffer.getSample (0, 15);
+        bool shape = std::fabs (buffer.getSample (0, 9)) < 1.0e-6f && std::fabs (high) > 1.0e-3f;
+        for (int i = 10; i < 40; ++i)
+            shape = shape && std::fabs (buffer.getSample (0, i) - high) < 1.0e-6f;
+        shape = shape && std::fabs (buffer.getSample (0, 40)) < 1.0e-6f;
+        check (shape, "gate high from the first key to the last release, legato through the overlap");
+    }
+
+    // The MIDI cable round-trips through a save.
+    const auto saved = saveState (p);
+    auto xml = juce::AudioProcessor::getXmlFromBinary (saved.getData(), static_cast<int> (saved.getSize()));
+    auto* list = xml != nullptr ? xml->getChildByName ("CABLES") : nullptr;
+    check (list != nullptr && list->getNumChildElements() == 1
+               && list->getChildElement (0)->getStringAttribute ("from") == "MIDI:VEL",
+           "a MIDI cable saves under its MIDI: jack id");
+    finish ("testMidiSampleAccurate");
+}
+
+static void testMgSyncStateBackCompat()
+{
+    RoninAudioProcessor fresh;
+    check (fresh.mgSyncParameter() != nullptr && ! fresh.mgSyncParameter()->get(), "MG starts FREE");
+    check (fresh.mgSyncDivisionParameter()->getIndex() == MgModule::kDefaultSyncDivision, "division starts at 1/4");
+
+    // SYNC and the division round-trip in format 2.
+    RoninAudioProcessor saver;
+    saver.mgSyncParameter()->setValueNotifyingHost (1.0f);
+    saver.mgSyncDivisionParameter()->setValueNotifyingHost (saver.mgSyncDivisionParameter()->convertTo0to1 (13.0f));
+    const auto state = saveState (saver);
+    RoninAudioProcessor loader;
+    loader.setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+    check (loader.mgSyncParameter()->get() && loader.mgSyncDivisionParameter()->getIndex() == 13, "SYNC 1/16 round-trips");
+    runBlocks (loader, 1);
+    check (loader.mgModule().syncOn(), "the MG follows the parameter");
+
+    // A format-2 patch saved before MG SYNC existed loads FREE, even over a SYNC session.
+    auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
+    xml->removeAttribute ("mgSync");
+    xml->removeAttribute ("mgSyncDiv");
+    juce::MemoryBlock old;
+    juce::AudioProcessor::copyXmlToBinary (*xml, old);
+    loader.setStateInformation (old.getData(), static_cast<int> (old.getSize()));
+    check (! loader.mgSyncParameter()->get() && loader.mgSyncDivisionParameter()->getIndex() == MgModule::kDefaultSyncDivision,
+           "an older format-2 patch loads FREE");
+    runBlocks (loader, 1);
+    check (! loader.mgModule().syncOn(), "and the MG runs free");
+
+    // Format 1 loads FREE.
+    loader.mgSyncParameter()->setValueNotifyingHost (1.0f);
+    const auto v1 = makeV1State (loader, {}, { { "vcfCutoff", 0.4 } });
+    loader.setStateInformation (v1.getData(), static_cast<int> (v1.getSize()));
+    check (loader.presetError().isEmpty(), "a 16-module format-1 blob still loads");
+    check (! loader.mgSyncParameter()->get(), "a format-1 patch loads FREE");
+
+    // A factory program is FREE.
+    loader.mgSyncParameter()->setValueNotifyingHost (1.0f);
+    loader.setCurrentProgram (kInitPreset);
+    check (! loader.mgSyncParameter()->get(), "a factory program sets FREE");
+
+    // FREE renders the same with or without SYNC's division touched (the division alone changes nothing).
+    RoninAudioProcessor a;
+    RoninAudioProcessor b;
+    b.mgSyncDivisionParameter()->setValueNotifyingHost (b.mgSyncDivisionParameter()->convertTo0to1 (3.0f));
+    a.prepareToPlay (48000.0, 256);
+    b.prepareToPlay (48000.0, 256);
+    bool same = true;
+    juce::AudioBuffer<float> ba (2, 256);
+    juce::AudioBuffer<float> bb (2, 256);
+    juce::MidiBuffer midi;
+    for (int k = 0; k < 40; ++k)
+    {
+        for (int i = 0; i < 256; ++i)
+        {
+            const float x = 0.3f * std::sin (0.01f * static_cast<float> (k * 256 + i));
+            ba.setSample (0, i, x); ba.setSample (1, i, x);
+            bb.setSample (0, i, x); bb.setSample (1, i, x);
+        }
+        a.processBlock (ba, midi);
+        b.processBlock (bb, midi);
+        for (int i = 0; i < 256; ++i)
+            same = same && std::fabs (ba.getSample (0, i) - bb.getSample (0, i)) < 1.0e-12f;
+    }
+    check (same, "FREE ignores the division");
+    finish ("testMgSyncStateBackCompat");
+}
+
+
+namespace {
+
+struct FakeHead final : juce::AudioPlayHead {
+    juce::AudioPlayHead::PositionInfo info;
+    juce::Optional<juce::AudioPlayHead::PositionInfo> getPosition() const override { return info; }
+};
+
+}
+
+static void testMgSyncHostPlayhead()
+{
+    // The processor reads tempo, play state and song position from the host, per block.
+    RoninAudioProcessor p;
+    FakeHead head;
+    p.setPlayHead (&head);
+    p.mgSyncParameter()->setValueNotifyingHost (1.0f);
+    p.prepareToPlay (48000.0, 480);
+    head.info.setBpm (120.0);
+    head.info.setIsPlaying (true);
+    head.info.setPpqPosition (5.25);
+    runBlocks (p, 1, 480);
+    check (std::fabs (p.hostBpm() - 120.0) < 1.0e-9 && p.hostPlaying(), "host tempo and play state are read");
+    check (p.mgModule().phaseLocked(), "SYNC + playing locks the MG");
+    // 480 samples at 120 BPM = 0.02 beats; the last sample is one sample before 5.27.
+    const double last = 5.25 + 479.0 * 120.0 / (60.0 * 48000.0);
+    check (std::fabs (p.mgModule().phase() - (last - std::floor (last))) < 1.0e-9, "MG phase = song position at 1/4");
+
+    // Loop / relocate: the host jumps back; the next block starts on the new position.
+    head.info.setPpqPosition (2.5);
+    runBlocks (p, 1, 1);
+    check (std::fabs (p.mgModule().phase() - 0.5) < 1.0e-9, "a relocate lands the MG on the new position");
+
+    // HQ: the engine runs at 2x; the song position still advances in beats.
+    p.hqParameter()->setValueNotifyingHost (1.0f);
+    p.prepareToPlay (48000.0, 480);
+    head.info.setPpqPosition (1.0);
+    runBlocks (p, 1, 480);
+    const double hqLast = 1.0 + 959.0 * 120.0 / (60.0 * 96000.0);
+    check (std::fabs (p.mgModule().phase() - (hqLast - std::floor (hqLast))) < 1.0e-9, "HQ keeps the lock");
+
+    // Stopped: not locked; no tempo: the read-out shows 0 BPM.
+    head.info.setIsPlaying (false);
+    runBlocks (p, 1, 64);
+    check (! p.mgModule().phaseLocked() && ! p.hostPlaying(), "stopped: free-running");
+    head.info = juce::AudioPlayHead::PositionInfo();
+    runBlocks (p, 1, 64);
+    check (p.hostBpm() <= 0.0 && ! p.mgModule().phaseLocked(), "no host tempo: free-running, 0 BPM shown");
+    p.setPlayHead (nullptr);
+    finish ("testMgSyncHostPlayhead");
+}
+
+
+static void testListControlRightClickRule()
+{
+    // Every list control (MAIN and every tab): right-click opens the whole list with the current item ticked;
+    // a stepping control steps forward on click and back on Shift-click.
+    RoninAudioProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> base (p.createEditor());
+    auto* editor = dynamic_cast<RoninAudioProcessorEditor*> (base.get());
+    check (editor != nullptr, "the editor opens");
+    if (editor == nullptr)
+    {
+        finish ("testListControlRightClickRule");
+        return;
+    }
+    juce::PopupMenu shown;
+    std::function<void (int)> pick;
+    int menus = 0;
+    ronin_ui::listMenuSpy = [&] (const juce::PopupMenu& menu, std::function<void (int)> callback) {
+        shown = menu;
+        pick = std::move (callback);
+        ++menus;
+    };
+    auto menuMatches = [&] (const ronin_ui::ListControl& list) {
+        int items = 0;
+        int ticked = -1;
+        int tickedCount = 0;
+        bool names = true;
+        juce::PopupMenu::MenuItemIterator it (shown);
+        while (it.next())
+        {
+            const auto& item = it.getItem();
+            if (item.isTicked)
+            {
+                ticked = item.itemID - 1;
+                ++tickedCount;
+            }
+            names = names && item.itemID - 1 == items && items < list.items.size() && item.text == list.items[items];
+            ++items;
+        }
+        return items == list.items.size() && tickedCount == 1 && ticked == list.current && names;
+    };
+    int controls = 0;
+    int steppers = 0;
+    for (auto tab : { ronin_ui::Tab::Voice, ronin_ui::Tab::Env, ronin_ui::Tab::Patch, ronin_ui::Tab::Midi, ronin_ui::Tab::Setup })
+    {
+        editor->showTab (tab);
+        auto* page = editor->page (tab);
+        for (const auto& list : page->listControls())
+        {
+            ++controls;
+            const juce::String where = juce::String (ronin_ui::tabName (tab)) + " " + list.name;
+            const int before = menus;
+            page->clickDesign (list.design.getCentreX(), list.design.getCentreY(), true, false);
+            check (menus == before + 1, (where + ": right-click opens the list").toRawUTF8());
+            check (menuMatches (list), (where + ": the menu has every item, the current one ticked").toRawUTF8());
+            if (! list.steps)
+                continue;
+            ++steppers;
+            const int n = list.items.size();
+            auto now = [&] {
+                for (const auto& l : page->listControls())
+                    if (l.name == list.name)
+                        return l.current;
+                return -1;
+            };
+            page->clickDesign (list.design.getCentreX(), list.design.getCentreY(), false, true);
+            check (now() == ronin_ui::stepIndex (list.current, n, true), (where + ": Shift-click steps back").toRawUTF8());
+            page->clickDesign (list.design.getCentreX(), list.design.getCentreY(), false, false);
+            check (now() == list.current, (where + ": click steps forward").toRawUTF8());
+            pick (n);   // the last item, picked from the menu
+            check (now() == n - 1, (where + ": a menu pick selects that item").toRawUTF8());
+            pick (list.current + 1);
+        }
+    }
+    check (steppers >= 1, "the MIDI tab's DIVISION is a stepping list");
+
+    editor->showTab (ronin_ui::Tab::Main);
+    auto& bay = editor->patchBay();
+    const auto lists = bay.listControls();
+    check (lists.size() == 2, "MAIN: DIV RATIO SWITCH and PRESET");
+    for (int i = 0; i < static_cast<int> (lists.size()); ++i)
+    {
+        ++controls;
+        const int before = menus;
+        bay.listRightClick (i);
+        const juce::String where = "MAIN " + lists[static_cast<size_t> (i)].name;
+        check (menus == before + 1 && menuMatches (lists[static_cast<size_t> (i)]),
+               (where + ": right-click lists every item, current ticked").toRawUTF8());
+    }
+    int knob = -1;
+    for (int k = 0; k < kPanelKnobCount; ++k)
+        if (kPanelKnobs[k].kind == 1)
+            knob = k;
+    const int ratio = bay.listControls()[0].current;
+    bay.switchClick (knob, true);
+    check (bay.listControls()[0].current == ronin_ui::stepIndex (ratio, 2, true), "MAIN DIV: Shift-click steps back");
+    bay.switchClick (knob, false);
+    check (bay.listControls()[0].current == ratio, "MAIN DIV: click steps forward");
+    check (controls >= 9, "every list control was checked");
+    ronin_ui::listMenuSpy = nullptr;
+    base.reset();
+    finish ("testListControlRightClickRule");
+}
+
+static void testHelpTextReadable()
+{
+    // Help text is at least 9 pt (12 px) on screen and zooms after half a second of hover.
+    RoninAudioProcessor p;
+    p.setUiScalePercent (75);
+    std::unique_ptr<juce::AudioProcessorEditor> base (p.createEditor());
+    auto* editor = dynamic_cast<RoninAudioProcessorEditor*> (base.get());
+    if (editor == nullptr)
+    {
+        check (false, "the editor opens");
+        finish ("testHelpTextReadable");
+        return;
+    }
+    editor->setSize (1366, RoninAudioProcessorEditor::heightForWidth (1366));
+    auto* page = editor->page (ronin_ui::Tab::Midi);
+    editor->showTab (ronin_ui::Tab::Midi);
+    check (page->noteSize (9.5f) >= 12.0f, "help text is at least 12 px at 1366 wide");
+    page->listControls();   // paints
+    page->hoverDesign (400.0f, 485.0f, 0.2);
+    check (page->zoomedNote().isEmpty(), "no zoom before half a second");
+    page->hoverDesign (400.0f, 485.0f, 0.6);
+    check (page->zoomedNote().isNotEmpty(), "help text zooms after half a second");
+    page->hoverDesign (400.0f, 200.0f, 2.0);
+    check (page->zoomedNote().isEmpty(), "a jack row (not help text) does not zoom");
+    base.reset();
+    finish ("testHelpTextReadable");
+}
+
+
+static void testEditorRepaintOnlyWhatChanged()
+{
+    RoninAudioProcessor p;
+    std::unique_ptr<juce::AudioProcessorEditor> base (p.createEditor());
+    auto* editor = dynamic_cast<RoninAudioProcessorEditor*> (base.get());
+    if (editor == nullptr)
+    {
+        check (false, "the editor opens");
+        finish ("testEditorRepaintOnlyWhatChanged");
+        return;
+    }
+    auto& bay = editor->patchBay();
+    check (bay.animating(), "MAIN animates while shown");
+    editor->showTab (ronin_ui::Tab::Voice);
+    check (! bay.animating(), "the MAIN timer stops on another tab");
+    editor->showTab (ronin_ui::Tab::Main);
+    check (bay.animating(), "and starts again on MAIN");
+
+    const auto first = bay.createComponentSnapshot (bay.getLocalBounds(), true, 1.0f);
+    for (int i = 0; i < 900; ++i)
+        bay.runFrame();
+    bay.runFrame();
+    check (bay.lastDirtyBounds().isEmpty(), "a settled face repaints nothing");
+    const auto second = bay.createComponentSnapshot (bay.getLocalBounds(), true, 1.0f);
+    bool same = first.getWidth() == second.getWidth() && first.getHeight() == second.getHeight();
+    check (same, "snapshots keep their size");
+
+    // A knob moved by the host repaints that knob only.
+    auto* cutoff = dynamic_cast<juce::RangedAudioParameter*> (p.parameterForPanelKnob ("VCF", "CUTOFF"));
+    if (cutoff != nullptr)
+    {
+        cutoff->setValueNotifyingHost (cutoff->getValue() > 0.5f ? 0.2f : 0.8f);
+        bay.runFrame();
+        const auto dirty = bay.lastDirtyBounds();
+        check (! dirty.isEmpty() && dirty.getWidth() < bay.getWidth() / 4 && dirty.getHeight() < bay.getHeight() / 3,
+               "a host knob change repaints a small area");
+    }
+    base.reset();
+    finish ("testEditorRepaintOnlyWhatChanged");
+}
+
 int main()
 {
     juce::ScopedJuceInitialiser_GUI juce;
@@ -724,6 +1104,12 @@ int main()
     testSlashJackIdsStateRoundTrip();
     testFactoryBankStateRoundTrip();
     testFactoryBankRenders();
+    testMidiSampleAccurate();
+    testMgSyncStateBackCompat();
+    testMgSyncHostPlayhead();
+    testListControlRightClickRule();
+    testHelpTextReadable();
+    testEditorRepaintOnlyWhatChanged();
     std::printf ("ProcessorTests: %d passed, %d failed\n", gPassed, gFailed);
     return gFailed == 0 ? 0 : 1;
 }

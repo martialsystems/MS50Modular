@@ -932,8 +932,20 @@ private:
             page.paint (g);   // regions come from paint
             page.mouseDown (down);
         };
+        auto shiftClickPage = [] (ronin_ui::Page& page, float x, float y)
+        {
+            const auto at = page.origin() + juce::Point<float> (x, y) * page.scale();
+            auto source = juce::Desktop::getInstance().getMainMouseSource();
+            const juce::ModifierKeys mods (juce::ModifierKeys::leftButtonModifier | juce::ModifierKeys::shiftModifier);
+            const auto time = juce::Time::getCurrentTime();
+            juce::MouseEvent down (source, at, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, &page, &page, time, at, time, 1, false);
+            juce::Image scratch (juce::Image::ARGB, page.getWidth(), page.getHeight(), true);
+            juce::Graphics g (scratch);
+            page.paint (g);
+            page.mouseDown (down);
+        };
 
-        for (auto tab : { Tab::Voice, Tab::Env, Tab::Patch, Tab::Setup, Tab::Main })
+        for (auto tab : { Tab::Voice, Tab::Env, Tab::Patch, Tab::Midi, Tab::Setup, Tab::Main })
         {
             clickStrip (tab);
             expect (editor.currentTab() == tab, "tab click selects the tab");
@@ -1000,6 +1012,41 @@ private:
             patch->keyPressed (juce::KeyPress (juce::KeyPress::deleteKey));
             expect (publishedCount (*processor) == cablesBefore - 1, "Del unplugs the selected cable");
             expect (bay.visualCount() == visualBefore - 1, "MAIN bay drops the unplugged cable");
+        }
+
+        // MIDI: MG RATE FREE/SYNC, the DIVISION stepper (click forward, Shift-click back), patching a MIDI jack.
+        clickStrip (Tab::Midi);
+        auto* midiPage = dynamic_cast<ronin_ui::MidiPage*> (editor.page (Tab::Midi));
+        expect (midiPage != nullptr && editor.currentTab() == Tab::Midi, "MIDI tab opens");
+        if (midiPage != nullptr)
+        {
+            expect (processor->acceptsMidi(), "the plugin takes MIDI");
+            expect (! processor->mgSyncParameter()->get(), "MG starts FREE");
+            clickPage (*midiPage, 1070.0f + 180.0f, 118.0f);
+            expect (processor->mgSyncParameter()->get(), "MIDI tab selects SYNC");
+            const int division = processor->mgSyncDivisionParameter()->getIndex();
+            clickPage (*midiPage, 1190.0f, 189.0f);
+            expect (processor->mgSyncDivisionParameter()->getIndex() == (division + 1) % MgModule::kSyncDivisionCount,
+                    "DIVISION click steps forward");
+            shiftClickPage (*midiPage, 1190.0f, 189.0f);
+            expect (processor->mgSyncDivisionParameter()->getIndex() == division, "DIVISION Shift-click steps back");
+            clickPage (*midiPage, 1070.0f + 60.0f, 118.0f);
+            expect (! processor->mgSyncParameter()->get(), "MIDI tab selects FREE");
+            const int before = publishedCount (*processor);
+            const int visual = bay.visualCount();
+            expect (midiPage->patchTargets().contains ("EG 1:TRIG"), "panel inputs are patch targets");
+            expect (midiPage->togglePatch (MidiIn::kGate, "EG 1:TRIG"), "MIDI:GATE -> EG 1:TRIG patches");
+            expect (publishedCount (*processor) == before + 1 && bay.visualCount() == visual,
+                    "the MIDI cable is in the graph; the MAIN art is unchanged");
+            expect (midiPage->togglePatch (MidiIn::kGate, "EG 1:TRIG") && publishedCount (*processor) == before,
+                    "the same pick unplugs it");
+        }
+
+        // MAIN DIV RATIO SWITCH: click forward, Shift-click back.
+        {
+            const auto lists = bay.listControls();
+            expect (lists.size() == 2 && lists[0].items.size() == 2 && lists[1].items.size() == processor->getNumPrograms(),
+                    "MAIN list controls: DIV RATIO (2) and PRESET (all programs)");
         }
 
         clickStrip (Tab::Main);

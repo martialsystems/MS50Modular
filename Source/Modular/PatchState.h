@@ -19,6 +19,7 @@
 struct RackIndices {
     int ext = -1, output = -1, noise = -1, vcf = -1, vca1 = -1, vca2 = -1, eg1 = -1, mg = -1, vco = -1, eg2 = -1,
         ring = -1, divider = -1, inverter = -1, integrator = -1, mixer = -1, sampleHold = -1;
+    int midi = -1;   // MIDI IN (no panel jack; jack ids MIDI:NOTE, MIDI:HZ/V LIN, MIDI:GATE, MIDI:VEL)
 };
 
 namespace patchstate {

@@ -85,7 +85,7 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build --config Debug
 ```
 
-The VST3 bundle exists under `build/`. Load it in a host. Stereo audio passes, bit-identical to the input aside from host float handling. MIDI notes do nothing because MIDI input is off.
+The VST3 bundle exists under `build/`. Load it in a host. Stereo audio passes, bit-identical to the input aside from host float handling. MIDI notes do nothing until a MIDI jack is patched on the MIDI tab.
 
 Do not touch: docs, except a one-line "step 1 builds" note if the JUCE tag had to change.
 

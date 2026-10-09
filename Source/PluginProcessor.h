@@ -14,6 +14,7 @@
 #include "Modular/Integrator.h"
 #include "Modular/Inverter.h"
 #include "Modular/Mg.h"
+#include "Modular/MidiIn.h"
 #include "Modular/Mixer.h"
 #include "Modular/Noise.h"
 #include "Modular/OutputModule.h"
@@ -85,6 +86,7 @@ public:
     int integratorGraphIndex() const noexcept { return integratorModuleIndex_; }
     int mixerGraphIndex() const noexcept { return mixerModuleIndex_; }
     int sampleHoldGraphIndex() const noexcept { return sampleHoldModuleIndex_; }
+    int midiGraphIndex() const noexcept { return midiModuleIndex_; }
 
     // Null when that column is still a picture.
     juce::AudioProcessorParameter* parameterForPanelKnob (const char* section, const char* label) const;
@@ -116,6 +118,16 @@ public:
     const Vcf& vcfModule() const noexcept { return vcf; }
     const Eg1& eg1Module() const noexcept { return eg1; }
     const Eg2& eg2Module() const noexcept { return eg2; }
+    const MidiIn& midiModule() const noexcept { return midiIn; }
+    const MgModule& mgModule() const noexcept { return mg; }
+
+    // MIDI tab: MG host sync. FREE by default and for every patch saved before it existed.
+    juce::AudioParameterBool* mgSyncParameter() noexcept { return mgSync_; }
+    juce::AudioParameterChoice* mgSyncDivisionParameter() noexcept { return mgSyncDivision_; }
+    // The host transport the last block saw (UI read-outs). bpm 0 = the host reports no tempo.
+    double hostBpm() const noexcept { return hostBpm_.load (std::memory_order_relaxed); }
+    bool hostPlaying() const noexcept { return hostPlaying_.load (std::memory_order_relaxed); }
+    double hostPpq() const noexcept { return hostPpq_.load (std::memory_order_relaxed); }
     float jackVolts (int module, int port) const noexcept { return graph.portVolts (module, port); }
     // JCS R15: |V| > 5.5 V for more than 10 ms (held 100 ms for the UI).
     bool jackOverRange (int module, int port) const noexcept { return graph.portOverRange (module, port); }
@@ -163,6 +175,7 @@ private:
     Integrator integrator;
     Mixer mixer;
     SampleHold sampleHold;
+    MidiIn midiIn;
     juce::StringArray loadReport_;
     juce::AudioProcessLoadMeasurer loadMeasurer_;
     std::atomic<bool> cableColourByRole_ { true };   // JCS R14 default: BY ROLE
@@ -189,6 +202,7 @@ private:
     int integratorModuleIndex_ = -1;
     int mixerModuleIndex_ = -1;
     int sampleHoldModuleIndex_ = -1;
+    int midiModuleIndex_ = -1;
 
     juce::AudioParameterBool* effectOn_ = nullptr;
     juce::AudioParameterFloat* vcfCutoff_ = nullptr;
@@ -226,6 +240,13 @@ private:
     juce::AudioParameterFloat* dividerRatio_ = nullptr;
     juce::AudioParameterChoice* vcoTriShape_ = nullptr;
     juce::AudioParameterBool* hqMode_ = nullptr;
+    juce::AudioParameterBool* mgSync_ = nullptr;
+    juce::AudioParameterChoice* mgSyncDivision_ = nullptr;
+    std::atomic<double> hostBpm_ { 0.0 };
+    std::atomic<bool> hostPlaying_ { false };
+    std::atomic<double> hostPpq_ { 0.0 };
+    void applyMidi (const juce::MidiMessage& message);
+    void resetSyncToFree();
     std::atomic<bool> hqActive_ { false };
     double hostRate_ = 48000.0;
     jidai::dsp::Downsampler2x decimatorL_;   // shared jidai-common halfband (third_party/jidai-common)
