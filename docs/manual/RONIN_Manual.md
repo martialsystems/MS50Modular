@@ -65,12 +65,14 @@ RONIN runs as a VST3 effect and as a device in the JIDAI RACK, where its jacks p
 | **Hover** over a knob or jack | Shows its real value: Hz, note and cents, seconds, volts or percent. |
 | **Right-click** a knob | Type a value. RONIN reads what it shows: `1.07 kHz`, `621 ms`, `2.5 s`, `+34 c`, `Q 4`, `3 V`, `58 %` or `8'`. A bare number uses the knob's own unit. |
 | **Click** the DIV switch | Toggles between /2 and /4. |
+| **Right-click** a list or selector | Opens the whole list with the current item ticked (the DIV switch, the PRESET screen, the selectors on the tabs). |
+| **Shift-click** a list control | Steps back one item; a plain click steps forward. |
 
 Every knob is a host parameter, so your DAW can automate it. Knobs move without zipper noise.
 
 ### 3.2 Tabs and header
 
-The tab strip at the top switches between **MAIN** (the panel), **VOICE**, **ENV**, **PATCH** and **SETUP**.
+The tab strip at the top switches between **MAIN** (the panel), **VOICE**, **ENV**, **PATCH**, **MIDI** and **SETUP**.
 
 | Control | What it does |
 |---|---|
@@ -238,7 +240,7 @@ With CABLE COLOUR set to BY ROLE, a cable takes the colour of its source jack's 
 
 ### 4.5 Jack reference
 
-All 57 jacks on the panel. "In" is an input and "Out" an output.
+All 57 jacks on the panel, then the four MIDI jacks. "In" is an input and "Out" an output.
 
 | Section | Jack | In/Out | Role | Level and behaviour |
 |---|---|---|---|---|
@@ -299,6 +301,10 @@ All 57 jacks on the panel. "In" is an input and "Out" an output.
 | OUTPUT | L | In | Audio | Dry left |
 | OUTPUT | R | In | Audio | Dry right |
 | OUTPUT | WET | In | Audio | The patch, to both sides |
+| MIDI | NOTE | Out | V/OCT pitch | From MIDI notes, patched on the MIDI tab. 1 V/oct, C3 (MIDI 48) = 0 V. Holds after release. |
+| MIDI | HZ/V LIN | Out | HZ/V pitch | The same note, linear: C3 = 1 V |
+| MIDI | GATE | Out | Gate / clock | 5 V while any key is held |
+| MIDI | VEL | Out | CV | Velocity ÷ 127 × 5 V, holds until the next key |
 
 In the JIDAI RACK, RONIN has four more back-only jacks: HOST IN L/R and HOST OUT L/R (see Back Panel Patching).
 
@@ -306,23 +312,11 @@ In the JIDAI RACK, RONIN has four more back-only jacks: HOST IN L/R and HOST OUT
 
 ## 5. MIDI and host sync
 
-**MIDI.** The RONIN plugin is an audio effect. It does not receive MIDI. To play RONIN from a keyboard or a MIDI clip, use it in the JIDAI RACK: RACK I/O turns MIDI notes into pitch and gate voltages for RONIN's V/OCT (or HZ/V) and EG TRIG inputs. The MIDI Fold Synth starter rack is wired this way (see Back Panel Patching).
+**MIDI.** RONIN takes MIDI notes on any channel and turns them into four jacks with the same mapping as the JIDAI RACK: NOTE (1 V/oct, C3 = MIDI 48 = 0 V), HZ/V LIN, GATE (0/5 V) and VEL (0 to 5 V). Patch them to panel inputs on the MIDI tab, for example NOTE → VCO V/OCT and GATE → EG 1 TRIG. It plays one note at a time: the newest key wins, overlapping keys are legato (the gate stays high), and each note lands on its exact sample. No program patches the MIDI jacks, so programs sound the same with or without MIDI.
 
-**Tempo.** RONIN does not read your DAW's tempo or transport. The self-playing programs take their timing from the MG (or S&H RATE), which runs freely. The factory programs are set for 125 BPM: an MG RATE of 8.33 Hz is 16th notes at 125 BPM.
+**Tempo.** On the MIDI tab, set MG RATE to **SYNC** and pick a DIVISION (4 bars to 1/32, with dotted and triplet values). While your DAW plays, the MG follows the song position, so it stays in place after a jump or a loop. Stopped, it runs on at the division rate; with no host tempo it uses its RATE knob. Older projects and the factory programs load on **FREE** and sound as before. In FREE, the factory programs are set for 125 BPM; to fit another tempo, right-click MG RATE and type BPM ÷ 15 Hz for 16th notes, BPM ÷ 30 Hz for 8ths or BPM ÷ 60 Hz for quarters.
 
-To fit another tempo, right-click MG RATE and type the rate you need:
-
-| Note value | MG RATE |
-|---|---|
-| 16th notes | BPM ÷ 15 Hz (for example 8.33 Hz at 125 BPM, 8.67 Hz at 130 BPM) |
-| 8th notes | BPM ÷ 30 Hz |
-| Quarter notes | BPM ÷ 60 Hz |
-
-The same applies to S&H RATE in programs that clock S&H from its own RATE (06 S&H FILTER).
-
-To lock RONIN to your song exactly, use the JIDAI RACK. Its RACK I/O sends a 16th-note clock (CLK 1/16) from your DAW's transport, which you can patch into RONIN's EG TRIG, DIV IN or S&H CLOCK inputs.
-
-**Automation and programs.** All 36 host parameters can be automated: EFFECT, the 33 panel controls, TRI SHAPE and HQ. The 22 factory programs also appear in your DAW's program list. RONIN's whole state (cables, knobs and page settings) is saved with your DAW project.
+**Automation and programs.** All 38 host parameters can be automated: EFFECT, the 33 panel controls, TRI SHAPE, HQ, MG SYNC and MG SYNC DIVISION. The 22 factory programs also appear in your DAW's program list. RONIN's whole state (cables, knobs and page settings) is saved with your DAW project.
 
 ---
 
@@ -429,11 +423,11 @@ RONIN is built for Mac and Windows. Version 0.1 is a beta.
 | Type | Semi-modular synthesizer and effect, 16 sections |
 | Format | VST3 audio effect for Mac and Windows. Version 0.1 beta. |
 | Channels | Stereo in, stereo out |
-| MIDI | None in the plugin (MIDI to CV is available in the JIDAI RACK) |
+| MIDI | Notes in: NOTE, HZ/V LIN, GATE and VEL jacks, patched on the MIDI tab |
 | Jacks | 57 on the panel: 28 inputs, 29 outputs. 61 in the JIDAI RACK (adds HOST IN L/R, HOST OUT L/R). |
 | Cables | Up to 64. Inputs sum, outputs fan out, plugs stack. |
 | Controls | 32 knobs, the DIV switch, the EFFECT rocker and the HOLD key |
-| Host parameters | 36, all automatable |
+| Host parameters | 38, all automatable |
 | Latency | 0 samples. 23 samples with HQ on, reported to the host. |
 | HQ | VCO and VCF run at 2× the sample rate |
 | Feedback | Each loop is delayed by exactly one sample |
@@ -451,7 +445,7 @@ RONIN is built for Mac and Windows. Version 0.1 is a beta.
 | EXT IN gate | Threshold 0.05 V to 2 V (default 0.2 V). Release 10 ms to 500 ms (default 80 ms). Attack 5 ms. Closes below 70 % of the threshold. |
 | Output | LEVEL: 0 is silent, 70 % is unity, 100 % is +6 dB |
 | Factory programs | 22 in one bank |
-| Pages | MAIN, VOICE, ENV, PATCH, SETUP |
+| Pages | MAIN, VOICE, ENV, PATCH, MIDI, SETUP |
 | UI | 1280 × 480 at 100 %. Scale 75 %, 100 %, 125 %, 150 % or 200 %. |
 | Rack device | 4 U open, 1 U closed, 4 U back plate. 0 samples latency. |
 
@@ -465,8 +459,8 @@ RONIN is built for Mac and Windows. Version 0.1 is a beta.
 | INIT or an effect program is silent | It needs audio at EXT IN. INIT opens only when the input passes THRESHOLD (0.2 V by default; full scale is 5 V). Lower THRESHOLD, or hold HOLD to check the patch. |
 | I only hear my dry track | EFFECT is off, or OUTPUT MIX is at 0. With EFFECT off, only OUTPUT L and R pass. |
 | RONIN is not in my instrument list | RONIN is an effect, not an instrument. Look for it among your DAW's effects. |
-| Notes don't respond to MIDI | The plugin has no MIDI input. Play it through the JIDAI RACK (section 5). |
-| The pattern drifts against my song | RONIN does not follow the host tempo. Set MG RATE for your tempo (section 5), or clock it from the JIDAI RACK. |
+| Notes don't respond to MIDI | Patch the MIDI jacks on the MIDI tab: NOTE to VCO V/OCT and GATE to an EG TRIG (section 5). |
+| The pattern drifts against my song | Set MG RATE to SYNC on the MIDI tab (section 5), or set MG RATE for your tempo. |
 | Louder than my other tracks, or clipping | OUTPUT LEVEL above 70 % boosts by up to 6 dB. Turn it back to 70 % (unity) or lower. The PATCH page lamp shows jacks beyond ±5.5 V. |
 | An envelope never fires | EG TRIG fires when the voltage drops below 1.0 V and rests released at 5 V. Gate outputs are converted for you. Other signals fire it while they are low (section 4.3). |
 | An envelope stays open | EG 1 holds at SUSTAIN while its trigger stays below 1.0 V. Check the S-TRIG HELD lamp on the ENV page. |
