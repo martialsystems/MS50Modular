@@ -121,8 +121,84 @@ void MgModule::prepare (double rate)
     phase_ = 0.0;
 }
 
+namespace {
+
+struct SyncDivision { const char* name; double beats; };
+constexpr SyncDivision kDivisions[MgModule::kSyncDivisionCount] = {
+    { "4 BARS", 16.0 }, { "2 BARS", 8.0 }, { "1 BAR", 4.0 }, { "1/2.", 3.0 }, { "1/2", 2.0 }, { "1/2T", 4.0 / 3.0 },
+    { "1/4.", 1.5 }, { "1/4", 1.0 }, { "1/4T", 2.0 / 3.0 }, { "1/8.", 0.75 }, { "1/8", 0.5 }, { "1/8T", 1.0 / 3.0 },
+    { "1/16.", 0.375 }, { "1/16", 0.25 }, { "1/16T", 1.0 / 6.0 }, { "1/32", 0.125 },
+};
+
+int clampDivision (int index) noexcept
+{
+    return index < 0 ? 0 : (index >= MgModule::kSyncDivisionCount ? MgModule::kSyncDivisionCount - 1 : index);
+}
+
+}
+
+const char* MgModule::syncDivisionName (int index) noexcept
+{
+    return kDivisions[clampDivision (index)].name;
+}
+
+double MgModule::syncDivisionBeats (int index) noexcept
+{
+    return kDivisions[clampDivision (index)].beats;
+}
+
+void MgModule::setSync (bool on, int division) noexcept
+{
+    sync_ = on;
+    division_ = clampDivision (division);
+    if (! on)
+        locked_.store (false, std::memory_order_relaxed);
+}
+
+void MgModule::setHostClock (const HostClock& clock) noexcept
+{
+    clock_ = clock;
+}
+
 void MgModule::processSample()
 {
+    if (sync_)
+    {
+        // SYNC. Playing with a host tempo: the phase is the song position in cycles, so it lines up again after a
+        // relocate or a loop. FREQ MOD does not bend a locked MG. Stopped: the division's rate at the last tempo,
+        // free-running from the current phase. No host tempo: the knob rate (and FREQ MOD), as FREE.
+        const double rate = sampleRate > 1.0 ? sampleRate : 48000.0;
+        const double beats = kDivisions[division_].beats;
+        const bool tempo = clock_.valid && clock_.bpm > 0.0;
+        double dtD;
+        if (tempo && clock_.playing)
+        {
+            const double cycles = clock_.ppq / beats;
+            phase_ = cycles - std::floor (cycles);
+            dtD = clock_.bpm / (60.0 * rate * beats);
+            clock_.ppq += clock_.bpm / (60.0 * rate);
+            locked_.store (true, std::memory_order_relaxed);
+        }
+        else
+        {
+            if (tempo)
+                dtD = clock_.bpm / (60.0 * rate * beats);
+            else
+            {
+                const float base = knobHz();
+                const float hz = clampf (base + (portValue[kFreqMod] / 5.0f) * base, kMinHz, kMaxHz);
+                dtD = static_cast<double> (hz) / rate;
+            }
+            phase_ += dtD;
+            if (phase_ >= 1.0)
+                phase_ -= std::floor (phase_);
+            locked_.store (false, std::memory_order_relaxed);
+        }
+        rateShown_.store (static_cast<float> (dtD * rate), std::memory_order_relaxed);
+        renderOutputs (dtD);
+        return;
+    }
+
     const float base = knobHz();
     const float fm = portValue[kFreqMod];
     // S-16 scale factor: (FreqMod volts / 5) * knobHz.
@@ -133,7 +209,12 @@ void MgModule::processSample()
     phase_ += dtD;
     if (phase_ >= 1.0)
         phase_ -= std::floor (phase_);
+    rateShown_.store (hz, std::memory_order_relaxed);
+    renderOutputs (dtD);
+}
 
+void MgModule::renderOutputs (double dtD)
+{
     const float phase = static_cast<float> (phase_);
     const float dt = static_cast<float> (dtD);
     const float sym = clampf (pw01_ + portValue[kPwm] / 5.0f, 0.0f, 1.0f);

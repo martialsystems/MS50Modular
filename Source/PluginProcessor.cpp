@@ -3,6 +3,7 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "Modular/EffectSwitch.h"
+#include <limits>
 
 namespace {
 
@@ -74,6 +75,19 @@ RoninAudioProcessor::RoninAudioProcessor()
                                             juce::AudioParameterBoolAttributes().withStringFromValueFunction (
                                                 [] (bool on, int) { return on ? juce::String ("HQ ON") : juce::String ("OFF"); }));
     addParameter (hqMode_);
+    // MIDI tab: MG host sync. FREE keeps the MG on its RATE knob exactly as before.
+    mgSync_ = new juce::AudioParameterBool (juce::ParameterID { "mgSync", 1 }, "MG Sync", false,
+                                            juce::AudioParameterBoolAttributes().withStringFromValueFunction (
+                                                [] (bool on, int) { return on ? juce::String ("SYNC") : juce::String ("FREE"); }));
+    addParameter (mgSync_);
+    {
+        juce::StringArray divisions;
+        for (int i = 0; i < MgModule::kSyncDivisionCount; ++i)
+            divisions.add (MgModule::syncDivisionName (i));
+        mgSyncDivision_ = new juce::AudioParameterChoice (juce::ParameterID { "mgSyncDiv", 1 }, "MG Sync Division",
+                                                          divisions, MgModule::kDefaultSyncDivision);
+        addParameter (mgSyncDivision_);
+    }
 
     extModuleIndex_ = graph.addModule (extIn);
     outputModuleIndex_ = graph.addModule (output);
@@ -91,6 +105,8 @@ RoninAudioProcessor::RoninAudioProcessor()
     integratorModuleIndex_ = graph.addModule (integrator);
     mixerModuleIndex_ = graph.addModule (mixer);
     sampleHoldModuleIndex_ = graph.addModule (sampleHold);
+    // MIDI IN joins after the 16 panel modules, so every panel module keeps its graph index (and the format-1 blob).
+    midiModuleIndex_ = graph.addModule (midiIn);
     // A fresh instance is the INIT program: its cables, the default table, and Effect on.
     setCurrentProgram (kDefaultFactoryPreset);
 }
@@ -309,6 +325,8 @@ void RoninAudioProcessor::applyHostControls()
     apply (extInThreshold_, extIn, ExtIn::kKnobThreshold);
     apply (extInRelease_, extIn, ExtIn::kKnobRelease);
     vco.setTriShape (triShape());
+    mg.setSync (mgSync_ != nullptr && mgSync_->get(),
+                mgSyncDivision_ != nullptr ? mgSyncDivision_->getIndex() : MgModule::kDefaultSyncDivision);
     const float mixKnob = outputMix_ != nullptr ? outputMix_->convertTo0to1 (outputMix_->get()) : 1.0f;
     output.setMix (outputMixAfterSwitch (effectIsOn(), mixKnob));
     if (outputLevel_ != nullptr)
@@ -457,9 +475,44 @@ bool RoninAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) co
         && layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo();
 }
 
-void RoninAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
+void RoninAudioProcessor::applyMidi (const juce::MidiMessage& message)
+{
+    if (message.isNoteOn())
+        midiIn.noteOn (message.getNoteNumber(), message.getVelocity());
+    else if (message.isNoteOff())
+        midiIn.noteOff (message.getNoteNumber());
+    else if (message.isAllNotesOff() || message.isAllSoundOff())
+        midiIn.allNotesOff();
+}
+
+void RoninAudioProcessor::resetSyncToFree()
+{
+    if (mgSync_ != nullptr)
+        mgSync_->setValueNotifyingHost (0.0f);
+    if (mgSyncDivision_ != nullptr)
+        mgSyncDivision_->setValueNotifyingHost (mgSyncDivision_->convertTo0to1 (static_cast<float> (MgModule::kDefaultSyncDivision)));
+}
+
+void RoninAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
+
+    // Host transport for MG SYNC: tempo, play state and the song position at this block's first sample.
+    MgModule::HostClock clock;
+    if (auto* hostPlayHead = getPlayHead())
+    {
+        if (const auto position = hostPlayHead->getPosition())
+        {
+            clock.valid = position->getBpm().hasValue() && position->getPpqPosition().hasValue();
+            clock.playing = position->getIsPlaying();
+            clock.bpm = position->getBpm().orFallback (120.0);
+            clock.ppq = position->getPpqPosition().orFallback (0.0);
+        }
+    }
+    mg.setHostClock (clock);
+    hostBpm_.store (clock.valid ? clock.bpm : 0.0, std::memory_order_relaxed);
+    hostPlaying_.store (clock.valid && clock.playing, std::memory_order_relaxed);
+    hostPpq_.store (clock.ppq, std::memory_order_relaxed);
 
     const int numSamples = buffer.getNumSamples();
     const int numInputs = getTotalNumInputChannels();
@@ -469,7 +522,23 @@ void RoninAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
         buffer.clear (channel, 0, numSamples);
 
     if (numInputs < 2 || numOutputs < 2)
+    {
+        for (const auto metadata : midiMessages)
+            applyMidi (metadata.getMessage());
         return;
+    }
+
+    // MIDI events land on their own sample (sample-accurate): each is applied just before that sample renders.
+    auto nextEvent = midiMessages.cbegin();
+    const auto endEvent = midiMessages.cend();
+    auto applyDue = [&] (int sample)
+    {
+        while (nextEvent != endEvent && (*nextEvent).samplePosition <= sample)
+        {
+            applyMidi ((*nextEvent).getMessage());
+            ++nextEvent;
+        }
+    };
 
     float* left = buffer.getWritePointer (0);
     float* right = buffer.getWritePointer (1);
@@ -489,21 +558,25 @@ void RoninAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
     {
         for (int i = 0; i < numSamples; ++i)
         {
+            applyDue (i);
             extIn.setHostSample (left[i], right[i]);
             graph.process();
             left[i] = output.hostLeft();
             right[i] = output.hostRight();
         }
+        applyDue (std::numeric_limits<int>::max());
         return;
     }
 
     for (int i = 0; i < numSamples; ++i)
     {
+        applyDue (i);
         extIn.setHostSample (left[i], right[i]);
         const hq::StereoPair pair = hq::renderPair (graph, output);   // earlier sub-sample first, one per statement
         left[i] = hq::decimate (decimatorL_, pair.earlierLeft, pair.laterLeft);
         right[i] = hq::decimate (decimatorR_, pair.earlierRight, pair.laterRight);
     }
+    applyDue (std::numeric_limits<int>::max());
 }
 
 juce::AudioProcessorEditor* RoninAudioProcessor::createEditor()
@@ -523,7 +596,7 @@ const juce::String RoninAudioProcessor::getName() const
 
 bool RoninAudioProcessor::acceptsMidi() const
 {
-    return false;
+    return true;
 }
 
 bool RoninAudioProcessor::producesMidi() const
@@ -611,6 +684,8 @@ void RoninAudioProcessor::setCurrentProgram (int index)
     // A new patch starts on the true TRIANGLE (M-R2, decided by the user).
     if (vcoTriShape_ != nullptr)
         vcoTriShape_->setValueNotifyingHost (0.0f);
+    // Every factory program runs the MG free on its RATE knob.
+    resetSyncToFree();
     applyHostControls();
     graph.prepare (engineSampleRate());
 }
@@ -643,6 +718,7 @@ RackIndices RoninAudioProcessor::rackIndices() const noexcept
     r.integrator = integratorModuleIndex_;
     r.mixer = mixerModuleIndex_;
     r.sampleHold = sampleHoldModuleIndex_;
+    r.midi = midiModuleIndex_;
     return r;
 }
 
@@ -739,6 +815,11 @@ void RoninAudioProcessor::loadFormat2 (const juce::XmlElement& xml, int format)
     }
     graph.setCables (legal, legalCount);
     readParameters (xml);
+    // A patch saved before MG SYNC existed has no such attributes: it loads FREE (and sounds as it did).
+    if (! xml.hasAttribute ("mgSync") && mgSync_ != nullptr)
+        mgSync_->setValueNotifyingHost (0.0f);
+    if (! xml.hasAttribute ("mgSyncDiv") && mgSyncDivision_ != nullptr)
+        mgSyncDivision_->setValueNotifyingHost (mgSyncDivision_->convertTo0to1 (static_cast<float> (MgModule::kDefaultSyncDivision)));
     setCableColourByRole (xml.getStringAttribute ("uiCableColour", "ROLE") != "MANUAL");
     setEgTimeInMs (xml.getStringAttribute ("uiEgTime", "s") == "ms");
     setUiScalePercent (juce::jlimit (75, 200, xml.getIntAttribute ("uiScale", 100)));
@@ -767,6 +848,8 @@ void RoninAudioProcessor::loadFormat1 (const juce::XmlElement& xml)
             *vca1Initial_ = 0.0f;
     }
     readParameters (xml);
+    // Format 1 predates MG SYNC: FREE.
+    resetSyncToFree();
 
     // M-R1: EG knobs keep their segment durations under the new 1 ms .. 60 s real-time law.
     // Only knobs the session stored are migrated; an absent attribute keeps the current (new-law) value.

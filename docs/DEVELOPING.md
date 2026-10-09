@@ -54,7 +54,7 @@ cmake --build build-strict --target Ronin_VST3 RoninTests RoninProcessorTests Ro
 
 Run it with g++ and with clang (`-DCMAKE_CXX_COMPILER=clang++`; `-Wimplicit-int-float-conversion` is clang-only). JUCE modules and the vendored jidai-common are SYSTEM includes in this mode, so only RONIN code is held to the flags. The engine files the rack compiles are `RONIN_ENGINE_SOURCES` in `CMakeLists.txt` (JUCE-free); the plugin adds `RONIN_PLUGIN_SOURCES`. Exact float compares go through `ronin::exactlyEqual` (`Source/Modular/FloatCompare.h`). Narrowing is written as an explicit `static_cast` that keeps the old arithmetic, so the sound stays bit-identical.
 
-Requirements: CMake 3.22 or newer, a C++20 compiler and git. JUCE 8.0.4 is fetched by CMake, not vendored. Format: VST3. `IS_SYNTH` false. MIDI input off.
+Requirements: CMake 3.22 or newer, a C++20 compiler and git. JUCE 8.0.4 is fetched by CMake, not vendored. Format: VST3. `IS_SYNTH` false. MIDI input on (`NEEDS_MIDI_INPUT`): notes reach the MIDI IN module, applied on their own sample within the block.
 
 FL Studio on macOS does not open the Debug bundle. After a VST3 change, quit FL Studio and Plugin Manager, then run `scripts/install_fl_plugin.sh`, then Find plugins in FL Studio. The script publishes one universal Release bundle through `~/Library/Audio/Plug-Ins/VST3/RONIN.vst3`. The procedure is in `docs/BUILD_GUIDE.md` under FL Studio install (2026-10-05).
 

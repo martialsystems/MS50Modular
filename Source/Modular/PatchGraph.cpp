@@ -638,7 +638,8 @@ bool PatchGraph::setState (const void* data, int size)
         return fail ("preset state is corrupt");
     if (version != kStateVersion)
         return fail ("preset version is not supported");
-    if (modules != moduleCount_ || cables < 0 || cables > kMaxCables)
+    // A blob from before a module was appended (MIDI IN) stores fewer modules: the appended ones keep their state.
+    if (modules < 1 || modules > moduleCount_ || cables < 0 || cables > kMaxCables)
         return fail ("preset state is corrupt");
 
     float knobs[kMaxModules][kMaxPresetKnobs] {};
@@ -698,7 +699,7 @@ bool PatchGraph::setState (const void* data, int size)
             modules_[module]->setKnob (knob, knobs[module][knob]);
     }
 
-    for (int module = 0; module < moduleCount_; ++module)
+    for (int module = 0; module < modules; ++module)
     {
         if (modules_[module]->presetScaleIndex() == scaleIndex[module])
             continue;

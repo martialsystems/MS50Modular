@@ -37,13 +37,15 @@ set(RONIN_ENGINE_SOURCES
   Source/Modular/Integrator.cpp
   Source/Modular/Mixer.cpp
   Source/Modular/SampleHold.cpp
+  Source/Modular/MidiIn.cpp
   Source/UI/PatchBayLogic.cpp)
 
 set(RONIN_PLUGIN_SOURCES
   Source/PluginProcessor.cpp
   Source/PluginEditor.cpp
   Source/UI/TabPages.cpp
-  Source/UI/PatchBayView.cpp)
+  Source/UI/PatchBayView.cpp
+  Source/UI/ListControl.cpp)
 
 # Compiler command-line family. clang-cl reports CXX_COMPILER_ID Clang but takes MSVC-style options.
 if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
@@ -69,7 +71,7 @@ juce_add_plugin(Ronin
   COMPANY_NAME "Martial Systems"
   BUNDLE_ID com.martialsystems.ronin
   IS_SYNTH FALSE
-  NEEDS_MIDI_INPUT FALSE
+  NEEDS_MIDI_INPUT TRUE
   NEEDS_MIDI_OUTPUT FALSE
   IS_MIDI_EFFECT FALSE
   EDITOR_WANTS_KEYBOARD_FOCUS FALSE
@@ -129,7 +131,8 @@ set(RONIN_UNIT_TEST_SOURCES
   Source/Tests/VcoRedesignTests.cpp
   Source/Tests/DspRedesignTests.cpp
   Source/Tests/GraphRedesignTests.cpp
-  Source/Tests/JackIdTests.cpp)
+  Source/Tests/JackIdTests.cpp
+  Source/Tests/MidiSyncTests.cpp)
 
 add_executable(RoninTests ${RONIN_UNIT_TEST_SOURCES} ${RONIN_ENGINE_SOURCES})
 juce_add_gui_app(RoninPanelProbe PRODUCT_NAME "RoninPanelProbe")

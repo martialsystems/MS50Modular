@@ -3,8 +3,11 @@
 #include "UI/TabPages.h"
 
 #include "Modular/EgLaw.h"
+#include "Modular/Mg.h"
+#include "Modular/MidiIn.h"
 #include "Modular/PatchState.h"
 #include "UI/KnobUnits.h"
+#include "UI/PatchBayLogic.h"
 
 #include <cmath>
 
@@ -22,6 +25,9 @@ const juce::Colour kDim (0xff8f8a7c);
 const juce::Colour kLcdBack (0xffb9c39c);
 const juce::Colour kLcdInk (0xff1e2419);
 const juce::Colour kStrip (0xff0c0c0d);
+// 9 pt (12 px) is the smallest help or description text on screen.
+constexpr float kMinNotePx = 12.0f;
+constexpr double kZoomDelaySeconds = 0.5;
 
 juce::String utf8 (const char* s) { return juce::String::fromUTF8 (s); }
 juce::String str (const std::string& s) { return juce::String::fromUTF8 (s.c_str()); }
@@ -42,7 +48,7 @@ juce::String jackName (const RoninAudioProcessor& p, int module, int port)
 
 const char* tabName (Tab tab) noexcept
 {
-    static const char* names[kTabCount] = { "MAIN", "VOICE", "ENV", "PATCH", "SETUP" };
+    static const char* names[kTabCount] = { "MAIN", "VOICE", "ENV", "PATCH", "MIDI", "SETUP" };
     const int i = static_cast<int> (tab);
     return names[i >= 0 && i < kTabCount ? i : 0];
 }
@@ -130,6 +136,18 @@ void Page::visibilityChanged()
 
 void Page::timerCallback()
 {
+    if (zoomNote_.isEmpty() && hover_.x >= 0.0f
+        && juce::Time::getMillisecondCounterHiRes() * 0.001 - hoverSince_ >= kZoomDelaySeconds)
+    {
+        for (const auto& n : notes_)
+        {
+            if (n.design.contains (hover_))
+            {
+                zoomNote_ = n.text;
+                zoomAnchor_ = n.design;
+            }
+        }
+    }
     repaint();
 }
 
@@ -153,14 +171,39 @@ juce::Rectangle<float> Page::toLocal (juce::Rectangle<float> d) const noexcept
     return { o.x + d.getX() * s, o.y + d.getY() * s, d.getWidth() * s, d.getHeight() * s };
 }
 
-void Page::addRegion (juce::Rectangle<float> design, std::function<void (bool)> action)
+void Page::addRegion (juce::Rectangle<float> design, std::function<void (bool, bool)> action)
 {
     regions_.push_back ({ design, std::move (action) });
+}
+
+void Page::ensurePainted()
+{
+    // Regions are rebuilt by paint; make sure they exist before the first paint.
+    if (regions_.empty() && getWidth() > 0)
+    {
+        juce::Image scratch (juce::Image::ARGB, juce::jmax (1, getWidth()), juce::jmax (1, getHeight()), true);
+        juce::Graphics g (scratch);
+        paint (g);
+    }
+}
+
+std::vector<ListControl> Page::listControls()
+{
+    // Paint now so the list reflects the current values (paint rebuilds it).
+    if (getWidth() > 0)
+    {
+        juce::Image scratch (juce::Image::ARGB, juce::jmax (1, getWidth()), juce::jmax (1, getHeight()), true);
+        juce::Graphics g (scratch);
+        paint (g);
+    }
+    return lists_;
 }
 
 void Page::paint (juce::Graphics& g)
 {
     regions_.clear();
+    lists_.clear();
+    notes_.clear();
     g.fillAll (juce::Colour (0xff101012));
     const auto plate = toLocal ({ 0.0f, 0.0f, kW, kH });
     g.setGradientFill (juce::ColourGradient (kPlateTop, plate.getX(), plate.getY(), kPlateBottom, plate.getX(),
@@ -175,23 +218,19 @@ void Page::paint (juce::Graphics& g)
         g.fillEllipse (r);
     }
     paintPage (g);
+    paintZoom (g);
 }
 
-bool Page::clickDesign (float x, float y, bool right)
+bool Page::clickDesign (float x, float y, bool right, bool shift)
 {
-    // Regions are rebuilt by paint; make sure they exist for a click that arrives before the first paint.
-    if (regions_.empty() && getWidth() > 0)
-    {
-        juce::Image scratch (juce::Image::ARGB, juce::jmax (1, getWidth()), juce::jmax (1, getHeight()), true);
-        juce::Graphics g (scratch);
-        paint (g);
-    }
+    ensurePainted();
+    zoomNote_.clear();
     for (auto it = regions_.rbegin(); it != regions_.rend(); ++it)
     {
         if (it->design.contains (x, y))
         {
             auto action = it->action;
-            action (right);
+            action (right, shift);
             repaint();
             return true;
         }
@@ -204,7 +243,92 @@ void Page::mouseDown (const juce::MouseEvent& e)
     grabKeyboardFocus();
     const float s = scale();
     const auto o = origin();
-    clickDesign ((e.position.x - o.x) / s, (e.position.y - o.y) / s, e.mods.isPopupMenu());
+    clickDesign ((e.position.x - o.x) / s, (e.position.y - o.y) / s, e.mods.isPopupMenu(), e.mods.isShiftDown());
+}
+
+void Page::mouseMove (const juce::MouseEvent& e)
+{
+    const float s = scale();
+    const auto o = origin();
+    const juce::Point<float> d ((e.position.x - o.x) / s, (e.position.y - o.y) / s);
+    hover_ = d;
+    hoverSince_ = juce::Time::getMillisecondCounterHiRes() * 0.001;
+    if (zoomNote_.isNotEmpty() && ! zoomAnchor_.contains (d))
+    {
+        zoomNote_.clear();
+        repaint();
+    }
+}
+
+void Page::mouseExit (const juce::MouseEvent&)
+{
+    hover_ = { -1.0f, -1.0f };
+    if (zoomNote_.isNotEmpty())
+    {
+        zoomNote_.clear();
+        repaint();
+    }
+}
+
+void Page::hoverDesign (float x, float y, double heldSeconds)
+{
+    ensurePainted();
+    hover_ = { x, y };
+    zoomNote_.clear();
+    if (heldSeconds >= kZoomDelaySeconds)
+    {
+        for (const auto& n : notes_)
+        {
+            if (n.design.contains (hover_))
+            {
+                zoomNote_ = n.text;
+                zoomAnchor_ = n.design;
+            }
+        }
+    }
+    repaint();
+}
+
+float Page::noteSize (float designSize) const noexcept
+{
+    return juce::jmax (designSize * scale(), kMinNotePx);
+}
+
+void Page::note (juce::Graphics& g, juce::Rectangle<float> d, const juce::String& s, juce::Justification just)
+{
+    g.setColour (kDim);
+    g.setFont (juce::Font (juce::FontOptions (noteSize (9.5f))).boldened());
+    g.drawFittedText (s, toLocal (d).toNearestInt(), just, 2, 0.8f);
+    notes_.push_back ({ d, s });
+}
+
+void Page::paintZoom (juce::Graphics& g)
+{
+    if (zoomNote_.isEmpty())
+        return;
+    // The help line enlarged in a box just below it (above it near the bottom), never past the plate.
+    const float px = noteSize (9.5f) * 1.6f;
+    const juce::Font font = juce::Font (juce::FontOptions (px)).boldened();
+    juce::GlyphArrangement glyphs;
+    glyphs.addLineOfText (font, zoomNote_, 0.0f, 0.0f);
+    const float textW = glyphs.getBoundingBox (0, -1, true).getWidth();
+    const auto anchor = toLocal (zoomAnchor_);
+    const float maxW = static_cast<float> (getWidth()) - 24.0f;
+    const float w = juce::jmin (maxW, textW + 28.0f);
+    const int lines = juce::jmax (1, static_cast<int> (std::ceil ((textW + 28.0f) / maxW)));
+    const float h = px * 1.35f * static_cast<float> (lines) + 16.0f;
+    float x = juce::jlimit (12.0f, static_cast<float> (getWidth()) - 12.0f - w, anchor.getCentreX() - w * 0.5f);
+    float y = anchor.getBottom() + 6.0f;
+    if (y + h > static_cast<float> (getHeight()) - 6.0f)
+        y = anchor.getY() - 6.0f - h;
+    const juce::Rectangle<float> box (x, y, w, h);
+    g.setColour (juce::Colour (0xf0111113));
+    g.fillRoundedRectangle (box, 5.0f);
+    g.setColour (kGold);
+    g.drawRoundedRectangle (box, 5.0f, 1.2f);
+    g.setColour (kLabel);
+    g.setFont (font);
+    g.drawFittedText (zoomNote_, box.reduced (12.0f, 6.0f).toNearestInt(), juce::Justification::centred, lines + 1, 1.0f);
 }
 
 void Page::block (juce::Graphics& g, juce::Rectangle<float> d, const juce::String& title)
@@ -236,8 +360,10 @@ void Page::lcd (juce::Graphics& g, juce::Rectangle<float> d, const juce::String&
 }
 
 void Page::toggle (juce::Graphics& g, juce::Rectangle<float> d, const juce::StringArray& names, int selected,
-                   std::function<void (int)> choose)
+                   std::function<void (int)> choose, const juce::String& name)
 {
+    ListControl list { name, names, selected, false, d, choose };
+    lists_.push_back (list);
     const int n = names.size();
     const float w = d.getWidth() / static_cast<float> (juce::jmax (1, n));
     for (int i = 0; i < n; ++i)
@@ -252,8 +378,40 @@ void Page::toggle (juce::Graphics& g, juce::Rectangle<float> d, const juce::Stri
         g.setColour (on ? juce::Colour (0xff101010) : kLabel);
         g.setFont (juce::Font (juce::FontOptions (10.5f * scale())).boldened());
         g.drawFittedText (names[i], r.toNearestInt(), juce::Justification::centred, 1, 0.6f);
-        addRegion (cell, [choose, i] (bool) { choose (i); });
+        addRegion (cell, [this, choose, list, i] (bool right, bool) {
+            if (right)
+                showListMenu (list, this);
+            else
+                choose (i);
+        });
     }
+}
+
+void Page::stepper (juce::Graphics& g, juce::Rectangle<float> d, const juce::String& name, const juce::StringArray& items,
+                    int current, std::function<void (int)> choose)
+{
+    ListControl list { name, items, current, true, d, choose };
+    lists_.push_back (list);
+    const auto r = toLocal (d);
+    g.setColour (kLcdBack);
+    g.fillRect (r);
+    g.setColour (juce::Colour (0xff0a0a0b));
+    g.drawRect (r, juce::jmax (1.0f, scale()));
+    g.setColour (kLcdInk);
+    g.setFont (juce::Font (juce::FontOptions (14.0f * scale())).boldened());
+    g.drawFittedText (items[current], r.toNearestInt(), juce::Justification::centred, 1, 0.7f);
+    // Step arrows at both ends: left-click anywhere steps forward, Shift-click back.
+    g.setFont (juce::Font (juce::FontOptions (11.0f * scale())));
+    g.drawText (juce::String::fromUTF8 ("\xe2\x97\x82"), r.withWidth (18.0f * scale()), juce::Justification::centred);
+    g.drawText (juce::String::fromUTF8 ("\xe2\x96\xb8"), r.withTrimmedLeft (r.getWidth() - 18.0f * scale()),
+                juce::Justification::centred);
+    const int count = items.size();
+    addRegion (d, [this, list, choose, current, count] (bool right, bool shift) {
+        if (right)
+            showListMenu (list, this);
+        else
+            choose (stepIndex (current, count, shift));
+    });
 }
 
 void Page::lamp (juce::Graphics& g, juce::Point<float> c, bool lit, juce::Colour colour)
@@ -309,14 +467,13 @@ void VoicePage::paintPage (juce::Graphics& g)
     const double hz = static_cast<double> (osc.lastHz());
     lcd (g, { 140, 90, 280, 40 }, str (knobunits::noteName (hz)), 20.0f);
     lcd (g, { 180, 140, 200, 26 }, juce::String (hz, 2) + " Hz", 13.0f);
-    text (g, { 60, 170, 440, 18 }, "TUNER (HZ/V LIN or V/OCT path)", 10.0f, kDim);
+    note (g, { 60, 170, 440, 18 }, "TUNER (HZ/V LIN or V/OCT path)");
 
     text (g, { 60, 220, 440, 18 }, "TRI SHAPE", 11.0f, kLabel);
     auto* shape = processor.triShapeParameter();
     toggle (g, { 160, 244, 240, 26 }, { "TRIANGLE", "PARABOLA (legacy)" }, shape != nullptr ? shape->getIndex() : 0,
-            [shape] (int i) { if (shape != nullptr) shape->setValueNotifyingHost (static_cast<float> (i)); });
-    text (g, { 60, 274, 440, 30 }, utf8 ("new patches: TRIANGLE (anti-aliased)  \xc2\xb7  PARABOLA: legacy, for older saved patches"),
-          9.5f, kDim);
+            [shape] (int i) { if (shape != nullptr) shape->setValueNotifyingHost (static_cast<float> (i)); }, "TRI SHAPE");
+    note (g, { 60, 274, 440, 30 }, utf8 ("new patches: TRIANGLE (anti-aliased)  \xc2\xb7  PARABOLA: legacy, for older saved patches"));
 
     text (g, { 60, 330, 440, 18 }, "FOOTAGE REFERENCE", 11.0f, kLabel);
     const char* feet[4] = { "32'", "16'", "8'", "4'" };
@@ -328,15 +485,15 @@ void VoicePage::paintPage (juce::Graphics& g)
         text (g, { x - 40.0f, 386.0f, 80.0f, 16.0f }, feet[i], 12.0f, kLabel);
         text (g, { x - 40.0f, 402.0f, 80.0f, 14.0f }, cs[i], 10.0f, kDim);
     }
-    text (g, { 60, 440, 440, 30 }, "which C plays at HZ/V LIN 1 V and at V/OCT 0 V", 9.5f, kDim);
+    note (g, { 60, 440, 440, 30 }, "which C plays at HZ/V LIN 1 V and at V/OCT 0 V");
 
     // QUALITY: HQ 2x, latency, CPU.
     text (g, { 580, 90, 440, 18 }, utf8 ("HQ 2\xc3\x97 (VCO + VCF)  \xc2\xb7  default OFF"), 11.0f, kLabel);
     auto* hq = processor.hqParameter();
     toggle (g, { 720, 114, 160, 26 }, { "OFF", "ON" }, hq != nullptr && hq->get() ? 1 : 0,
-            [hq] (int i) { if (hq != nullptr) hq->setValueNotifyingHost (static_cast<float> (i)); });
+            [hq] (int i) { if (hq != nullptr) hq->setValueNotifyingHost (static_cast<float> (i)); }, "HQ");
     lcd (g, { 680, 170, 240, 30 }, "latency " + juce::String (processor.getLatencySamples()) + " smp", 14.0f);
-    text (g, { 580, 206, 440, 30 }, "ON runs the engine at 2x and reports 23 samples of latency to the host", 9.5f, kDim);
+    note (g, { 580, 206, 440, 30 }, "ON runs the engine at 2x and reports 23 samples of latency to the host");
     lcd (g, { 680, 260, 240, 30 }, "CPU " + juce::String (processor.cpuPercent(), 1) + " %", 14.0f);
 
     // VCF: drive pull (fixed) and live effective cutoff.
@@ -344,10 +501,9 @@ void VoicePage::paintPage (juce::Graphics& g)
     text (g, { 1100, 90, 440, 18 }, "DRIVE PULL", 11.0f, kLabel);
     lcd (g, { 1200, 114, 240, 30 }, juce::String (Vcf::kInputPull, 3) + " (fixed)", 14.0f);
     const double newOct = std::log2 (Vcf::effectiveHzFor (1000.0, 2.5, Vcf::kInputPull) / 1000.0);
-    text (g, { 1100, 150, 440, 30 }, "a 2.5 V input pulls the cutoff down " + juce::String (-newOct, 2) + " octave",
-          9.5f, kDim);
+    note (g, { 1100, 150, 440, 30 }, "a 2.5 V input pulls the cutoff down " + juce::String (-newOct, 2) + " octave");
     lcd (g, { 1200, 220, 240, 30 }, "CUTOFF " + str (knobunits::hz (static_cast<double> (filter.effectiveHz()))), 14.0f);
-    text (g, { 1100, 256, 440, 30 }, "knob + CV + drive pull, live; sample-rate independent", 9.5f, kDim);
+    note (g, { 1100, 256, 440, 30 }, "knob + CV + drive pull, live; sample-rate independent");
 }
 
 // ---- ENV -------------------------------------------------------------------------------------
@@ -430,8 +586,8 @@ void EnvPage::paintEg1 (juce::Graphics& g, juce::Rectangle<float> a)
     const auto mark = toLocal ({ box.getX(), box.getBottom() - 10.0f - (box.getHeight() - 20.0f) * juce::jlimit (0.0f, 1.2f, level), box.getWidth(), 1.0f });
     g.setColour (juce::Colour (0x886fe36f));
     g.fillRect (mark);
-    text (g, { a.getX(), a.getBottom() - 46.0f, a.getWidth(), 16.0f },
-          utf8 ("real seconds (knob 1 ms \xe2\x80\xa6 60 s); labels match what you hear"), 9.5f, kDim);
+    note (g, { a.getX(), a.getBottom() - 50.0f, a.getWidth(), 24.0f },
+          utf8 ("real seconds (knob 1 ms \xe2\x80\xa6 60 s); labels match what you hear"));
 }
 
 void EnvPage::paintEg2 (juce::Graphics& g, juce::Rectangle<float> a)
@@ -491,8 +647,8 @@ void EnvPage::paintEg2 (juce::Graphics& g, juce::Rectangle<float> a)
     const auto mark = toLocal ({ box.getX(), box.getBottom() - 10.0f - (box.getHeight() - 20.0f) * juce::jlimit (0.0f, 1.2f, level), box.getWidth(), 1.0f });
     g.setColour (juce::Colour (0x886fe36f));
     g.fillRect (mark);
-    text (g, { a.getX(), a.getBottom() - 46.0f, a.getWidth(), 16.0f },
-          "HOLD then DELAY wait after TRIG (DELAY OUT fires a 5 V pulse at the end of HOLD)", 9.5f, kDim);
+    note (g, { a.getX(), a.getBottom() - 50.0f, a.getWidth(), 24.0f },
+          "HOLD then DELAY wait after TRIG (DELAY OUT fires a 5 V pulse at the end of HOLD)");
 }
 
 // ---- PATCH -----------------------------------------------------------------------------------
@@ -570,18 +726,17 @@ void PatchPage::paintPage (juce::Graphics& g)
         text (g, { 690, r.getY(), 140, 30 }, utf8 (info.glyph) + " " + info.name, 11.0f,
               juce::Colour (jcs::argb (info.rgb)), juce::Justification::centredLeft);
         text (g, { 830, r.getY(), 245, 30 }, flagFor (processor, c), 9.5f, kDim, juce::Justification::centredLeft);
-        addRegion (r, [this, i] (bool right) {
+        addRegion (r, [this, i] (bool right, bool) {
             selected_ = i;
             if (right)
                 showMenu (i);
         });
     }
     if (n == 0)
-        text (g, { 60, 200, 1020, 30 }, "No cables. Patch on the MAIN tab.", 12.0f, kDim);
-    text (g, { 60, 486, 1020, 30 },
+        note (g, { 60, 200, 1020, 30 }, "No cables. Patch on the MAIN tab or, for MIDI, on the MIDI tab.");
+    note (g, { 60, 486, 1020, 30 },
           utf8 ("click a row to monitor it \xc2\xb7 Del unplugs \xc2\xb7 right-click: colour override, convert, unplug "
-                "\xc2\xb7 colour = source role"),
-          9.5f, kDim);
+                "\xc2\xb7 colour = source role"));
 
     // Jack monitor: the selected cable's two jacks (the input shows its summed volts), and the host output.
     auto row = [&] (float y, const juce::String& name, jcs::Role role, const juce::String& value, bool over)
@@ -614,7 +769,7 @@ void PatchPage::paintPage (juce::Graphics& g)
     const juce::String db = std::fabs (outL) > 1.0e-6f ? juce::String (20.0 * static_cast<double> (std::log10 (std::fabs (outL))), 1) + " dBFS"
                                                        : juce::String ("-inf dBFS");
     row (230, "OUTPUT:L (dry in)", jcs::Role::Audio, db, std::fabs (outL) > 1.0f);
-    text (g, { 1160, 486, 380, 30 }, "red lamp: over range, |V| > 5.5 V for over 10 ms", 9.5f, kDim);
+    note (g, { 1160, 486, 380, 30 }, "red lamp: over range, |V| > 5.5 V for over 10 ms");
 }
 
 void PatchPage::showMenu (int index)
@@ -677,6 +832,180 @@ void PatchPage::mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelD
     repaint();
 }
 
+
+// ---- MIDI ------------------------------------------------------------------------------------
+
+juce::StringArray MidiPage::patchTargets()
+{
+    juce::StringArray targets;
+    for (int jack = 0; jack < kPanelJackCount; ++jack)
+        if (kPanelJacks[jack].dir == 0)
+            targets.add (juce::String (kPanelJacks[jack].section) + ":" + kPanelJacks[jack].label);
+    return targets;
+}
+
+bool MidiPage::togglePatch (int midiPort, const juce::String& target)
+{
+    const RackIndices rack = processor.rackIndices();
+    int module = -1;
+    int port = -1;
+    if (rack.midi < 0 || ! patchstate::jackAddress (rack, target.toStdString(), module, port))
+        return false;
+    Cable cables[PatchGraph::kMaxCables];
+    const int n = processor.copyPublishedCables (cables, PatchGraph::kMaxCables);
+    for (int i = 0; i < n; ++i)
+    {
+        const Cable& c = cables[i];
+        if (c.sourceModule == rack.midi && c.sourcePort == midiPort && c.destModule == module && c.destPort == port)
+        {
+            processor.disconnectJacks (c.sourceModule, c.sourcePort, c.destModule, c.destPort);
+            if (onCablesChanged)
+                onCablesChanged();
+            return true;
+        }
+    }
+    const bool ok = processor.connectJacks (rack.midi, midiPort, module, port) == PatchGraph::ConnectResult::Ok;
+    if (ok && onCablesChanged)
+        onCablesChanged();
+    return ok;
+}
+
+void MidiPage::showPatchMenu (int midiPort)
+{
+    const RackIndices rack = processor.rackIndices();
+    Cable cables[PatchGraph::kMaxCables];
+    const int n = processor.copyPublishedCables (cables, PatchGraph::kMaxCables);
+    const auto targets = patchTargets();
+    juce::PopupMenu menu;
+    juce::String section;
+    juce::PopupMenu sub;
+    auto flush = [&] {
+        if (section.isNotEmpty())
+            menu.addSubMenu (section, sub);
+        sub = juce::PopupMenu();
+    };
+    for (int t = 0; t < targets.size(); ++t)
+    {
+        const juce::String s = targets[t].upToFirstOccurrenceOf (":", false, false);
+        if (s != section)
+        {
+            flush();
+            section = s;
+        }
+        int module = -1;
+        int port = -1;
+        bool patched = false;
+        if (patchstate::jackAddress (rack, targets[t].toStdString(), module, port))
+            for (int i = 0; i < n; ++i)
+                patched = patched || (cables[i].sourceModule == rack.midi && cables[i].sourcePort == midiPort
+                                      && cables[i].destModule == module && cables[i].destPort == port);
+        sub.addItem (t + 1, targets[t].fromFirstOccurrenceOf (":", false, false), true, patched);
+    }
+    flush();
+    juce::Component::SafePointer<MidiPage> safe (this);
+    menu.showMenuAsync (juce::PopupMenu::Options().withMousePosition(), [safe, midiPort, targets] (int result) {
+        if (safe == nullptr || result < 1 || result > targets.size())
+            return;
+        safe->togglePatch (midiPort, targets[result - 1]);
+        safe->repaint();
+    });
+}
+
+void MidiPage::paintPage (juce::Graphics& g)
+{
+    const juce::Rectangle<float> in (40, 40, 740, 484), sync (820, 40, 740, 484);
+    block (g, in, "MIDI IN");
+    block (g, sync, "HOST SYNC");
+
+    // MIDI IN: the live key, then the four jacks with their cables.
+    const auto& midi = processor.midiModule();
+    const int rackMidi = processor.midiGraphIndex();
+    const int last = midi.lastNote();
+    char name[16] = {};
+    if (last >= 0)
+        jidai::jcs::pitch::noteName (last, name, static_cast<int> (sizeof name));
+    lamp (g, { 100, 98 }, midi.heldCount() > 0, juce::Colour (jcs::roleArgb (jcs::Role::GateClk)));
+    text (g, { 114, 88, 80, 20 }, "GATE", 10.5f, kLabel, juce::Justification::centredLeft);
+    text (g, { 200, 76, 160, 16 }, "NOTE", 10.5f, kLabel);
+    lcd (g, { 200, 94, 160, 30 }, last >= 0 ? juce::String (name) + "  (" + juce::String (last) + ")" : juce::String ("--"), 15.0f);
+    text (g, { 380, 76, 160, 16 }, "VELOCITY", 10.5f, kLabel);
+    lcd (g, { 380, 94, 160, 30 }, juce::String (processor.jackVolts (rackMidi, MidiIn::kVel), 2) + " V", 15.0f);
+    text (g, { 560, 76, 160, 16 }, "KEYS HELD", 10.5f, kLabel);
+    lcd (g, { 560, 94, 160, 30 }, juce::String (midi.heldCount()), 15.0f);
+
+    Cable cables[PatchGraph::kMaxCables];
+    const int n = processor.copyPublishedCables (cables, PatchGraph::kMaxCables);
+    text (g, { 70, 150, 200, 16 }, "JACK", 9.5f, kDim, juce::Justification::centredLeft);
+    text (g, { 300, 150, 120, 16 }, "VALUE", 9.5f, kDim, juce::Justification::centredLeft);
+    text (g, { 440, 150, 200, 16 }, "PATCHED TO", 9.5f, kDim, juce::Justification::centredLeft);
+    for (int port = 0; port < midijacks::kCount; ++port)
+    {
+        const float y = 186.0f + static_cast<float> (port) * 56.0f;
+        const PortDesc desc = midi.port (port);
+        const auto ring = toLocal ({ 70, y - 9.0f, 18, 18 });
+        g.setColour (juce::Colour (jcs::roleArgb (portRole (desc))));
+        g.drawEllipse (ring, 2.5f * scale());
+        text (g, { 96, y - 12.0f, 200, 24 }, juce::String ("MIDI:") + midijacks::label (port), 11.0f, kLabel,
+              juce::Justification::centredLeft);
+        lcd (g, { 300, y - 13.0f, 120, 26 }, juce::String (processor.jackVolts (rackMidi, port), 2) + " V", 12.0f);
+        juce::StringArray dests;
+        for (int i = 0; i < n; ++i)
+            if (cables[i].sourceModule == rackMidi && cables[i].sourcePort == port)
+                dests.add (jackName (processor, cables[i].destModule, cables[i].destPort));
+        const juce::Rectangle<float> button (440, y - 14.0f, 310, 28);
+        const auto r = toLocal (button);
+        g.setColour (juce::Colour (0xff050506));
+        g.fillRect (r);
+        g.setColour (juce::Colour (0xff3c3c3f));
+        g.drawRect (r, 1.0f);
+        text (g, button.reduced (10.0f, 0.0f), dests.isEmpty() ? utf8 ("not patched  \xe2\x96\xbe") : dests.joinIntoString (", ") + utf8 ("  \xe2\x96\xbe"),
+              10.5f, dests.isEmpty() ? kDim : kLabel, juce::Justification::centredLeft);
+        addRegion (button, [this, port] (bool, bool) { showPatchMenu (port); });
+    }
+    note (g, { 60, 420, 700, 44 },
+          utf8 ("NOTE: 1 V/oct, C3 (MIDI 48) = 0 V \xc2\xb7 HZ/V LIN: C3 = 1 V \xc2\xb7 GATE 0/5 V \xc2\xb7 VEL 0..5 V "
+                "\xc2\xb7 newest key wins, legato \xc2\xb7 pitch and velocity hold after release"));
+    note (g, { 60, 470, 700, 30 }, "click PATCHED TO to add or remove a cable to a panel input; MIDI cables are listed on PATCH");
+
+    // HOST SYNC: MG rate source, division, the host's transport and the MG's live rate.
+    auto* syncOn = processor.mgSyncParameter();
+    auto* division = processor.mgSyncDivisionParameter();
+    const auto& mg = processor.mgModule();
+    text (g, { 840, 80, 700, 18 }, "MG RATE", 11.0f, kLabel);
+    toggle (g, { 1070, 104, 240, 28 }, { "FREE", "SYNC" }, syncOn != nullptr && syncOn->get() ? 1 : 0,
+            [syncOn] (int i) { if (syncOn != nullptr) syncOn->setValueNotifyingHost (static_cast<float> (i)); }, "MG RATE");
+    text (g, { 840, 150, 700, 18 }, "DIVISION (one MG cycle)", 11.0f, kLabel);
+    juce::StringArray divisions;
+    for (int i = 0; i < MgModule::kSyncDivisionCount; ++i)
+        divisions.add (MgModule::syncDivisionName (i));
+    stepper (g, { 1100, 174, 180, 30 }, "MG DIVISION", divisions, division != nullptr ? division->getIndex() : MgModule::kDefaultSyncDivision,
+             [division] (int i) {
+                 if (division != nullptr)
+                     division->setValueNotifyingHost (division->convertTo0to1 (static_cast<float> (i)));
+             });
+
+    const double bpm = processor.hostBpm();
+    const bool playing = processor.hostPlaying();
+    const double ppq = processor.hostPpq();
+    text (g, { 860, 240, 160, 16 }, "HOST TEMPO", 10.5f, kLabel);
+    lcd (g, { 860, 258, 160, 30 }, bpm > 0.0 ? juce::String (bpm, 1) + " BPM" : juce::String ("no tempo"), 14.0f);
+    text (g, { 1040, 240, 160, 16 }, "TRANSPORT", 10.5f, kLabel);
+    lcd (g, { 1040, 258, 160, 30 }, bpm <= 0.0 ? juce::String ("--") : (playing ? "PLAY" : "STOP"), 14.0f);
+    text (g, { 1220, 240, 160, 16 }, "POSITION", 10.5f, kLabel);
+    const int bar = static_cast<int> (std::floor (ppq / 4.0)) + 1;
+    const double beat = ppq - std::floor (ppq / 4.0) * 4.0 + 1.0;
+    lcd (g, { 1220, 258, 160, 30 }, bpm > 0.0 ? juce::String (bar) + " . " + juce::String (beat, 2) : juce::String ("--"), 14.0f);
+    text (g, { 860, 318, 160, 16 }, "MG RATE NOW", 10.5f, kLabel);
+    lcd (g, { 860, 336, 160, 30 }, str (knobunits::hz (static_cast<double> (mg.rateHz()))), 14.0f);
+    lamp (g, { 1060, 351 }, mg.phaseLocked(), juce::Colour (0xff6fe36f));
+    text (g, { 1074, 341, 300, 20 }, "LOCKED TO SONG POSITION", 10.5f, kLabel, juce::Justification::centredLeft);
+    note (g, { 840, 400, 700, 44 },
+          utf8 ("SYNC while the host plays: the MG follows the song position, so it lines up after a jump or a loop "
+                "\xc2\xb7 stopped: runs on at the division rate \xc2\xb7 no host tempo: the RATE knob"));
+    note (g, { 840, 470, 700, 30 },
+          utf8 ("FREQ MOD does not bend a locked MG \xc2\xb7 click steps, Shift-click steps back, right-click lists all"));
+}
+
 // ---- SETUP -----------------------------------------------------------------------------------
 
 void SetupPage::paintPage (juce::Graphics& g)
@@ -699,7 +1028,7 @@ void SetupPage::paintPage (juce::Graphics& g)
         processor.setUiScalePercent (scales[i]);
         if (onScale)
             onScale (scales[i]);
-    });
+    }, "UI SCALE");
     if (auto* top = getParentComponent())
         lcd (g, { 260, 146, 300, 26 },
              juce::String (top->getWidth()) + utf8 (" \xc3\x97 ") + juce::String (top->getHeight()) + " (art + tabs)", 12.0f);
@@ -709,13 +1038,13 @@ void SetupPage::paintPage (juce::Graphics& g)
         processor.setCableColourByRole (i == 0);
         if (onCableColourMode)
             onCableColourMode();
-    });
-    text (g, { 60, 240, 700, 30 },
+    }, "CABLE COLOUR");
+    note (g, { 60, 240, 700, 30 },
           "BY ROLE: S-TRIG / AUDIO / V/OCT / GATE-CLK / HZ/V LIN / CV colours. MANUAL: the palette swatches.",
-          9.5f, kDim, juce::Justification::centredLeft);
+          juce::Justification::centredLeft);
     text (g, { 60, 290, 300, 26 }, "EG TIME DISPLAY", 11.0f, kLabel, juce::Justification::centredLeft);
     toggle (g, { 420, 290, 260, 26 }, { "s", "ms" }, processor.egTimeInMs() ? 1 : 0,
-            [this] (int i) { processor.setEgTimeInMs (i == 1); });
+            [this] (int i) { processor.setEgTimeInMs (i == 1); }, "EG TIME DISPLAY");
 
     // Migration report (M-R1 .. M-R5) of the last loaded patch.
     const auto& lines = processor.loadReport();
@@ -724,9 +1053,13 @@ void SetupPage::paintPage (juce::Graphics& g)
         shown.add (processor.loadedFormat() >= 2 ? "Format 2 patch: nothing to migrate."
                                                  : "New patch: nothing migrated.");
     for (int i = 0; i < shown.size() && i < 8; ++i)
-        lcd (g, { 850, 80.0f + static_cast<float> (i) * 52.0f, 680, 42 }, shown[i], 10.5f);
-    text (g, { 840, 500, 700, 18 }, "patch format " + juce::String (patchstate::kFormat) + ": knobs by id, cables by jack id",
-          9.5f, kDim);
+    {
+        // The load report is help text: at least 9 pt, and it zooms on hover.
+        const juce::Rectangle<float> line (850, 80.0f + static_cast<float> (i) * 52.0f, 680, 42);
+        lcd (g, line, shown[i], noteSize (10.5f) / scale());
+        notes_.push_back ({ line, shown[i] });
+    }
+    note (g, { 840, 496, 700, 24 }, "patch format " + juce::String (patchstate::kFormat) + ": knobs by id, cables by jack id");
 }
 
 }

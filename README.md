@@ -41,6 +41,7 @@ The front panel keeps its open, symmetric layout. Everything else lives on tabs 
 - **VOICE:** a tuner, the triangle or parabola choice, a footage reference, the filter's live effective cutoff, and the HQ quality switch with latency and CPU readouts.
 - **ENV:** both envelopes with live stage lamps, real-time readouts and a curve view.
 - **PATCH:** a list of every cable and a live jack monitor with an over-range lamp.
+- **MIDI:** MIDI notes as NOTE, HZ/V LIN, GATE and VEL jacks you patch to the panel, and MG sync to your DAW's tempo and song position.
 - **SETUP:** UI scale (75 to 200 %), cable colour mode, EG time display, and a report on what changed when an older patch loaded.
 
 ### Quality and automation

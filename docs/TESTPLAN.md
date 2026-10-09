@@ -15,7 +15,7 @@ After step 1:
 *   VST3 builds from the CMake command in the build guide.
 *   A host scans it as an effect, not an instrument.
 *   Stereo track, stereo out. A mono track is not a supported layout (`isBusesLayoutSupported` returns false).
-*   Playing MIDI notes does not change audio. MIDI input is off.
+*   MIDI input is on. With no MIDI jack patched (every factory program), playing notes does not change audio. With MIDI:NOTE and MIDI:GATE patched, notes play the patch on their own sample.
 *   Bypass in the host returns dry stereo, subject to the host's own bypass. This is a host feature, not an Output-module test.
 
 ## Dry Ext In to Output
