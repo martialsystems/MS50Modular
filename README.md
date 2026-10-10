@@ -12,7 +12,9 @@ RONIN puts a whole analog-style rack inside one plugin. Run your track through i
 
 - [Jidai Collection](https://github.com/martialsystems/jidai-collection)
 
-> **Found a bug?** Please [open a GitHub issue](https://github.com/martialsystems/Ronin/issues/new/choose) and fill in the bug report form.
+**Found a bug?** Please [open a GitHub issue](https://github.com/martialsystems/Ronin/issues/new/choose) and fill in the bug report form.
+
+**Download the Manual** [Here.](https://github.com/martialsystems/Ronin/blob/main/docs/manual/RONIN_Manual.pdf)
 
 ## Features
 
