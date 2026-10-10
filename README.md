@@ -1,6 +1,6 @@
 # RONIN
 
-**A semi-modular synthesizer you patch as an effect. Part of the Jidai Collection by Martial Systems.**
+**A semi-modular, patchabe effects engine that doubles as a self-modulating synthesizer. Part of the Jidai Collection by Martial Systems.**
 
 RONIN puts a whole analog-style rack inside one plugin. Run your track through it, or let it make its own sound: a VCO, a resonant diode-bridge filter, two VCAs, two envelopes, an LFO, noise, a ring modulator, sample and hold and more, all wired with patch cables you drag across the panel. Patch the filter into its own cutoff, ring-modulate a signal with itself, or gate the whole rack from your input, then blend it back in with one MIX knob.
 
