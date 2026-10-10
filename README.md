@@ -1,4 +1,8 @@
-Download: [Mac](https://github.com/martialsystems/Ronin/releases/latest/download/RONIN-macOS.zip), [Windows](https://github.com/martialsystems/Ronin/releases/latest/download/RONIN-Windows.zip).
+Download the collection: [JIDAI RACK for Mac](https://github.com/martialsystems/jidai-collection/releases/latest/download/JIDAI-RACK-macOS.zip), [Windows](https://github.com/martialsystems/jidai-collection/releases/latest/download/JIDAI-RACK-Windows.zip).
+
+RONIN on its own: [Mac](https://github.com/martialsystems/Ronin/releases/latest/download/RONIN-macOS.zip), [Windows](https://github.com/martialsystems/Ronin/releases/latest/download/RONIN-Windows.zip).
+
+Use JIDAI RACK. RONIN is already in it, so BUSHIDO can play it and its jacks patch to ORIGAMI and SHOGUN. The RONIN download is one voice on a track: run audio through it, or let it play, and blend it with MIX.
 
 > **Found a bug?** Please [open a GitHub issue](https://github.com/martialsystems/Ronin/issues/new/choose) and fill in the bug report form.
 
