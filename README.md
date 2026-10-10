@@ -1,16 +1,18 @@
-Download the collection: [JIDAI RACK for Mac](https://github.com/martialsystems/jidai-collection/releases/latest/download/JIDAI-RACK-macOS.zip), [Windows](https://github.com/martialsystems/jidai-collection/releases/latest/download/JIDAI-RACK-Windows.zip).
-
-RONIN on its own: [Mac](https://github.com/martialsystems/Ronin/releases/latest/download/RONIN-macOS.zip), [Windows](https://github.com/martialsystems/Ronin/releases/latest/download/RONIN-Windows.zip).
-
-Use JIDAI RACK. RONIN is already in it, so BUSHIDO can play it and its jacks patch to ORIGAMI and SHOGUN. The RONIN download is one voice on a track: run audio through it, or let it play, and blend it with MIX.
-
-> **Found a bug?** Please [open a GitHub issue](https://github.com/martialsystems/Ronin/issues/new/choose) and fill in the bug report form.
-
 # RONIN
 
 **A semi-modular synthesizer you patch as an effect. Part of the Jidai Collection by Martial Systems.**
 
 RONIN puts a whole analog-style rack inside one plugin. Run your track through it, or let it make its own sound: a VCO, a resonant diode-bridge filter, two VCAs, two envelopes, an LFO, noise, a ring modulator, sample and hold and more, all wired with patch cables you drag across the panel. Patch the filter into its own cutoff, ring-modulate a signal with itself, or gate the whole rack from your input, then blend it back in with one MIX knob.
+
+## Download:
+
+- [Mac](https://github.com/martialsystems/Ronin/releases/latest/download/RONIN-macOS.zip)
+
+- [Windows](https://github.com/martialsystems/Ronin/releases/latest/download/RONIN-Windows.zip)
+
+- [Jidai Collection](https://github.com/martialsystems/jidai-collection)
+
+> **Found a bug?** Please [open a GitHub issue](https://github.com/martialsystems/Ronin/issues/new/choose) and fill in the bug report form.
 
 ## Features
 
